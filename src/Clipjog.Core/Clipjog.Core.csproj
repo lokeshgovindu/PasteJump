@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Deliberately platform-neutral (net10.0, not net10.0-windows).
+    Core holds the paste-mode state machine, the clip store and the formatters.
+    It must be unit-testable with no Win32 dependency and no message loop -
+    that is the whole reason for leaving AutoHotkey. Win32 access is expressed
+    as interfaces here and implemented in Clipjog.Interop.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+  </ItemGroup>
+
+</Project>

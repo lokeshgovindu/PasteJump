@@ -1,0 +1,60 @@
+<!--
+    Light palette. The default theme.
+
+    Every key defined here must also be defined in Dark.xaml under the same name. ThemeManager swaps
+    one dictionary for the other wholesale, so a key present in only one theme resolves to nothing
+    after a switch, and whatever referenced it renders transparent.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Surfaces -->
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFF7F7F9" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#FFD9D9E0" />
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextBrush" Color="#FF1B1B20" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#FF6B6B77" />
+
+    <!-- Semantic -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="WarnBrush" Color="#FFB45309" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#FFC2321F" />
+
+    <!-- Control chrome. Previously unthemed, which is why the dark UI looked broken: text boxes,
+         combo boxes and grid headers kept WPF's default light styling against a dark window. -->
+    <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="#FFC3C3CD" />
+    <SolidColorBrush x:Key="ControlHoverBrush" Color="#FFECECF1" />
+    <SolidColorBrush x:Key="ControlPressedBrush" Color="#FFDFDFE7" />
+    <SolidColorBrush x:Key="ControlDisabledTextBrush" Color="#FFA3A3AE" />
+    <!--
+        Selection follows the Windows ListView convention: a soft vertical gradient with a defined
+        outline, rather than a flat fill.
+
+        The outline is doing most of the work. A flat pale fill reads as "slightly different row" and
+        gets lost against an alternating background; a bordered shape reads as one selected object, and
+        stays legible with dark text on top - which matters because text colour is far more constrained
+        than background colour.
+    -->
+    <LinearGradientBrush x:Key="SelectionBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FFDCEBFB" />
+        <GradientStop Offset="1" Color="#FFBAD8F7" />
+    </LinearGradientBrush>
+
+    <SolidColorBrush x:Key="SelectionBorderBrush" Color="#FF7DA8D4" />
+    <SolidColorBrush x:Key="SelectionTextBrush" Color="#FF0B1C38" />
+    <SolidColorBrush x:Key="HoverBorderBrush" Color="#FFDCE8F5" />
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#FFBFBFCA" />
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#FF9C9CA8" />
+
+    <!-- Deliberately darker than BorderBrush. The splitter is drawn as a 1px line inside a wider
+         transparent grab area, so it needs more contrast than a panel edge to register at all. -->
+    <SolidColorBrush x:Key="SplitterLineBrush" Color="#FF9A9AA6" />
+
+    <!-- Overlay drop shadow. A Color, not a Brush: DropShadowEffect.Color takes a Color, and it has
+         to be its own resource to be swappable with the theme. -->
+    <Color x:Key="ShadowColor">#FF3A3A48</Color>
+
+</ResourceDictionary>

@@ -1,0 +1,56 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <DebugType>embedded</DebugType>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Product identity">
+    <Product>Clipjog</Product>
+    <Company>Clipjog</Company>
+    <Authors>Lokesh Govindu</Authors>
+    <Copyright>Copyright (c) 2026 Lokesh Govindu</Copyright>
+  </PropertyGroup>
+
+  <!--
+    Versioning: major.minor.build.revision, year-based major. Set here so every project and the
+    published exe carry the same number.
+
+    Three properties, because MSBuild treats them differently and getting it wrong produces a build
+    that reports the wrong version:
+
+      AssemblyVersion   - the strong identity. Four parts, and the ONLY one Win32 shows in the file
+                          properties dialog. Must stay parseable as four integers.
+      FileVersion       - the Win32 FILEVERSION resource. Kept identical to AssemblyVersion.
+      InformationalVersion - free-form, and what the app displays. Left equal to the numeric version
+                          here; note the SDK appends "+<commit sha>" to it unless
+                          IncludeSourceRevisionInInformationalVersion is disabled, which is exactly
+                          the sort of thing that ends up in a tray tooltip by accident.
+
+    Version itself is deliberately NOT set: it defaults from these and setting it as well is how the
+    three drift apart.
+  -->
+  <PropertyGroup Label="Versioning">
+    <ClipjogVersion>2026.1.0.0</ClipjogVersion>
+    <AssemblyVersion>$(ClipjogVersion)</AssemblyVersion>
+    <FileVersion>$(ClipjogVersion)</FileVersion>
+    <InformationalVersion>$(ClipjogVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <!--
+    ICU note: on Windows 10 1903+ .NET uses the OS-provided icu.dll, so a
+    self-contained build does not ship icudt.dat. Leaving InvariantGlobalization
+    false therefore costs no size, and we need culture-aware case-insensitive
+    comparison for search over arbitrary clipboard text.
+  -->
+  <PropertyGroup>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

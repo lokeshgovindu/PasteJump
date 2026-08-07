@@ -1,0 +1,165 @@
+﻿<Window x:Class="Clipjog.App.Views.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Clipjog Overlay"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Focusable="False"
+        Topmost="True"
+        SizeToContent="WidthAndHeight"
+        UseLayoutRounding="True">
+
+    <!--
+        ShowActivated=False and Focusable=False are necessary but not sufficient - WS_EX_NOACTIVATE
+        is applied in code-behind as well. Without it a click or certain focus events can still
+        bring this window forward, and the moment that happens the paste lands in the overlay
+        instead of the user's document.
+    -->
+
+    <Border Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            Padding="0"
+            MaxWidth="560">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="12"
+                              ShadowDepth="2"
+                              Opacity="0.45"
+                              Color="{DynamicResource ShadowColor}" />
+        </Border.Effect>
+
+        <StackPanel>
+
+            <!-- Header: position, mode, formatter, flags -->
+            <Border Background="{DynamicResource SurfaceRaisedBrush}"
+                    CornerRadius="5,5,0,0"
+                    Padding="10,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="PositionText"
+                               Grid.Column="0"
+                               Foreground="{DynamicResource TextBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Text="Clip 1 of 1" />
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Center">
+                        <TextBlock x:Name="PinnedChip"
+                                   Style="{StaticResource ChipText}"
+                                   Foreground="{DynamicResource WarnBrush}"
+                                   Margin="0,0,8,0"
+                                   Visibility="Collapsed"
+                                   Text="PINNED" />
+                        <TextBlock x:Name="TagsChip"
+                                   Style="{StaticResource ChipText}"
+                                   Margin="0,0,8,0"
+                                   Visibility="Collapsed" />
+                        <TextBlock x:Name="SourceChip"
+                                   Style="{StaticResource ChipText}"
+                                   Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="PopChip"
+                                   Style="{StaticResource ChipText}"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   Margin="0,0,8,0"
+                                   Visibility="Collapsed"
+                                   Text="POP" />
+                        <TextBlock x:Name="FormatterChip"
+                                   Style="{StaticResource ChipText}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Commit-mode banner. Only shown once X has been pressed, because it is the only
+                 signal that releasing Ctrl will destroy rather than paste. -->
+            <Border x:Name="ModeBanner"
+                    Background="{DynamicResource DangerBrush}"
+                    Padding="10,4"
+                    Visibility="Collapsed">
+                <TextBlock x:Name="ModeText"
+                           Foreground="White"
+                           FontSize="12"
+                           FontWeight="SemiBold" />
+            </Border>
+
+            <!-- Search box. Not a real input control: it mirrors a query assembled from hook
+                 events, precisely so this window never needs focus. -->
+            <Border x:Name="SearchRow"
+                    Background="{DynamicResource SurfaceRaisedBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="0,1,0,1"
+                    Padding="10,5"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Search"
+                               Foreground="{DynamicResource AccentBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
+
+                    <TextBlock x:Name="SearchQueryText"
+                               Grid.Column="1"
+                               Foreground="{DynamicResource TextBrush}"
+                               FontFamily="Consolas"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <TextBlock x:Name="MatchCountText"
+                               Grid.Column="2"
+                               Style="{StaticResource ChipText}" />
+                </Grid>
+            </Border>
+
+            <!-- Body: text preview or image thumbnail -->
+            <Grid Margin="10,8,10,10">
+                <TextBlock x:Name="PreviewText"
+                           Foreground="{DynamicResource TextBrush}"
+                           FontFamily="Consolas"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           MaxHeight="220"
+                           LineHeight="16" />
+
+                <Image x:Name="PreviewImage"
+                       MaxHeight="220"
+                       MaxWidth="520"
+                       Stretch="Uniform"
+                       HorizontalAlignment="Left"
+                       Visibility="Collapsed" />
+
+                <TextBlock x:Name="EmptyText"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           FontSize="12"
+                           FontStyle="Italic"
+                           Visibility="Collapsed"
+                           Text="No clips" />
+            </Grid>
+
+        </StackPanel>
+    </Border>
+</Window>

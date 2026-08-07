@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Clipjog.App/Clipjog.App.csproj" />
+    <Project Path="src/Clipjog.Core/Clipjog.Core.csproj" />
+    <Project Path="src/Clipjog.Import/Clipjog.Import.csproj" />
+    <Project Path="src/Clipjog.Interop/Clipjog.Interop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Clipjog.Core.Tests/Clipjog.Core.Tests.csproj" />
+    <Project Path="tests/Clipjog.Interop.Probe/Clipjog.Interop.Probe.csproj" />
+    <Project Path="tests/Clipjog.UiSmoke/Clipjog.UiSmoke.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,48 @@
+# Build output
+bin/
+obj/
+artifacts/
+
+# Runtime data. The app is portable and stores its database next to the executable, so a
+# published folder accumulates data/ - never commit a clipboard history.
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# User settings produced at runtime
+settings.json
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# OS noise
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editor backups
+*~
+*.bak
+*.orig

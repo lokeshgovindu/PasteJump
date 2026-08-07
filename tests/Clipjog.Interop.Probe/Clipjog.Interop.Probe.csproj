@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Phase 0 spike harness. Not shipped.
+    Spike A - hold-Ctrl / tap-V gesture, overlay that never steals focus.
+    Spike B - clipboard format round-trip fidelity (HTML, RTF, DIB, HDROP, Excel).
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Clipjog.Probe</AssemblyName>
+    <RootNamespace>Clipjog.Interop.Probe</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Clipjog.Core\Clipjog.Core.csproj" />
+    <ProjectReference Include="..\..\src\Clipjog.Interop\Clipjog.Interop.csproj" />
+  </ItemGroup>
+
+</Project>

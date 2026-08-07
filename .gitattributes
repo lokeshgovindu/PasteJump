@@ -1,0 +1,26 @@
+# Normalise line endings in the repository to LF, and check out native on Windows.
+#
+# Without this, whether a file lands as CRLF or LF depends on each clone's core.autocrlf setting,
+# which shows up later as whole-file diffs that touch nothing.
+* text=auto
+
+# Explicit for the file types this repo actually contains, so nothing depends on Git's heuristics.
+*.cs        text diff=csharp
+*.csproj    text
+*.props     text
+*.slnx      text
+*.xaml      text
+*.md        text
+*.json      text
+*.manifest  text
+*.gitignore text
+
+# Scripts run by Windows PowerShell 5.1. CRLF on checkout is what the shell and editors expect.
+*.ps1       text eol=crlf
+
+# Binary: never normalise, never diff as text.
+*.ico       binary
+*.png       binary
+*.jpg       binary
+*.db        binary
+*.avc       binary

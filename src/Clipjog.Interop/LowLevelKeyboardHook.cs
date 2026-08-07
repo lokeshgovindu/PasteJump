@@ -1,0 +1,167 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Clipjog.Interop.Win32;
+
+namespace Clipjog.Interop;
+
+/// <summary>A single key transition seen by the hook.</summary>
+/// <param name="IsInjected">
+/// <c>LLKHF_INJECTED</c> was set. True for any synthetic input, whoever produced it.
+/// </param>
+/// <param name="IsOwnInjection">
+/// The event carries our <see cref="NativeConstants.ClipjogInputSignature"/>, so it is a keystroke
+/// this process synthesised. Prefer this over <paramref name="IsInjected"/> for loop-guarding:
+/// treating all injected input as ours makes the gesture unusable under Remote Desktop, in VM guest
+/// windows, and for anyone driving the keyboard from a macro tool or on-screen keyboard.
+/// </param>
+public readonly record struct KeyboardHookEvent(
+    int VirtualKey,
+    bool IsKeyDown,
+    bool IsInjected,
+    bool IsOwnInjection);
+
+/// <summary>
+/// A <c>WH_KEYBOARD_LL</c> hook.
+/// <para>
+/// This exists because <c>RegisterHotKey</c> fundamentally cannot express the gesture. A
+/// registered hotkey fires once per chord; it has no way to say "Ctrl is still down and V was
+/// tapped again", which is the entire interaction model of this app.
+/// </para>
+/// <para>
+/// Two hard constraints come with it. First, the callback runs on the thread that installed the
+/// hook and blocks all keyboard input machine-wide until it returns - exceed
+/// <c>LowLevelHooksTimeout</c> (300 ms by default) and Windows silently discards the hook, at
+/// which point the app appears to work but has stopped receiving keys. So the handler must stay
+/// cheap and must never throw. Second, our own synthesised keystrokes come back through here,
+/// which is what <see cref="KeyboardHookEvent.IsInjected"/> is for - without that check, sending
+/// Ctrl+V to paste would re-enter paste mode forever.
+/// </para>
+/// </summary>
+public sealed class LowLevelKeyboardHook : IDisposable
+{
+    private readonly NativeMethods.HookProc _callback;
+    private readonly Func<KeyboardHookEvent, bool> _handler;
+    private IntPtr _hook;
+    private bool _disposed;
+
+    /// <summary>
+    /// Rolling count of handler exceptions. A throwing handler would tear down the hook, so they
+    /// are swallowed here; this counter exists so the failure is at least observable.
+    /// </summary>
+    public int HandlerFaultCount { get; private set; }
+
+    /// <summary>Longest handler execution seen, for verifying we stay well inside the OS timeout.</summary>
+    public TimeSpan WorstHandlerDuration { get; private set; }
+
+    /// <param name="handler">
+    /// Returns true to swallow the keystroke, false to let it through. Must be fast and must not
+    /// block.
+    /// </param>
+    public LowLevelKeyboardHook(Func<KeyboardHookEvent, bool> handler)
+    {
+        _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+
+        // Field-held for the same reason as the window procedure: Windows keeps a raw function
+        // pointer and the GC must not move or collect the delegate behind it.
+        _callback = HookCallback;
+    }
+
+    public bool IsInstalled => _hook != IntPtr.Zero;
+
+    /// <summary>
+    /// Installs the hook. Must be called from a thread with a running message pump - the WPF UI
+    /// thread qualifies.
+    /// </summary>
+    public void Install()
+    {
+        if (IsInstalled)
+        {
+            return;
+        }
+
+        // A low-level hook is global, so hMod is ignored and the thread id must be 0. Passing the
+        // current module handle here is a widespread copy-paste error that happens to work.
+        _hook = NativeMethods.SetWindowsHookEx(
+            NativeConstants.WH_KEYBOARD_LL,
+            _callback,
+            IntPtr.Zero,
+            0);
+
+        if (_hook == IntPtr.Zero)
+        {
+            throw new InvalidOperationException(
+                $"SetWindowsHookEx(WH_KEYBOARD_LL) failed: {Marshal.GetLastWin32Error()}");
+        }
+    }
+
+    public void Uninstall()
+    {
+        if (!IsInstalled)
+        {
+            return;
+        }
+
+        NativeMethods.UnhookWindowsHookEx(_hook);
+        _hook = IntPtr.Zero;
+    }
+
+    private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode != NativeConstants.HC_ACTION)
+        {
+            return NativeMethods.CallNextHookEx(_hook, nCode, wParam, lParam);
+        }
+
+        var message = (int)wParam;
+
+        var isKeyDown = message is NativeConstants.WM_KEYDOWN or NativeConstants.WM_SYSKEYDOWN;
+        var isKeyUp = message is NativeConstants.WM_KEYUP or NativeConstants.WM_SYSKEYUP;
+
+        if (!isKeyDown && !isKeyUp)
+        {
+            return NativeMethods.CallNextHookEx(_hook, nCode, wParam, lParam);
+        }
+
+        bool swallow;
+
+        try
+        {
+            var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+            var injected = (info.flags & NativeConstants.LLKHF_INJECTED) != 0;
+            var ownInjection = injected && info.dwExtraInfo == NativeConstants.ClipjogInputSignature;
+
+            var start = Stopwatch.GetTimestamp();
+
+            swallow = _handler(new KeyboardHookEvent((int)info.vkCode, isKeyDown, injected, ownInjection));
+
+            var elapsed = Stopwatch.GetElapsedTime(start);
+
+            if (elapsed > WorstHandlerDuration)
+            {
+                WorstHandlerDuration = elapsed;
+            }
+        }
+        catch (Exception)
+        {
+            // Letting this propagate into native code would tear the hook down and leave the
+            // machine's keyboard handling in our debt. Count it and pass the key through.
+            HandlerFaultCount++;
+            swallow = false;
+        }
+
+        return swallow
+            ? new IntPtr(1)
+            : NativeMethods.CallNextHookEx(_hook, nCode, wParam, lParam);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        Uninstall();
+    }
+}

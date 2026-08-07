@@ -1,0 +1,32 @@
+<Application x:Class="Clipjog.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        No StartupUri: this is a tray-resident app with no main window. Startup is driven from
+        App.OnStartup so the hook, the clipboard listener and the tray icon come up before any
+        window exists - and so that ShutdownMode can be explicit rather than tied to a window
+        that may never be shown.
+    -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--
+                    Slot 0 is the palette and is REPLACED WHOLESALE by ThemeManager at runtime. The
+                    entry here only sets the design-time and pre-settings-load default; anything that
+                    depends on its position must go through ThemeManager.PaletteSlot.
+
+                    Light by default.
+                -->
+                <ResourceDictionary Source="Themes/Light.xaml" />
+
+                <!-- Slot 1 onwards: theme-independent, referencing slot 0 via DynamicResource.
+
+                     Everything lives in a merged dictionary rather than inline here, so the whole
+                     resource set can be composed by pack:// URI from outside App.xaml - see the note
+                     in Shared.xaml. -->
+                <ResourceDictionary Source="Themes/Controls.xaml" />
+                <ResourceDictionary Source="Themes/Shared.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
