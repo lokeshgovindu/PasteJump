@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 211 passing (`dotnet test`) |
+| Tests | 216 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | ~134 MB self-contained `win-x64` |
 
@@ -60,7 +60,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      211 tests.
+tests/PasteJump.Core.Tests      216 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -181,7 +181,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 211 tests
+dotnet test                                         # 216 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
