@@ -1,0 +1,33 @@
+﻿<Window x:Class="PasteJump.App.Views.TagEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PasteJump - Tags"
+        Width="420"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        Background="{DynamicResource SurfaceBrush}"
+        Icon="{DynamicResource AppIcon}"
+        WindowStartupLocation="CenterScreen">
+
+    <StackPanel Margin="12">
+        <TextBlock Foreground="{DynamicResource MutedTextBrush}"
+                   Text="Tags, separated by spaces or commas"
+                   Margin="0,0,0,6" />
+
+        <TextBox x:Name="TagsBox"
+                 Padding="5,4"
+                 FontFamily="Consolas"
+                 FontSize="13" />
+
+        <TextBlock Foreground="{DynamicResource MutedTextBrush}"
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Text="Tags are searchable in paste mode - press F while holding Ctrl, then type." />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Click="OnOkClicked" Content="_OK" IsDefault="True" MinWidth="84" Padding="14,5" />
+            <Button Click="OnCancelClicked" Content="_Cancel" IsCancel="True" MinWidth="84" Padding="14,5" Margin="6,0,0,0" />
+        </StackPanel>
+    </StackPanel>
+</Window>

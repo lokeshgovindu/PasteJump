@@ -1,4 +1,4 @@
-# Clipjog
+# PasteJump
 
 A keyboard-driven multiple-clipboard manager for Windows.
 
@@ -12,7 +12,7 @@ the target machine, and nothing to install.**
 
 ## Why this exists
 
-Clipjog is a ground-up reimplementation of [aviaryan/Clipjump](https://github.com/aviaryan/Clipjump),
+PasteJump is a ground-up reimplementation of [aviaryan/Clipjump](https://github.com/aviaryan/Clipjump),
 an excellent AutoHotkey v1 utility whose last commit was April 2016. The gesture it invented is
 still, as far as I can tell, unique — no other clipboard manager lets you walk a stack without ever
 opening a window or moving your hands. But AHK v1 made it effectively unmaintainable: no debugger,
@@ -27,8 +27,8 @@ This is a reimplementation from observed behaviour, not a port. No Clipjump code
 ### Run it
 
 ```
-dotnet publish src/Clipjog.App/Clipjog.App.csproj -c Release -o artifacts/publish
-artifacts/publish/Clipjog.exe
+dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
+artifacts/publish/PasteJump.exe
 ```
 
 It lives in the notification area. Left-click for history, right-click for the menu.
@@ -97,26 +97,26 @@ Clipjump had features this does not, dropped on purpose to keep the surface hone
 
 ```
 src/
-  Clipjog.Core      Domain logic. net10.0, deliberately NOT net10.0-windows.
+  PasteJump.Core      Domain logic. net10.0, deliberately NOT net10.0-windows.
                     Paste-mode state machine, clip store, formatters, capture
                     orchestration. No Win32, no WPF, no message loop — so it is
                     all unit-testable.
-  Clipjog.Interop   Win32 implementations of the Core abstractions. Clipboard
+  PasteJump.Interop   Win32 implementations of the Core abstractions. Clipboard
                     access, the low-level keyboard hook, SendInput, tray icon,
                     message-only window.
-  Clipjog.Import    One-time migration of Clipjump 12.x history.
-  Clipjog.App       WPF: overlay, history window, settings, tray wiring.
+  PasteJump.Import    One-time migration of Clipjump 12.x history.
+  PasteJump.App       WPF: overlay, history window, settings, tray wiring.
 tests/
-  Clipjog.Core.Tests      160 tests over the state machine, store, capture path,
+  PasteJump.Core.Tests      160 tests over the state machine, store, capture path,
                           formatters and importer.
-  Clipjog.Interop.Probe   Phase 0 spike harness. Not shipped.
+  PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 ```
 
 Three decisions dissolve most of the original's complexity:
 
 **1. The system clipboard is never used as scratch space.** Clipjump wrote clip #7 *to the
 clipboard* in order to preview it, which is the root of its retry loops, its `ONCLIPBOARD` flag
-protocol, and an invisible focus-stealing window created to appease Excel. Clipjog reads the
+protocol, and an invisible focus-stealing window created to appease Excel. PasteJump reads the
 clipboard once per change, stores every format, renders all previews from its own store, and touches
 the clipboard again only at the instant of pasting.
 
@@ -144,7 +144,7 @@ stored id tomorrow would attach the bytes to an unrelated format.
 
 ## Migrating from Clipjump
 
-On first run Clipjog looks for a Clipjump installation and offers to import its history. The source
+On first run PasteJump looks for a Clipjump installation and offers to import its history. The source
 folder is opened read-only via a temporary copy and is never modified. Imported rows are tagged
 `clipjump-12.5` so they can be identified later.
 
@@ -156,12 +156,12 @@ reverse-engineerable but not worth it for data that turns over in days.
 ## Known limitations
 
 - **A capture can still be lost under heavy clipboard contention.** The clipboard is a machine-wide
-  lock. Clipjog retries with backoff (~620 ms inline) and then twice more on a delay, but if another
+  lock. PasteJump retries with backoff (~620 ms inline) and then twice more on a delay, but if another
   process holds the clipboard longer than that, the copy is dropped and
   `CaptureService.DroppedCaptureCount` increments. This is inherent to the Win32 clipboard, not
   fixable in principle — only made rarer.
 - **Elevated windows.** A non-elevated keyboard hook cannot see keystrokes in elevated windows, so
-  the gesture does not work in them. Running Clipjog elevated via a scheduled task fixes it, at the
+  the gesture does not work in them. Running PasteJump elevated via a scheduled task fixes it, at the
   cost of a UAC prompt at setup.
 - **~134 MB on disk.** WPF supports neither trimming nor NativeAOT, so a self-contained build is
   large. This was an accepted trade: the alternative was hand-writing every window in Win32.

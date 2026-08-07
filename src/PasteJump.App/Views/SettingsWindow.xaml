@@ -1,0 +1,306 @@
+<Window x:Class="PasteJump.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PasteJump - Settings"
+        Width="740"
+        Height="520"
+        MinWidth="640"
+        MinHeight="440"
+        Background="{DynamicResource SurfaceBrush}"
+        Icon="{DynamicResource AppIcon}"
+        WindowStartupLocation="CenterScreen">
+
+    <!--
+        Tabbed rather than one long column. With five groups the single-column form ran taller than a
+        1080p screen could show at 125% scaling, and SizeToContent="Height" meant it simply grew off
+        the bottom edge with no scrollbar. A fixed height plus tabs keeps every setting reachable.
+    -->
+
+    <Window.Resources>
+        <!--
+            Each of these MUST carry BasedOn. A window-level implicit style replaces the app-level one
+            for that type outright rather than merging with it, so without BasedOn these would discard
+            the themed ControlTemplates in Themes/Controls.xaml and the controls would fall back to
+            WPF's built-in light chrome - the exact problem the theming work was fixing.
+        -->
+        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+            <Setter Property="Margin" Value="0,5,0,5" />
+        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="14,5" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="MinWidth" Value="84" />
+        </Style>
+
+        <!-- Label / editor row. Every setting below uses this shape, so it is defined once. -->
+        <Style x:Key="SettingRow" TargetType="Grid">
+            <Setter Property="Margin" Value="0,7,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0">
+
+            <TabItem Header="_Capture">
+                <StackPanel>
+                    <CheckBox x:Name="MonitorClipboardCheck"
+                              Content="Watch the clipboard"
+                              ToolTip="Turn off to make PasteJump inert but still resident. Same as Pause in the tray menu." />
+                    <CheckBox x:Name="StoreImagesCheck"
+                              Content="Store images"
+                              ToolTip="Images are much larger than text. Turning this off keeps the database small." />
+                    <CheckBox x:Name="AllowDuplicatesCheck"
+                              Content="Record a repeated copy as a new clip"
+                              ToolTip="Off (recommended): re-copying something promotes the existing clip instead of adding another. On: every copy becomes a new entry." />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="96" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Maximum clips kept" />
+                        <TextBox x:Name="MaxClipsBox"
+                                 Grid.Column="1"
+                                 ToolTip="How many clips the stack holds before the oldest are evicted. Pinned clips are exempt." />
+                    </Grid>
+
+                    <TextBlock Margin="0,12,0,3"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Text="Never capture while these programs are in front (one per line)" />
+                    <TextBox x:Name="IgnoredProcessesBox"
+                             Height="78"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"
+                             FontFamily="Consolas"
+                             ToolTip="Executable names, e.g. keepass.exe. Useful for password managers - the clipboard is never even read while one of these is focused." />
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="_History">
+                <StackPanel>
+                    <CheckBox x:Name="RecordHistoryCheck"
+                              Content="Keep a searchable history archive"
+                              ToolTip="History is a long-term log that survives clips being evicted from the stack." />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="96" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Days of history to keep" />
+                        <TextBox x:Name="RetentionDaysBox"
+                                 Grid.Column="1"
+                                 ToolTip="0 keeps everything for ever. Old entries are pruned at start-up." />
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="_Paste mode">
+                <StackPanel>
+                    <CheckBox x:Name="PreservePositionCheck"
+                              Content="Reopen on the clip I was last on"
+                              ToolTip="On: paste mode resumes where you left it. Off: it always starts at the newest clip." />
+                    <CheckBox x:Name="OpenSearchCheck"
+                              Content="Open straight into search"
+                              ToolTip="Ctrl+V goes directly to the search box instead of the clip list." />
+                    <CheckBox x:Name="ResetFormatterCheck"
+                              Content="Reset the paste format on every entry"
+                              ToolTip="On: the format returns to the default each time. Off: the last format you chose with Z is remembered." />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Default paste format" />
+                        <ComboBox x:Name="DefaultFormatterCombo"
+                                  Grid.Column="1"
+                                  ToolTip="Applied to every paste unless you cycle it with Z during the gesture." />
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="_Appearance">
+                <StackPanel>
+                    <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Theme" />
+                        <ComboBox x:Name="ThemeCombo"
+                                  Grid.Column="1"
+                                  ToolTip="Applies immediately. &quot;Same as Windows&quot; follows the app colour mode and tracks changes to it." />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="History list density" />
+                        <ComboBox x:Name="DensityCombo"
+                                  Grid.Column="1"
+                                  ToolTip="Row spacing in the history list. Compact fits the most rows on screen; Roomy is easiest to hit with a mouse." />
+                    </Grid>
+
+                    <CheckBox x:Name="ShowCopyNotificationCheck"
+                              Margin="0,12,0,5"
+                              Content="Show a brief notification after each copy"
+                              ToolTip="A small popup near the cursor confirming the copy was captured, with the clip count." />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="96" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="How long it stays (ms)" />
+                        <TextBox x:Name="CopyNotificationMsBox"
+                                 Grid.Column="1"
+                                 ToolTip="Between 250 and 10000 milliseconds." />
+                    </Grid>
+
+                    <TextBlock Margin="0,14,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               FontSize="11"
+                               Text="The notification-area icon always follows the Windows taskbar colour, which is a separate setting from the app theme." />
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="_System">
+                <StackPanel>
+                    <CheckBox x:Name="RunAtLogonCheck"
+                              Content="Start PasteJump when I sign in"
+                              ToolTip="Adds a shortcut to your Startup folder. No scheduled task, no elevation." />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="96" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Pause before pasting (ms)" />
+                        <TextBox x:Name="PasteSettleDelayBox"
+                                 Grid.Column="1"
+                                 ToolTip="Gap between putting a clip on the clipboard and sending Ctrl+V. Raise it if a particular application pastes the previous clip - Office and Electron apps cache the clipboard briefly. 0 to 500." />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Editor used by the H key" />
+                        <TextBox x:Name="TextEditorBox"
+                                 Grid.Column="1"
+                                 ToolTip="Program launched when you press H during the gesture to edit a clip." />
+                    </Grid>
+
+                    <TextBlock x:Name="VersionText"
+                               Margin="0,16,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               FontSize="11" />
+                </StackPanel>
+            </TabItem>
+
+            <!--
+                Last in the list, as the reference does it. Built by reflection over PasteJumpSettings, so
+                it cannot fall behind the settings that actually exist.
+            -->
+            <TabItem Header="Ad_vanced">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <TextBox x:Name="AdvancedFilterBox"
+                                 TextChanged="OnAdvancedFilterChanged"
+                                 ToolTip="Filter by setting name or value" />
+
+                        <TextBlock x:Name="AdvancedFilterCue"
+                                   Text="Search settings…"
+                                   Foreground="{DynamicResource MutedTextBrush}"
+                                   Margin="7,0,0,0"
+                                   VerticalAlignment="Center"
+                                   IsHitTestVisible="False" />
+                    </Grid>
+
+                    <DataGrid x:Name="AdvancedGrid"
+                              Grid.Row="1"
+                              SelectionMode="Single"
+                              EnableRowVirtualization="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Name"
+                                                Binding="{Binding Name}"
+                                                Width="1.4*"
+                                                ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="Type"
+                                                Binding="{Binding TypeName}"
+                                                Width="1.1*"
+                                                ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="Value"
+                                                Binding="{Binding Value}"
+                                                Width="1.2*"
+                                                ElementStyle="{StaticResource CellText}" />
+                            <DataGridTextColumn Header="Default"
+                                                Binding="{Binding Default}"
+                                                Width="1.2*"
+                                                ElementStyle="{StaticResource MutedValueText}" />
+                        </DataGrid.Columns>
+
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Setter Property="ToolTip"
+                                        Value="{Binding Name, StringFormat='{}{0} — see data\\settings.json'}" />
+                                <Style.Triggers>
+                                    <!-- Anything changed from its default is worth spotting at a glance;
+                                         it is the first thing to check when behaviour is surprising. -->
+                                    <DataTrigger Binding="{Binding IsModified}" Value="True">
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+
+                    <TextBlock x:Name="AdvancedStatus"
+                               Grid.Row="2"
+                               Margin="2,8,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               FontSize="11"
+                               TextWrapping="Wrap" />
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+
+        <TextBlock x:Name="ValidationText"
+                   Grid.Row="1"
+                   Foreground="{DynamicResource DangerBrush}"
+                   TextWrapping="Wrap"
+                   Margin="0,10,0,0"
+                   Visibility="Collapsed" />
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="OkButton" Click="OnOkClicked" Content="_OK" IsDefault="True"
+                    ToolTip="Apply and close" />
+            <Button x:Name="CancelButton" Click="OnCancelClicked" Content="_Cancel" IsCancel="True"
+                    ToolTip="Discard changes" />
+        </StackPanel>
+
+    </Grid>
+</Window>

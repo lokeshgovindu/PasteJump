@@ -5,7 +5,7 @@
 #   The notification area is the one place in Windows whose background colour changes underneath you.
 #   The taskbar follows SystemUsesLightTheme, so a single icon is guaranteed to be wrong half the
 #   time - which is what "the icon is not at all looking on dark taskbar" was about. The convention
-#   there is monochrome line art supplied once per taskbar colour, and Clipjog picks between them at
+#   there is monochrome line art supplied once per taskbar colour, and PasteJump picks between them at
 #   runtime. The coloured tile stays as the executable/Alt+Tab icon, where a single icon is correct.
 #
 # Source glyphs are named for their STROKE colour, and the outputs for the TASKBAR they belong on -
@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
 if (-not $AssetsPath) {
-    throw 'Pass -AssetsPath, e.g. src\Clipjog.App\Assets. ($PSScriptRoot is not reliable in a param default under -File.)'
+    throw 'Pass -AssetsPath, e.g. src\PasteJump.App\Assets. ($PSScriptRoot is not reliable in a param default under -File.)'
 }
 
 # 16 is the base tray size, 20/24 cover 125% and 150% scaling, 32 is the source resolution.

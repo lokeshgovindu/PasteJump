@@ -1,0 +1,176 @@
+﻿<Window x:Class="PasteJump.App.Views.ShortcutHelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PasteJump - Paste-mode keys"
+        Width="600"
+        SizeToContent="Height"
+        MaxHeight="760"
+        ResizeMode="NoResize"
+        Background="{DynamicResource SurfaceBrush}"
+        Icon="{DynamicResource AppIcon}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <Style x:Key="KeyStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,14,4" />
+        </Style>
+        <Style x:Key="DescStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="SectionStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Margin" Value="0,12,0,6" />
+        </Style>
+    </Window.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16">
+
+            <TextBlock Foreground="{DynamicResource TextBrush}"
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       Text="Press Ctrl+V and keep Ctrl held. The overlay appears; tap keys to act on the stack. Release Ctrl to commit." />
+
+            <TextBlock Style="{StaticResource SectionStyle}" Text="MOVING THROUGH CLIPS" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="V" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Step to an older clip" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="C" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Step back to a newer clip" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="A" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Jump to the newest clip" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="1 – 9" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Jump that many clips" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="–" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Reverse the direction the number keys jump in" />
+            </Grid>
+
+            <TextBlock Style="{StaticResource SectionStyle}" Text="PASTING" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="release Ctrl" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste the shown clip" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="+ Shift" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Hold Shift as you release to delete the clip after pasting (paste popping)" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste and stay open, to paste several clips in a row" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Z" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cycle paste format: Original, Plain text, Collapse whitespace, Sentence case, Unindent" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="S" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Put the clip on the Windows clipboard without pasting it" />
+            </Grid>
+
+            <TextBlock Style="{StaticResource SectionStyle}" Text="ORGANISING" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Space" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Pin or unpin. Pinned clips sort first and survive Delete All" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Q" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Move this clip to the front of the stack" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="T" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Edit tags" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="H" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clip in an external editor" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="E" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Export the clip to a file" />
+            </Grid>
+
+            <TextBlock Style="{StaticResource SectionStyle}" Text="SEARCH" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="F" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open search. Ctrl can be released - just type to filter by content or tag" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste the match" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Ctrl+V / Ctrl+C" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Move between matches while searching" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Esc" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cancel" />
+            </Grid>
+
+            <TextBlock Style="{StaticResource SectionStyle}" Text="DELETING" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="X" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}"
+                           Text="Cycle what releasing Ctrl will do: Cancel, then Delete this clip, then Delete All. A banner shows the current mode. Pressing X repeatedly cycles between those three and never returns to pasting." />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Esc" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cancel immediately and restore the previous clipboard" />
+            </Grid>
+
+            <TextBlock Foreground="{DynamicResource MutedTextBrush}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Margin="0,16,0,0"
+                       Text="Channels, plugins and Action Mode from Clipjump are not implemented. Because of that, the channel keys (Up, Down, PitSwap) are absent, and the X cycle has no Move or Copy stages." />
+
+            <Button Content="_Close"
+                    IsCancel="True"
+                    HorizontalAlignment="Right"
+                    MinWidth="84"
+                    Padding="14,5"
+                    Margin="0,16,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

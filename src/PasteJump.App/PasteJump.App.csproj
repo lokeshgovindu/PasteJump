@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>PasteJump</AssemblyName>
+    <RootNamespace>PasteJump.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!--
+    Self-contained portable-folder publish: no .NET runtime required on the
+    target machine. Trimming and NativeAOT are BOTH unsupported with WPF -
+    do not enable them, the ~110-150 MB output is the cost of the UI framework.
+  -->
+  <PropertyGroup>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    The WPF implicit-usings set does not include System.IO (unlike the plain library set), and
+    this app touches the filesystem in several places. Added once here rather than as a using
+    directive repeated across every view and service.
+  -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <!--
+    The tray icons ship as loose files beside the executable, unlike the application icon which is
+    embedded in the PE and read back with ExtractIconEx. They have to be loose because there are two
+    of them and the choice is made at runtime from the taskbar colour - an embedded resource would
+    need a resource id, and LoadImage(LR_LOADFROMFILE) against a portable folder is simpler than
+    plumbing that through. The .png sources are build-time inputs to tools\generate-tray-icons.ps1
+    and are deliberately NOT copied.
+  -->
+  <ItemGroup>
+    <Content Include="Assets\tray-on-light.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\tray-on-dark.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    pastejump.ico is embedded twice on purpose, and both are needed.
+
+    ApplicationIcon puts it in the PE header, which is what Explorer and the taskbar read and what
+    TrayIcon pulls back out with ExtractIconEx. That copy is NOT reachable through a pack:// URI, so a
+    Window.Icon binding cannot use it. The Resource item below makes it addressable in XAML, which is
+    what gives the child dialogs their title-bar icon.
+  -->
+  <ItemGroup>
+    <Resource Include="Assets\pastejump.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PasteJump.Core\PasteJump.Core.csproj" />
+    <ProjectReference Include="..\PasteJump.Interop\PasteJump.Interop.csproj" />
+    <ProjectReference Include="..\PasteJump.Import\PasteJump.Import.csproj" />
+  </ItemGroup>
+
+</Project>

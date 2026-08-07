@@ -17,7 +17,7 @@
 
 [CmdletBinding()]
 param(
-    [string] $OutputPath = (Join-Path $PSScriptRoot '..\src\Clipjog.App\Assets\clipjog.ico'),
+    [string] $OutputPath = (Join-Path $PSScriptRoot '..\src\PasteJump.App\Assets\pastejump.ico'),
     [string] $PreviewPath
 )
 
@@ -46,7 +46,7 @@ function New-RoundedPath {
     return $path
 }
 
-function New-ClipjogBitmap {
+function New-PasteJumpBitmap {
     param([int] $Size)
 
     $bmp = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
@@ -142,7 +142,7 @@ $sizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
 $frames = @()
 
 foreach ($size in $sizes) {
-    $bmp = New-ClipjogBitmap -Size $size
+    $bmp = New-PasteJumpBitmap -Size $size
     $stream = New-Object System.IO.MemoryStream
     $bmp.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
     $frames += , @{ Size = $size; Bytes = $stream.ToArray() }
@@ -206,7 +206,7 @@ if ($PreviewPath) {
     foreach ($row in 0, 1) {
         $x = 20
         foreach ($size in @(16, 20, 24, 32, 40, 48, 64)) {
-            $bmp = New-ClipjogBitmap -Size $size
+            $bmp = New-PasteJumpBitmap -Size $size
             $pg.DrawImage($bmp, $x, ($row * 100 + 50 - [int]($size / 2)), $size, $size)
             $bmp.Dispose()
             $x += $size + 18

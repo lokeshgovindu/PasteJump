@@ -1,4 +1,4 @@
-# Clipjog — working notes
+# PasteJump — working notes
 
 Keyboard-driven multiple-clipboard manager for Windows. .NET 10 + WPF.
 
@@ -20,7 +20,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
 | Tests | 211 passing (`dotnet test`) |
-| UI smoke | `tests/Clipjog.UiSmoke` — every window, both themes, exit 0 |
+| UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | ~134 MB self-contained `win-x64` |
 
 A round of user testing found several real bugs — all fixed, all now covered by tests. They share one
@@ -38,7 +38,7 @@ wide range of applications, and the Excel round-trip.
 Phase 0's two spikes are **built but not run**. See `PLAN.md` §9 for exit criteria.
 
 ```
-dotnet run --project tests\Clipjog.Interop.Probe
+dotnet run --project tests\PasteJump.Interop.Probe
 ```
 
 - **Tab 1 (Spike A)** — install the hook, then hold Ctrl and tap V in Notepad, Word, VS Code, Chrome
@@ -56,13 +56,13 @@ clipboard" path.
 ## Architecture, and the rule that matters
 
 ```
-src/Clipjog.Core      Domain logic. net10.0 — deliberately NOT net10.0-windows.
-src/Clipjog.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
-src/Clipjog.Import    One-time Clipjump 12.x history migration.
-src/Clipjog.App       WPF: overlay, history, settings, tray wiring.
-tests/Clipjog.Core.Tests      211 tests.
-tests/Clipjog.Interop.Probe   Phase 0 spike harness. Not shipped.
-tests/Clipjog.UiSmoke         Shows every window in both themes. Exit 0 if all open.
+src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windows.
+src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
+src/PasteJump.Import    One-time Clipjump 12.x history migration.
+src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
+tests/PasteJump.Core.Tests      211 tests.
+tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
+tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
 
 **`Core` must never reference WPF or Win32, and must never need a message loop.** Win32 access is
@@ -96,7 +96,7 @@ that immediately caught two real bugs. Expect to do the same again.
   and wrong if it ran.
 - **The hook callback blocks all keyboard input machine-wide.** Exceed `LowLevelHooksTimeout` and
   Windows silently discards the hook — the app then looks fine but has stopped receiving keys. All
-  side effects are queued onto the Dispatcher by `ClipjogPasteHost`; keep it that way.
+  side effects are queued onto the Dispatcher by `PasteJumpPasteHost`; keep it that way.
 - **Ignore *our own* injected input, not all of it.** Use `KeyboardHookEvent.IsOwnInjection`, which
   matches our `dwExtraInfo` signature. Filtering on `LLKHF_INJECTED` alone — as this once did — kills
   the gesture entirely under Remote Desktop, in VM guest windows, and for anyone on a macro keyboard,
@@ -126,7 +126,7 @@ that immediately caught two real bugs. Expect to do the same again.
   app's misbehaviour into our hang.
 - **`Microsoft.Data.Sqlite` pools connections**, so the native handle outlives `Dispose`. The
   importer sets `Pooling = false` or its temp database copy can never be deleted.
-- **WPF's implicit usings omit `System.IO`** — added once via `<Using>` in `Clipjog.App.csproj`.
+- **WPF's implicit usings omit `System.IO`** — added once via `<Using>` in `PasteJump.App.csproj`.
 - **Never use `Assembly.Location`.** All paths go through `AppPaths`, which uses
   `Environment.ProcessPath`, so switching to `PublishSingleFile` stays a csproj change.
   `AppContext.BaseDirectory` has the same trap: under single-file it is the extraction directory.
@@ -182,24 +182,24 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 ```
 dotnet build                                        # zero warnings expected
 dotnet test                                         # 211 tests
-dotnet publish src/Clipjog.App/Clipjog.App.csproj -c Release -o artifacts/publish
-dotnet run --project tests/Clipjog.Interop.Probe    # Phase 0 spikes (needs a human)
-dotnet run --project tests/Clipjog.UiSmoke          # every window, both themes
-dotnet run --project tests/Clipjog.UiSmoke -- --shot out   # ...and save PNGs of each
+dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
+dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
+dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
+dotnet run --project tests/PasteJump.UiSmoke -- --shot out   # ...and save PNGs of each
 ```
 
 Icons are regenerated with Windows PowerShell 5.1, which has System.Drawing. `$PSScriptRoot` is not
 reliable in a parameter default under `-File`, so pass the paths explicitly:
 
 ```
-powershell -File tools/generate-icon.ps1 -OutputPath src/Clipjog.App/Assets/clipjog.ico
-powershell -File tools/generate-tray-icons.ps1 -AssetsPath src/Clipjog.App/Assets
+powershell -File tools/generate-icon.ps1 -OutputPath src/PasteJump.App/Assets/pastejump.ico
+powershell -File tools/generate-tray-icons.ps1 -AssetsPath src/PasteJump.App/Assets
 ```
 
 Kill a running instance before building: it locks the output DLLs, and its `Global\` single-instance
 mutex silently prevents a newly built copy from starting.
 
-Handy while debugging capture: the app stores its database at `data/clipjog.db` beside the
+Handy while debugging capture: the app stores its database at `data/pastejump.db` beside the
 executable, so a published folder can be inspected directly with any SQLite tool.
 
 Read `PLAN.md` for the full design, the state-machine spec, and the two corrections made during

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- One-time migration of Clipjump 12.5 settings.ini and cache\data.db. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PasteJump.Core\PasteJump.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    Timestamp parsing is an implementation detail with awkward edge cases (local-vs-UTC, three
+    legacy formats, malformed rows), so it is worth testing directly rather than only through a
+    full import. Exposed to the test assembly instead of being made public.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>PasteJump.Core.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

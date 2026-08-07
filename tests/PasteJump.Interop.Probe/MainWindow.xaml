@@ -1,0 +1,77 @@
+<Window x:Class="PasteJump.Interop.Probe.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PasteJump Phase 0 Spike Harness"
+        Width="980"
+        Height="700"
+        WindowStartupLocation="CenterScreen">
+
+    <TabControl Margin="8">
+
+        <!-- ============================ SPIKE A ============================ -->
+        <TabItem Header="Spike A - gesture and focus">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8">
+                    <Run FontWeight="Bold" Text="Exit criteria." />
+                    <Run Text="Install the hook, then switch to Notepad, Word, VS Code, Chrome and Windows Terminal. Hold Ctrl and tap V five times in each. The foreground window must never change, the overlay must track the caret, and hook latency must stay far below the 300 ms LowLevelHooksTimeout. Repeat with the target window on a second monitor at a different scale factor." />
+                </TextBlock>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button x:Name="InstallHookButton" Click="OnInstallHook" Content="Install hook" Padding="10,4" Margin="0,0,6,0" />
+                    <Button x:Name="RemoveHookButton" Click="OnRemoveHook" Content="Remove hook" Padding="10,4" Margin="0,0,6,0" IsEnabled="False" />
+                    <Button x:Name="ShowOverlayButton" Click="OnToggleOverlay" Content="Toggle probe overlay" Padding="10,4" Margin="0,0,6,0" />
+                    <Button x:Name="ClearLogButton" Click="OnClearLog" Content="Clear log" Padding="10,4" Margin="0,0,20,0" />
+                    <TextBlock x:Name="HookStatsText" VerticalAlignment="Center" FontFamily="Consolas" />
+                </StackPanel>
+
+                <TextBox x:Name="KeyLog"
+                         Grid.Row="2"
+                         IsReadOnly="True"
+                         FontFamily="Consolas"
+                         FontSize="11"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         AcceptsReturn="True" />
+            </Grid>
+        </TabItem>
+
+        <!-- ============================ SPIKE B ============================ -->
+        <TabItem Header="Spike B - clipboard fidelity">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8">
+                    <Run FontWeight="Bold" Text="Exit criteria." />
+                    <Run Text="Copy something, press Capture, then Round-trip. Every format must come back byte-identical. Cover plain text, HTML from a browser, RTF from Word, an image from a browser (CF_DIB / CF_DIBV5), a file selection from Explorer (CF_HDROP), and the acid test: a formatted range from Excel, pasted back into Excel with formatting intact." />
+                </TextBlock>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button x:Name="CaptureButton" Click="OnCapture" Content="Capture clipboard" Padding="10,4" Margin="0,0,6,0" />
+                    <Button x:Name="RoundTripButton" Click="OnRoundTrip" Content="Round-trip (write then re-read and compare)" Padding="10,4" Margin="0,0,6,0" IsEnabled="False" />
+                    <Button x:Name="RestoreButton" Click="OnRestore" Content="Write captured back" Padding="10,4" Margin="0,0,20,0" IsEnabled="False" />
+                    <TextBlock x:Name="VerdictText" VerticalAlignment="Center" FontWeight="Bold" FontFamily="Consolas" />
+                </StackPanel>
+
+                <TextBox x:Name="FormatLog"
+                         Grid.Row="2"
+                         IsReadOnly="True"
+                         FontFamily="Consolas"
+                         FontSize="11"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         AcceptsReturn="True" />
+            </Grid>
+        </TabItem>
+
+    </TabControl>
+</Window>

@@ -85,7 +85,7 @@ src/
 tests/
   Clipjump.Core.Tests/   xUnit — state machine, store, formatters
   Clipjump.Interop.Probe/ manual harness for the Phase 0 spikes
-  Clipjog.UiSmoke/       shows every window in both themes; exit 0 if all open
+  PasteJump.UiSmoke/       shows every window in both themes; exit 0 if all open
 ```
 
 `Core` must not reference `App` or require a message loop. The state machine and
@@ -204,7 +204,7 @@ The product lives here. Specify it before writing UI.
    > original splits these explicitly: `clipChange()` assigns `TEMPSAVE := CURSAVE`
    > on every successful copy (`Clipjump.ahk:508`, `:517`) with no reference to the
    > setting, while `ini_PreserveClipPos` is consulted only in `endPastemode`
-   > (`Clipjump.ahk:1010-1012`). Clipjog implemented the second and omitted the
+   > (`Clipjump.ahk:1010-1012`). PasteJump implemented the second and omitted the
    > first, so the remembered clip id was set once and never cleared.
    >
    > The symptom was worse than a stuck index, because the position is anchored to a
@@ -338,7 +338,7 @@ Two things only a live run revealed:
   resource-scoping problem on first run: `AppIcon` and `ChipText` were declared inline
   in `Application.Resources`, which makes them unreachable to anything composing the
   resource set by pack URI. Both now live in `Themes/Shared.xaml`. Kept as
-  `tests/Clipjog.UiSmoke` — exit code 0 when every window opens, so CI can gate on it.
+  `tests/PasteJump.UiSmoke` — exit code 0 when every window opens, so CI can gate on it.
 
 ---
 
