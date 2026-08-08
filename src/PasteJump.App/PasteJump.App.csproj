@@ -22,9 +22,15 @@
     EnableCompressionInSingleFile roughly halves the result - measured 143 MB down to 65 MB - at the cost of
     decompressing assemblies on each start. Worth it for an app launched once per logon and then resident.
 
-    IncludeAllContentForSelfExtract is not optional. Without it the Assets\*.ico files stay loose beside the
-    exe and the publish is no longer a single file; with it they are bundled and extracted, which is why
-    AppPaths.AssetsDirectory probes the extraction directory as well as the exe's own folder.
+    IncludeNativeLibrariesForSelfExtract is required, because WPF's native libraries cannot be loaded from
+    inside the bundle. Note what it does NOT need to be joined by:
+
+    IncludeAllContentForSelfExtract is deliberately ABSENT, and was here once on the incorrect belief that
+    without it the Assets\*.ico files would sit loose beside the exe. They do not - content is bundled either
+    way, and extracted either way. What the flag adds is extraction of every *managed assembly* too, which
+    .NET can load straight from the bundle and has no reason to write to disk. Measured on this app: 9.76 MB
+    extracted to %TEMP% without it against 133.95 MB with it, 8 files against hundreds, and the icons present
+    in both. It cost roughly ten seconds on a first run and bought nothing.
   -->
   <PropertyGroup>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -35,7 +41,6 @@
 
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 

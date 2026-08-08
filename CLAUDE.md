@@ -318,10 +318,18 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 ## Constraints, already decided
 
 - **Publish is a single self-contained `PasteJump.exe`, ~65 MB, with nothing beside it.**
-  `PublishSingleFile` plus `EnableCompressionInSingleFile`, which measured 143 MB down to 65 MB in exchange
-  for decompressing assemblies at each start — the right trade for an app launched once per logon.
-  `IncludeAllContentForSelfExtract` is required, or the `Assets\*.ico` files stay loose beside the exe and it
-  is no longer one file.
+  `PublishSingleFile` plus `IncludeNativeLibrariesForSelfExtract` (WPF's native libraries cannot load from
+  inside the bundle) plus `EnableCompressionInSingleFile`.
+- **Compression is a measured trade, not an obvious win.** 143 MB down to 65 MB, at the cost of ~250 ms of CPU
+  decompressing on *every* start: measured 891 ms CPU uncompressed against 1141 ms compressed. Once the exe is
+  in the OS file cache the uncompressed build actually starts faster in wall-clock (1.3 s against 2.2 s), but a
+  logon-resident app launches just after boot when nothing is cached, and there reading 65 MB beats reading
+  143 MB. Keep compression; do not "improve" it on the strength of a warm-cache timing.
+- **`IncludeAllContentForSelfExtract` must stay OFF.** It was once set here on the mistaken belief that
+  without it the `Assets\*.ico` files would sit loose beside the exe. They do not: content is bundled *and*
+  extracted either way. What the flag adds is extracting every **managed assembly** too, which .NET loads
+  straight from the bundle and has no reason to write to disk. Measured: **9.76 MB in 8 files** extracted to
+  `%TEMP%` without it, against **133.95 MB** with it — about ten seconds of first-run I/O for nothing.
 - **WPF supports neither trimming nor NativeAOT**, and that is what fixes the floor in the tens of
   megabytes. Do not compare against a .NET Framework app: Carnac.exe is 4 MB because Windows already carries
   its runtime and Costura.Fody only had to embed a dozen managed DLLs. .NET 10 is not in Windows, so a
