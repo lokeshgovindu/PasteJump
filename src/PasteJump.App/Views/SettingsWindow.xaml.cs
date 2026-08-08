@@ -416,6 +416,25 @@ public partial class SettingsWindow : Window
         RefreshAdvanced();
     }
 
+    /// <summary>
+    /// Puts a density chosen in the history window into this dialog, and into the baseline.
+    /// <para>
+    /// Same reasoning as <see cref="ReloadRetention"/>: without it the combo still holds the old value and
+    /// writes it back on OK, undoing a choice the user made moments earlier in the other window. Updating the
+    /// baseline first matters - setting the combo raises SelectionChanged, and the dirty check runs from there,
+    /// so a stale baseline would light up Apply for a change that has already been saved.
+    /// </para>
+    /// </summary>
+    public void ReloadDensity(GridDensity density)
+    {
+        _baseline.GridDensity = density;
+
+        DensityCombo.SelectedItem = DensityChoices
+            .First(c => c.Density == density).Label;
+
+        RefreshAdvanced();
+    }
+
     // ------------------------------------------------------------------ excluded apps
 
     private void OnExcludedSelectionChanged(object sender, SelectionChangedEventArgs e)

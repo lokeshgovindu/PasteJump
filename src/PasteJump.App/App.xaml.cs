@@ -598,6 +598,7 @@ public partial class App : Application
         {
             _historyWindow = Themed(new HistoryWindow(
                 _store, _clipboard, _selfWrites, _formatters, _settings.GridDensity));
+            _historyWindow.DensityChanged += OnHistoryDensityChanged;
             _historyWindow.Closed += (_, _) => _historyWindow = null;
             _historyWindow.Show();
         }
@@ -623,6 +624,27 @@ public partial class App : Application
         {
             _settingsWindow.Activate();
         }
+    }
+
+    /// <summary>
+    /// Persists a density chosen in the history window, and keeps an open settings dialog honest about it.
+    /// <para>
+    /// The dialog must be told, not left to notice: it holds its own copy of the settings and writes the whole
+    /// object back on OK, so without this it would quietly restore the old density - the same trap
+    /// <see cref="SettingsWindow.ReloadRetention"/> exists for.
+    /// </para>
+    /// </summary>
+    private void OnHistoryDensityChanged(GridDensity density)
+    {
+        if (_settings.GridDensity == density)
+        {
+            return;
+        }
+
+        _settings.GridDensity = density;
+        _settingsStore.Save(_settings);
+
+        _settingsWindow?.ReloadDensity(density);
     }
 
     private void ShowAbout()

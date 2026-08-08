@@ -57,6 +57,27 @@
                         ToolTip="Remove every entry from history. This cannot be undone." />
             </StackPanel>
 
+            <!--
+                Density, here as well as in Settings. It is the one setting whose whole effect is visible in
+                this window, so choosing it anywhere else means opening a dialog to change a number and then
+                looking somewhere else to judge it. Both places write the same setting and each follows the
+                other while open.
+            -->
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,0,10,0">
+                <TextBlock Text="Density"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+                <ComboBox x:Name="DensityCombo"
+                          Width="104"
+                          VerticalAlignment="Center"
+                          SelectionChanged="OnDensityChanged"
+                          ToolTip="Row spacing for this list. Compact fits the most rows; Roomy is the easiest to hit with a mouse. Saved as a setting." />
+            </StackPanel>
+
             <!-- Search box with a cue banner. WPF has no native placeholder, so the hint is a
                  TextBlock layered behind the box and hidden as soon as there is text. -->
             <Grid Grid.Column="2" Width="320">

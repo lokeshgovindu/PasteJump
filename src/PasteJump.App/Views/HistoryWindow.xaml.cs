@@ -102,6 +102,17 @@ public partial class HistoryWindow : Window
     /// </summary>
     private const uint CfDib = 8;
 
+    /// <summary>
+    /// Same labels as the Settings dialog's own density combo, deliberately: two controls for one setting
+    /// that named the options differently would read as two different settings.
+    /// </summary>
+    private static readonly (GridDensity Density, string Label)[] DensityChoices =
+    [
+        (GridDensity.Roomy, "Roomy"),
+        (GridDensity.Cozy, "Cozy"),
+        (GridDensity.Compact, "Compact"),
+    ];
+
     private readonly ClipStore _store;
     private readonly IClipboardAccess _clipboard;
     private readonly SelfWriteGuard _selfWrites;
@@ -109,6 +120,12 @@ public partial class HistoryWindow : Window
     private readonly ObservableCollection<HistoryRow> _rows = [];
     private readonly DispatcherTimer _searchDebounce;
     private readonly DispatcherTimer _refreshDebounce;
+
+    /// <summary>
+    /// Suppresses <see cref="DensityChanged"/> while the combo is being set in code. Without it, applying a
+    /// change that arrived <em>from</em> the settings dialog would raise it straight back and save again.
+    /// </summary>
+    private bool _settingDensity;
 
     public HistoryWindow(
         ClipStore store,
@@ -125,6 +142,12 @@ public partial class HistoryWindow : Window
         InitializeComponent();
 
         EntriesGrid.ItemsSource = _rows;
+
+        foreach (var choice in DensityChoices)
+        {
+            DensityCombo.Items.Add(choice.Label);
+        }
+
         ApplyDensity(density);
 
         // Debounced so typing does not run one FTS query per keystroke.
@@ -168,6 +191,19 @@ public partial class HistoryWindow : Window
     /// </summary>
     public void ApplyDensity(GridDensity density)
     {
+        // Also the entry point for a change made in the Settings dialog, so the combo has to follow - guarded,
+        // or setting it here raises OnDensityChanged and saves a change that came from the other direction.
+        _settingDensity = true;
+
+        try
+        {
+            DensityCombo.SelectedItem = DensityChoices.First(c => c.Density == density).Label;
+        }
+        finally
+        {
+            _settingDensity = false;
+        }
+
         EntriesGrid.RowHeight = GridDensityMetrics.RowHeight(density);
 
         EntriesGrid.CellStyle = new Style(typeof(DataGridCell), (Style)FindResource(typeof(DataGridCell)))
@@ -183,6 +219,29 @@ public partial class HistoryWindow : Window
                         GridDensityMetrics.CellPaddingY(density))),
             },
         };
+    }
+
+    /// <summary>
+    /// Raised when the user picks a density here, so the host can persist it and keep an open settings
+    /// dialog in step. Not raised for a density applied <em>to</em> this window.
+    /// </summary>
+    public event Action<GridDensity>? DensityChanged;
+
+    private void OnDensityChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_settingDensity || DensityCombo.SelectedItem is not string label)
+        {
+            return;
+        }
+
+        var density = DensityChoices
+            .FirstOrDefault(c => string.Equals(c.Label, label, StringComparison.Ordinal))
+            .Density;
+
+        // Applied before announcing it, so the effect is on screen in the same frame as the click rather
+        // than waiting for the host to hand it back.
+        ApplyDensity(density);
+        DensityChanged?.Invoke(density);
     }
 
     /// <summary>
