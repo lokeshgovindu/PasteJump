@@ -19,7 +19,25 @@
         Note the tray cannot use this entry: it needs a filesystem path for LoadImage, and a pack:// URI
         is not one. See the Content item in PasteJump.App.csproj.
     -->
-    <BitmapImage x:Key="AppIcon" UriSource="pack://application:,,,/PasteJump;component/Assets/pastejump.ico" />
+    <!--
+        DecodePixelWidth is not optional, and leaving it off was a real bug: a BitmapImage decodes exactly one
+        frame of an .ico, and with no requested size WPF's icon decoder picks the SMALLEST - measured, 16 of the
+        nine frames present. Window.Icon then has nothing but that 16px bitmap to answer every request with, so
+        the taskbar button, Alt+Tab and Task Manager - which ask for 32 or more - all rendered a 16px image,
+        visibly smaller than every neighbouring icon rather than merely soft.
+
+        Asking for 256 makes WPF take the largest frame instead, and Windows downsamples from it for the small
+        sizes. That is the right way round: downscaling is always cleaner than the reverse, which is the same
+        reasoning as AppIconLarge below. The cost is that the hand-tuned 16px frame is no longer used for the
+        title bar; a 256 frame reduced to 16 is a fair trade for the taskbar being correct.
+
+        This does not affect Explorer or a pinned taskbar entry - those read the PE header, via ApplicationIcon
+        in the csproj, which still carries all nine frames and lets Windows pick per size.
+    -->
+    <BitmapImage x:Key="AppIcon"
+                 UriSource="pack://application:,,,/PasteJump;component/Assets/pastejump.ico"
+                 DecodePixelWidth="256"
+                 DecodePixelHeight="256" />
 
     <!--
         The mark for anything that *displays* it rather than using it as a window icon.
