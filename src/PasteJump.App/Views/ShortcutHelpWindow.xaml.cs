@@ -26,5 +26,12 @@ public partial class ShortcutHelpWindow : Window
 
         TriggerKeyText.Text = key.ToString();
         SearchStepText.Text = $"{chord} / Ctrl+C";
+
+        // SizeToContent is released once the initial height has been measured. Left on, it recomputes the
+        // height from the content and undoes any vertical resize the user makes, so the window would appear
+        // resizable and then silently snap back.
+        Loaded += (_, _) => SizeToContent = SizeToContent.Manual;
     }
+
+    private void OnCloseClicked(object sender, RoutedEventArgs e) => Close();
 }

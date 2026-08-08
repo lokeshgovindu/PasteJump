@@ -10,8 +10,11 @@ data/
 *.db-shm
 *.db-wal
 
-# User settings produced at runtime
+# User settings produced at runtime. Both names: the file was called settings.json before it was
+# renamed after the application, and an existing working copy may still have one.
+PasteJump.json
 settings.json
+data-location.json
 
 # Visual Studio / Rider / VS Code
 .vs/

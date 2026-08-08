@@ -46,7 +46,7 @@ stick and it takes its history with it.
 | Setting | Covers | Move it when |
 |---|---|---|
 | **Store clips in** | database, image blobs, logs | the program folder is not writable (unzipping under `C:\Program Files` is the usual way to find out), or you want one history shared across several copies |
-| **Store settings in** | `settings.json` | rarely — keeping it beside the program is what lets a portable copy carry its own configuration |
+| **Store settings in** | `PasteJump.json` | rarely — keeping it beside the program is what lets a portable copy carry its own configuration |
 
 Either can be *My user profile*, which is `%LOCALAPPDATA%\PasteJump`. PasteJump restarts, copies that
 half across, and leaves the old copy for you to delete.

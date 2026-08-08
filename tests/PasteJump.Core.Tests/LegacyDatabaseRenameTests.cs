@@ -95,4 +95,41 @@ public sealed class LegacyDatabaseRenameTests : IDisposable
 
         Assert.Equal("db", File.ReadAllText(_paths.DatabaseFile));
     }
+
+    // ---------------------------------------------------------------- settings.json to PasteJump.json
+
+    private string LegacySettingsPath => Path.Combine(_paths.SettingsDirectory, "settings.json");
+
+    [Fact]
+    public void A_legacy_settings_file_is_renamed()
+    {
+        // Without this the rename would present as every setting reverting to its default, with the real file
+        // still on disk under a name nothing looks for.
+        File.WriteAllText(LegacySettingsPath, """{ "maxClips": 42 }""");
+
+        Assert.True(_paths.TryMigrateLegacySettings());
+
+        Assert.False(File.Exists(LegacySettingsPath));
+        Assert.Equal("""{ "maxClips": 42 }""", File.ReadAllText(_paths.SettingsFile));
+    }
+
+    [Fact]
+    public void The_settings_file_is_named_after_the_application()
+        => Assert.Equal("PasteJump.json", Path.GetFileName(_paths.SettingsFile));
+
+    [Fact]
+    public void Existing_settings_are_never_overwritten_by_the_rename()
+    {
+        File.WriteAllText(LegacySettingsPath, """{ "maxClips": 1 }""");
+        File.WriteAllText(_paths.SettingsFile, """{ "maxClips": 2 }""");
+
+        Assert.False(_paths.TryMigrateLegacySettings());
+
+        Assert.Equal("""{ "maxClips": 2 }""", File.ReadAllText(_paths.SettingsFile));
+        Assert.True(File.Exists(LegacySettingsPath));
+    }
+
+    [Fact]
+    public void A_fresh_install_has_no_settings_to_rename()
+        => Assert.False(_paths.TryMigrateLegacySettings());
 }

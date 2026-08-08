@@ -132,8 +132,12 @@ that immediately caught two real bugs. Expect to do the same again.
   manager stealing the incoming chord; changing the keystroke is the fix for it stealing the outgoing one.
 - **`Shift+Insert` needs `KEYEVENTF_EXTENDEDKEY`.** Insert shares a scan code with numpad 0; without the
   flag a scan-code reader sees a numpad keypress with Num Lock off. Same family of bug as `wScan == 0`.
-- **The data locations cannot live in `settings.json`,** because one of them decides where
-  `settings.json` is. They live in `data-location.json` beside the exe, read before anything else. Clips
+- **The settings file is `PasteJump.json`, not `settings.json`.** Renamed because it does not always sit in
+  a folder that belongs only to us — under the user profile it shares a tree with other software.
+  `AppPaths.SettingsFileName` is the single definition; `TryMigrateLegacySettings` renames an old file on
+  start-up, without which the rename would look like every setting reverting to its default.
+- **The data locations cannot live in the settings file,** because one of them decides where that file
+  is. They live in `data-location.json` beside the exe, read before anything else. Clips
   and settings are located **independently** — `AppPaths` therefore has two roots, `ClipsRoot` and
   `SettingsRoot`, and no `DataDirectory`; use `ClipsDirectory` or `SettingsDirectory` and be deliberate
   about which. Blobs and logs follow the clips. The move is deferred to the next start-up

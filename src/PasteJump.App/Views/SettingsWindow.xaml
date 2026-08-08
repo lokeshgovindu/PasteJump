@@ -303,7 +303,7 @@
                         <ComboBox x:Name="SettingsLocationCombo"
                                   Grid.Column="1"
                                   SelectionChanged="OnDataLocationChanged"
-                                  ToolTip="Where settings.json lives. Independent of the clips: keep settings beside the program so a portable copy carries its own configuration, while the clips live elsewhere." />
+                                  ToolTip="Where PasteJump.json lives. Independent of the clips: keep settings beside the program so a portable copy carries its own configuration, while the clips live elsewhere." />
                     </Grid>
 
                     <TextBlock x:Name="SettingsLocationPathText"
@@ -372,7 +372,7 @@
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                 <Setter Property="ToolTip"
-                                        Value="{Binding Name, StringFormat='{}{0} — see data\\settings.json'}" />
+                                        Value="{Binding Name, StringFormat='{}{0} — see data\\PasteJump.json'}" />
                                 <Style.Triggers>
                                     <!-- Anything changed from its default is worth spotting at a glance;
                                          it is the first thing to check when behaviour is surprising. -->

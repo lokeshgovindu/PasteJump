@@ -103,6 +103,9 @@ public partial class App : Application
         _paths.EnsureCreated();
         _paths.TryMigrateLegacyDatabase();
 
+        // Before SettingsStore reads, or the rename would look like every setting reverting to its default.
+        _paths.TryMigrateLegacySettings();
+
         WarnIfDataDirectoryIsReadOnly();
 
         _settingsStore = new SettingsStore(_paths);
@@ -457,10 +460,19 @@ public partial class App : Application
     /// </para>
     /// </summary>
     private void ApplyTrayIcon()
+    {
+        // Greyed while disabled, which is Windows' own convention for an inactive icon and the only signal
+        // visible without hovering for the tooltip. Worth having precisely because Disable is not persisted:
+        // the state has to be obvious at a glance or it is easy to forget the app is switched off.
+        var name = _keyboardHook is { IsInstalled: false }
+            ? "pastejump-disabled.ico"
+            : "pastejump.ico";
+
         // Through AppPaths, so this resolves off Environment.ProcessPath like every other path in the
         // app. AppContext.BaseDirectory would look correct and then break under a single-file publish,
         // where it points at the extraction directory rather than the folder holding the exe.
-        => _trayIcon.SetIconFromFile(Path.Combine(_paths.AssetsDirectory, "pastejump.ico"));
+        _trayIcon.SetIconFromFile(Path.Combine(_paths.AssetsDirectory, name));
+    }
 
     /// <summary>
     /// A repeat copy that was suppressed rather than stored. Still acknowledged, and labelled so the
@@ -824,6 +836,7 @@ public partial class App : Application
         }
 
         _trayIcon.SetTooltip(BuildTrayTooltip());
+        ApplyTrayIcon();
     }
 
     /// <summary>

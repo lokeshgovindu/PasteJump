@@ -24,6 +24,8 @@ public partial class AboutWindow : Window
         CopyrightText.Text = AppVersion.Copyright;
     }
 
+    private void OnCloseClicked(object sender, RoutedEventArgs e) => Close();
+
     /// <summary>
     /// Opens the repository in the default browser.
     /// <para>

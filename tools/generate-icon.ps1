@@ -15,14 +15,33 @@
 #
 # Run with Windows PowerShell 5.1, which has System.Drawing available.
 
+#   * -Disabled renders the same geometry with the colour drained out, for the tray icon shown while
+#     PasteJump is disabled. Greyscale rather than translucent: Windows' own convention for an inactive
+#     icon is desaturation, and a semi-transparent tray icon reads as a rendering fault against some
+#     taskbar colours rather than as a state.
+
 [CmdletBinding()]
 param(
     [string] $OutputPath = (Join-Path $PSScriptRoot '..\src\PasteJump.App\Assets\pastejump.ico'),
-    [string] $PreviewPath
+    [string] $PreviewPath,
+    [switch] $Disabled
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
+
+# Tile gradient. The disabled pair is the enabled pair converted to its luminance, so the mark keeps its
+# shape and tonal structure and only loses its colour.
+if ($Disabled) {
+    $tileTop = [System.Drawing.Color]::FromArgb(255, 142, 142, 146)
+    $tileBottom = [System.Drawing.Color]::FromArgb(255, 79, 79, 84)
+    $cardColour = [System.Drawing.Color]::FromArgb(255, 236, 236, 238)
+}
+else {
+    $tileTop = [System.Drawing.Color]::FromArgb(255, 91, 147, 248)
+    $tileBottom = [System.Drawing.Color]::FromArgb(255, 29, 78, 216)
+    $cardColour = [System.Drawing.Color]::FromArgb(255, 255, 255, 255)
+}
 
 function New-RoundedPath {
     param(
@@ -68,8 +87,8 @@ function New-PasteJumpBitmap {
     $gradient = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
         (New-Object System.Drawing.PointF(0, $inset)),
         (New-Object System.Drawing.PointF(0, ($inset + $tileW))),
-        [System.Drawing.Color]::FromArgb(255, 91, 147, 248),
-        [System.Drawing.Color]::FromArgb(255, 29, 78, 216))
+        $script:tileTop,
+        $script:tileBottom)
 
     $g.FillPath($gradient, $tile)
 
@@ -103,7 +122,7 @@ function New-PasteJumpBitmap {
     $frontX = [single]($centreX + $offset / 2)
     $frontY = [single]($centreY + $offset / 2)
 
-    $white = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 255, 255, 255))
+    $white = New-Object System.Drawing.SolidBrush($script:cardColour)
 
     # 1. The back card.
     $backPath = New-RoundedPath -X $backX -Y $backY -W $cardW -H $cardH -Radius $cardR

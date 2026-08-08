@@ -55,7 +55,18 @@ public sealed class AppPaths
 
     public string BlobsDirectory => Path.Combine(ClipsDirectory, "blobs");
 
-    public string SettingsFile => Path.Combine(SettingsDirectory, "settings.json");
+    /// <summary>
+    /// Name of the settings file. Named after the application rather than the generic <c>settings.json</c>,
+    /// because it does not always sit in a folder that belongs only to PasteJump - with the settings stored
+    /// in the user profile it shares a tree with other software, and a file called <c>settings.json</c> there
+    /// says nothing about whose settings it holds.
+    /// </summary>
+    public const string SettingsFileName = "PasteJump.json";
+
+    /// <summary>The name used before the file was renamed after the application.</summary>
+    private const string LegacySettingsFileName = "settings.json";
+
+    public string SettingsFile => Path.Combine(SettingsDirectory, SettingsFileName);
 
     public string LogDirectory => Path.Combine(ClipsDirectory, "logs");
 
@@ -177,6 +188,40 @@ public sealed class AppPaths
         // Separate call rather than folded in above: when the two halves are in the same place this is a
         // no-op, and when they are not it is the only thing that creates the settings side.
         Directory.CreateDirectory(SettingsDirectory);
+    }
+
+    /// <summary>
+    /// Renames a <c>settings.json</c> left by an earlier version, and reports whether it did.
+    /// <para>
+    /// Without this, renaming the file would silently reset every setting to its default - the old file still
+    /// on disk under a name nothing looks for. Cheap insurance against exactly the failure
+    /// <see cref="TryMigrateLegacyDatabase"/> exists to prevent, and it moves rather than copies so the user
+    /// is not left wondering which of two files is live.
+    /// </para>
+    /// <para>
+    /// Only ever moves into an unoccupied name. If both exist the current one wins and the old file is left
+    /// alone, because overwriting live settings to tidy up a filename would be worse than a stray file.
+    /// </para>
+    /// </summary>
+    public bool TryMigrateLegacySettings()
+    {
+        var legacy = Path.Combine(SettingsDirectory, LegacySettingsFileName);
+
+        if (!File.Exists(legacy) || File.Exists(SettingsFile))
+        {
+            return false;
+        }
+
+        try
+        {
+            File.Move(legacy, SettingsFile);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Starting with defaults is recoverable; refusing to start is not. Reported rather than thrown.
+            return false;
+        }
     }
 
     /// <summary>Database name used before the app was renamed from Clipjog to PasteJump.</summary>

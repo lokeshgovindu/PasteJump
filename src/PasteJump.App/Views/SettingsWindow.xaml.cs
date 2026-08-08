@@ -320,7 +320,8 @@ public partial class SettingsWindow : Window
 
         AdvancedStatus.Text =
             $"{rows.Count} setting{(rows.Count == 1 ? string.Empty : "s")}, {modified} changed from default. " +
-            "Read-only here - edit on the other tabs, or in data\\settings.json while PasteJump is closed. " +
+            $"Read-only here - edit on the other tabs, or in data\\{AppPaths.SettingsFileName} while " +
+            "PasteJump is closed. " +
             $"Rows marked {DataLocationPointer.FileName} live in that file instead, beside PasteJump.exe.";
 
         AdvancedFilterCue.Visibility = string.IsNullOrEmpty(filter)

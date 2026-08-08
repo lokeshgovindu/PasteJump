@@ -22,8 +22,18 @@ public readonly record struct DataMigrationReport(bool Adopted, int FilesCopied,
 /// </summary>
 public static class DataMigrator
 {
-    /// <summary>Files belonging to the settings half. Everything else in <c>data</c> is clips.</summary>
-    private const string SettingsFileName = "settings.json";
+    /// <summary>
+    /// Files belonging to the settings half. Everything else in <c>data</c> is clips.
+    /// <para>
+    /// The superseded <c>settings.json</c> is listed too, so a move performed before the rename has caught up
+    /// carries the old file across rather than stranding it - the rename then happens at the destination on
+    /// the next start.
+    /// </para>
+    /// </summary>
+    private static readonly string[] SettingsFileNames = [AppPaths.SettingsFileName, "settings.json"];
+
+    private static bool IsSettingsFile(string relativePath) => SettingsFileNames
+        .Any(name => relativePath.Equals(name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Copies the database, blobs and logs from <paramref name="fromRoot"/> to <paramref name="toRoot"/>.
@@ -48,10 +58,7 @@ public static class DataMigrator
             return DataMigrationReport.NothingToDo;
         }
 
-        return Copy(
-            from.ClipsDirectory,
-            to.ClipsDirectory,
-            include: static name => !name.Equals(SettingsFileName, StringComparison.OrdinalIgnoreCase));
+        return Copy(from.ClipsDirectory, to.ClipsDirectory, include: static name => !IsSettingsFile(name));
     }
 
     /// <summary>
@@ -75,10 +82,7 @@ public static class DataMigrator
             return DataMigrationReport.NothingToDo;
         }
 
-        return Copy(
-            from.SettingsDirectory,
-            to.SettingsDirectory,
-            include: static name => name.Equals(SettingsFileName, StringComparison.OrdinalIgnoreCase));
+        return Copy(from.SettingsDirectory, to.SettingsDirectory, include: static name => IsSettingsFile(name));
     }
 
     /// <summary>

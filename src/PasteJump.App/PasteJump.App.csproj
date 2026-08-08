@@ -51,6 +51,14 @@
   <ItemGroup>
     <Resource Include="Assets\pastejump.ico" />
     <Content Include="Assets\pastejump.ico" CopyToOutputDirectory="PreserveNewest" />
+
+    <!--
+      Greyed variant for the tray while PasteJump is disabled. Content only: no window shows it, so it needs
+      no pack:// URI. Unlike the pair of monochrome glyphs this project used to carry, the two are not a
+      light/dark theme split - they are two application states, and picking between them is not something a
+      single icon can do.
+    -->
+    <Content Include="Assets\pastejump-disabled.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

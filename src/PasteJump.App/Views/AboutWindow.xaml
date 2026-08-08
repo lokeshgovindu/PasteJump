@@ -79,7 +79,13 @@
                     MinWidth="96"
                     Padding="14,5"
                     ToolTip="Copies the version and environment details, for pasting into a bug report" />
+            <!--
+                Needs the Click handler. IsCancel sets DialogResult, which only exists for a window shown with
+                ShowDialog; this one is shown with Show, so without a handler neither the button nor Esc does
+                anything. IsCancel stays because it is what routes Esc here.
+            -->
             <Button Content="_Close"
+                    Click="OnCloseClicked"
                     IsCancel="True"
                     IsDefault="True"
                     MinWidth="84"
