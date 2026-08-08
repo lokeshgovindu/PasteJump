@@ -6,9 +6,23 @@ using System.Windows.Input;
 namespace PasteJump.App.Views;
 
 /// <summary>One running program, as offered in the picker.</summary>
-/// <param name="FileName">Executable file name, which is what gets stored.</param>
+/// <param name="FileName">Executable file name, which is the only part that gets stored.</param>
 /// <param name="WindowTitle">Title of its main window, shown only to identify it.</param>
-public sealed record RunningApp(string FileName, string WindowTitle);
+/// <param name="FullPath">
+/// Where the executable actually lives, or null when the process could not be inspected. Shown because a file
+/// name alone is ambiguous - several programs ship an <c>updater.exe</c>, and matching is by name, so the path
+/// is how you tell whether the entry you are about to add is the one you meant.
+/// </param>
+/// <param name="Icon">The executable's small icon, or null when it has none we could read.</param>
+public sealed record RunningApp(
+    string FileName,
+    string WindowTitle,
+    string? FullPath,
+    System.Windows.Media.Imaging.BitmapSource? Icon)
+{
+    /// <summary>Path for display, saying so plainly when it could not be determined.</summary>
+    public string PathText => FullPath ?? "(path unavailable)";
+}
 
 /// <summary>
 /// Lets the user pick programs to exclude from the ones currently running, rather than typing an executable
@@ -79,7 +93,13 @@ public partial class RunningAppPicker : Window
                 continue;
             }
 
-            apps.Add(new RunningApp(fileName, process.MainWindowTitle));
+            var path = Services.ProgramIcons.TryGetPath(process);
+
+            apps.Add(new RunningApp(
+                fileName,
+                process.MainWindowTitle,
+                path,
+                Services.ProgramIcons.TryGetIcon(path)));
         }
 
         AppsGrid.ItemsSource = apps.OrderBy(static a => a.FileName, StringComparer.CurrentCultureIgnoreCase).ToList();

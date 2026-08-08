@@ -143,13 +143,23 @@ public sealed class BlobStore
 
             try
             {
-                var raw = File.ReadAllBytes(file);
-
-                if (HasMarker(raw))
+                // The marker is tested by reading four bytes, not the whole file. Reading each blob in full
+                // just to look at its header meant a complete pass over the blob store on every single
+                // start-up - 51 MB across 485 files on the store that exposed this - and it never stopped,
+                // because an already-converted blob was read and then discarded exactly like an unconverted
+                // one.
+                //
+                // Measured, so the trade is on record: with the file cache warm the peek is actually SLOWER
+                // (150 ms against 123 ms for that store), because 485 opens cost more than one streaming read
+                // of cached data. It wins on a cold cache and it stops the cost scaling with the size of the
+                // store rather than its file count, which is what matters as a history grows. Do not "optimise"
+                // this back to a full read on the strength of a warm-cache benchmark.
+                if (IsAlreadyCompressed(file))
                 {
                     continue;
                 }
 
+                var raw = File.ReadAllBytes(file);
                 spent += raw.Length;
 
                 // Verified against the filename before rewriting. If a legacy blob does not hash to its own
@@ -176,6 +186,29 @@ public sealed class BlobStore
     private static bool HasMarker(ReadOnlySpan<byte> stored)
         => stored.Length >= CompressedMarker.Length
             && stored[..CompressedMarker.Length].SequenceEqual(CompressedMarker);
+
+    /// <summary>
+    /// Whether a blob on disk already carries the compression marker, read without loading the file.
+    /// <para>
+    /// A short read rather than <see cref="File.ReadAllBytes"/>, because this runs once per blob on every
+    /// start-up and the overwhelmingly common answer is yes.
+    /// </para>
+    /// </summary>
+    private static bool IsAlreadyCompressed(string path)
+    {
+        Span<byte> head = stackalloc byte[4];
+
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite,
+            bufferSize: 0,
+            FileOptions.SequentialScan);
+
+        return stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false) == head.Length
+            && HasMarker(head);
+    }
 
     private static byte[] Compress(byte[] data)
     {

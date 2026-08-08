@@ -762,6 +762,28 @@
         </Style.Triggers>
     </Style>
 
+    <!--
+        A file path in a grid cell. Muted like any secondary column, with a trailing ellipsis and the whole path
+        on a tooltip.
+
+        Trailing is the only option WPF offers - TextTrimming has no leading-ellipsis mode, so a path can be cut
+        at the end or not at all. That is acceptable here only because the file name, which is the part a path
+        is usually truncated to preserve, already has a column of its own beside this one. Without that column
+        this would need a converter that shortens the middle.
+    -->
+    <Style x:Key="PathCellText" TargetType="TextBlock" BasedOn="{StaticResource CellText}">
+        <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="ToolTip" Value="{Binding PathText}" />
+        <Setter Property="ToolTipService.ShowDuration" Value="60000" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}"
+                         Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="MutedCellText" TargetType="TextBlock" BasedOn="{StaticResource NumericCellText}">
         <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         <Style.Triggers>

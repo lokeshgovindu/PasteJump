@@ -2,9 +2,9 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PasteJump - choose programs"
-        Width="560"
-        Height="480"
-        MinWidth="420"
+        Width="880"
+        Height="520"
+        MinWidth="620"
         MinHeight="320"
         ShowInTaskbar="False"
         Background="{DynamicResource SurfaceBrush}"
@@ -54,14 +54,44 @@
                   VirtualizingPanel.IsVirtualizing="True"
                   VirtualizingPanel.VirtualizationMode="Recycling">
             <DataGrid.Columns>
+                <!--
+                    The icon is what makes this list scannable. A column of executable names is a column of
+                    near-identical text, and the whole reason this dialog exists is that people know programs
+                    by their icon and their name in the Start menu, not by their file name.
+
+                    Sizing is fixed rather than Auto: an Auto column would resize as rows virtualise in and
+                    out, making the grid shift under the pointer while scrolling.
+                -->
+                <DataGridTemplateColumn Header="" Width="30" CanUserSort="False" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <!-- Stretch=None so a 32px frame is not blown up to fill the cell; the icon is
+                                 already the size the author drew for a list. -->
+                            <Image Source="{Binding Icon}"
+                                   Width="16"
+                                   Height="16"
+                                   Stretch="None"
+                                   HorizontalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
                 <DataGridTextColumn Header="Program"
                                     Binding="{Binding FileName}"
                                     Width="1.1*"
                                     ElementStyle="{StaticResource CellText}" />
                 <DataGridTextColumn Header="Window"
                                     Binding="{Binding WindowTitle}"
-                                    Width="1.9*"
+                                    Width="1.4*"
                                     ElementStyle="{StaticResource MutedValueText}" />
+
+                <!-- Truncated at the end, with the whole path on a tooltip. Losing the tail is tolerable only
+                     because the file name has its own column beside this one - see PathCellText. -->
+                <DataGridTextColumn Header="Path"
+                                    Binding="{Binding PathText}"
+                                    Width="2.2*"
+                                    ElementStyle="{StaticResource PathCellText}" />
             </DataGrid.Columns>
         </DataGrid>
 
