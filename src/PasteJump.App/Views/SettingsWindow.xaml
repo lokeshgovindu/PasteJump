@@ -285,7 +285,7 @@
                         <ComboBox x:Name="ClipsLocationCombo"
                                   Grid.Column="1"
                                   SelectionChanged="OnDataLocationChanged"
-                                  ToolTip="Where the clip database, the image blobs and the logs live. Changing this needs a restart; the existing data is copied and the old copy is left in place. Choose your user profile to share one history between a Debug and a Release build." />
+                                  ToolTip="Where the clip database and the image blobs live. Changing this needs a restart; the existing data is copied and the old copy is left in place. Choose your user profile to share one history between a Debug and a Release build." />
                     </Grid>
 
                     <TextBlock x:Name="ClipsLocationPathText"

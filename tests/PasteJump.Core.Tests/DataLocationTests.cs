@@ -226,10 +226,9 @@ public sealed class DataLocationTests : IDisposable
         Assert.StartsWith(paths.ClipsRoot, paths.DatabaseFile, StringComparison.Ordinal);
         Assert.StartsWith(paths.SettingsRoot, paths.SettingsFile, StringComparison.Ordinal);
 
-        // Blobs and logs follow the clips, not the settings: they are runtime output that grows, not
-        // configuration you would want travelling with a portable copy.
+        // Blobs follow the clips, not the settings: they are runtime data that grows, not configuration you
+        // would want travelling with a portable copy.
         Assert.StartsWith(paths.ClipsRoot, paths.BlobsDirectory, StringComparison.Ordinal);
-        Assert.StartsWith(paths.ClipsRoot, paths.LogDirectory, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -240,8 +239,12 @@ public sealed class DataLocationTests : IDisposable
         paths.EnsureCreated();
 
         Assert.True(Directory.Exists(paths.BlobsDirectory));
-        Assert.True(Directory.Exists(paths.LogDirectory));
         Assert.True(Directory.Exists(paths.SettingsDirectory));
+
+        // Nothing else. The app has no logger, so it must not leave an empty data\logs folder behind.
+        Assert.DoesNotContain(
+            Directory.EnumerateDirectories(paths.ClipsDirectory),
+            d => Path.GetFileName(d).Equals("logs", StringComparison.OrdinalIgnoreCase));
     }
 
     // ------------------------------------------------------------------ migration

@@ -1,6 +1,6 @@
 namespace PasteJump.Core.Settings;
 
-/// <summary>Where PasteJump keeps its database, blobs, settings and logs.</summary>
+/// <summary>Where PasteJump keeps its database, blobs and settings.</summary>
 public enum DataLocation
 {
     /// <summary>

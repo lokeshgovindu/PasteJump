@@ -140,7 +140,7 @@ that immediately caught two real bugs. Expect to do the same again.
   is. They live in `data-location.json` beside the exe, read before anything else. Clips
   and settings are located **independently** — `AppPaths` therefore has two roots, `ClipsRoot` and
   `SettingsRoot`, and no `DataDirectory`; use `ClipsDirectory` or `SettingsDirectory` and be deliberate
-  about which. Blobs and logs follow the clips. The move is deferred to the next start-up
+  about which. Blobs follow the clips. The move is deferred to the next start-up
   (`DataMigrator.AdoptClips` / `AdoptSettings`) because SQLite has the database open at the moment the
   user clicks OK, and the pointer records `migrateFrom` per half explicitly — inferring "there is a
   database over there, adopt it" would swallow an unrelated history the first time someone unzips a fresh

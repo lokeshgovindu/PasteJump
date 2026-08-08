@@ -38,14 +38,7 @@ public sealed class AppPaths
     /// <summary>Which of the supported locations <see cref="SettingsRoot"/> came from.</summary>
     public DataLocation SettingsLocation { get; }
 
-    /// <summary>
-    /// Holds the database, its write-ahead log sidecars, the blob store and the logs.
-    /// <para>
-    /// The log directory is grouped with the clips rather than the settings because it is the same kind
-    /// of thing: runtime output that grows, not configuration you would want travelling with a portable
-    /// copy of the program.
-    /// </para>
-    /// </summary>
+    /// <summary>Holds the database, its write-ahead log sidecars and the blob store.</summary>
     public string ClipsDirectory => Path.Combine(ClipsRoot, "data");
 
     /// <summary>Holds <c>settings.json</c>, and nothing else.</summary>
@@ -68,7 +61,8 @@ public sealed class AppPaths
 
     public string SettingsFile => Path.Combine(SettingsDirectory, SettingsFileName);
 
-    public string LogDirectory => Path.Combine(ClipsDirectory, "logs");
+    // There is deliberately no LogDirectory. The app has no logger, and the property existed only to have
+    // EnsureCreated make an empty data\logs folder on every start. Reintroduce both together or neither.
 
     /// <summary>Assets shipped alongside the executable, such as the notification-area icon.</summary>
     public string AssetsDirectory => Path.Combine(ApplicationDirectory, "Assets");
@@ -183,7 +177,6 @@ public sealed class AppPaths
     {
         Directory.CreateDirectory(ClipsDirectory);
         Directory.CreateDirectory(BlobsDirectory);
-        Directory.CreateDirectory(LogDirectory);
 
         // Separate call rather than folded in above: when the two halves are in the same place this is a
         // no-op, and when they are not it is the only thing that creates the settings side.

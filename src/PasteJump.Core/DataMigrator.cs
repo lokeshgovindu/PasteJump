@@ -36,7 +36,7 @@ public static class DataMigrator
         .Any(name => relativePath.Equals(name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Copies the database, blobs and logs from <paramref name="fromRoot"/> to <paramref name="toRoot"/>.
+    /// Copies the database and blobs from <paramref name="fromRoot"/> to <paramref name="toRoot"/>.
     /// <para>
     /// Declines rather than merges when the destination already holds a database. Two histories cannot be
     /// combined by copying files over each other - the blobs are addressed by content but the database

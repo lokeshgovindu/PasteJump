@@ -43,7 +43,7 @@ public sealed class DataLocationPointer
         Converters = { new JsonStringEnumConverter() },
     };
 
-    /// <summary>Where the database, blobs and logs live. Null means "not stated"; see <see cref="Clips"/>.</summary>
+    /// <summary>Where the database and blobs live. Null means "not stated"; see <see cref="Clips"/>.</summary>
     public DataLocation? ClipsLocation { get; set; }
 
     /// <summary>Where <c>settings.json</c> lives. Null means "not stated"; see <see cref="Settings"/>.</summary>
