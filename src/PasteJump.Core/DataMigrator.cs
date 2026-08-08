@@ -1,6 +1,6 @@
 namespace PasteJump.Core;
 
-/// <summary>Outcome of a data-directory move. <see cref="Adopted"/> is false when there was nothing to do.</summary>
+/// <summary>Outcome of a move. <see cref="Adopted"/> is false when there was nothing to do.</summary>
 /// <param name="Adopted">True when at least one file was copied.</param>
 /// <param name="FilesCopied">Files successfully copied.</param>
 /// <param name="Error">Populated when the copy was abandoned part-way.</param>
@@ -10,7 +10,7 @@ public readonly record struct DataMigrationReport(bool Adopted, int FilesCopied,
 }
 
 /// <summary>
-/// Moves the <c>data</c> folder between the two supported locations when the user changes the setting.
+/// Moves clips and settings between locations when the user changes either setting.
 /// <para>
 /// Runs at startup, before the store is opened, because the database cannot be copied while it is open.
 /// </para>
@@ -22,8 +22,11 @@ public readonly record struct DataMigrationReport(bool Adopted, int FilesCopied,
 /// </summary>
 public static class DataMigrator
 {
+    /// <summary>Files belonging to the settings half. Everything else in <c>data</c> is clips.</summary>
+    private const string SettingsFileName = "settings.json";
+
     /// <summary>
-    /// Copies <paramref name="fromRoot"/>'s data folder into <paramref name="toRoot"/>.
+    /// Copies the database, blobs and logs from <paramref name="fromRoot"/> to <paramref name="toRoot"/>.
     /// <para>
     /// Declines rather than merges when the destination already holds a database. Two histories cannot be
     /// combined by copying files over each other - the blobs are addressed by content but the database
@@ -31,20 +34,79 @@ public static class DataMigrator
     /// using most recently.
     /// </para>
     /// </summary>
-    public static DataMigrationReport Adopt(string fromRoot, string toRoot)
+    public static DataMigrationReport AdoptClips(string fromRoot, string toRoot)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fromRoot);
-        ArgumentException.ThrowIfNullOrWhiteSpace(toRoot);
+        var source = Resolve(fromRoot, toRoot);
 
-        var source = AppPaths.At(fromRoot);
-        var destination = AppPaths.At(toRoot);
-
-        if (string.Equals(source.RootDirectory, destination.RootDirectory, StringComparison.OrdinalIgnoreCase))
+        if (source is not var (from, to))
         {
             return DataMigrationReport.NothingToDo;
         }
 
-        if (!Directory.Exists(source.DataDirectory) || File.Exists(destination.DatabaseFile))
+        if (File.Exists(to.DatabaseFile))
+        {
+            return DataMigrationReport.NothingToDo;
+        }
+
+        return Copy(
+            from.ClipsDirectory,
+            to.ClipsDirectory,
+            include: static name => !name.Equals(SettingsFileName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Copies <c>settings.json</c> from <paramref name="fromRoot"/> to <paramref name="toRoot"/>.
+    /// <para>
+    /// Declines when the destination already has one, on the same reasoning as the clips: a settings file
+    /// already at the destination was put there deliberately.
+    /// </para>
+    /// </summary>
+    public static DataMigrationReport AdoptSettings(string fromRoot, string toRoot)
+    {
+        var source = Resolve(fromRoot, toRoot);
+
+        if (source is not var (from, to))
+        {
+            return DataMigrationReport.NothingToDo;
+        }
+
+        if (File.Exists(to.SettingsFile))
+        {
+            return DataMigrationReport.NothingToDo;
+        }
+
+        return Copy(
+            from.SettingsDirectory,
+            to.SettingsDirectory,
+            include: static name => name.Equals(SettingsFileName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Null when the two roots are the same or the source does not exist, which is the "nothing to do"
+    /// case for both halves.
+    /// </summary>
+    private static (AppPaths From, AppPaths To)? Resolve(string fromRoot, string toRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fromRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(toRoot);
+
+        var from = AppPaths.At(fromRoot);
+        var to = AppPaths.At(toRoot);
+
+        if (string.Equals(from.ClipsRoot, to.ClipsRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return Directory.Exists(from.ClipsDirectory) ? (from, to) : null;
+    }
+
+    private static DataMigrationReport Copy(
+        string sourceDirectory,
+        string destinationDirectory,
+        Func<string, bool> include)
+    {
+        if (!Directory.Exists(sourceDirectory))
         {
             return DataMigrationReport.NothingToDo;
         }
@@ -53,24 +115,31 @@ public static class DataMigrator
 
         try
         {
-            Directory.CreateDirectory(destination.DataDirectory);
+            Directory.CreateDirectory(destinationDirectory);
 
-            foreach (var file in Directory.EnumerateFiles(source.DataDirectory, "*", SearchOption.AllDirectories))
+            foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
             {
-                var relative = Path.GetRelativePath(source.DataDirectory, file);
-                var target = Path.Combine(destination.DataDirectory, relative);
+                var relative = Path.GetRelativePath(sourceDirectory, file);
 
-                // Leftover temp files from an interrupted settings save or a previous migration. Copying
-                // them would resurrect rubbish at the new location.
-                if (target.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+                // Matched on the leaf name, so settings.json is recognised wherever it sits while a blob
+                // that happens to share the name inside blobs\ is not.
+                if (!include(relative))
                 {
                     continue;
                 }
 
+                // Leftover temp files from an interrupted settings save or a previous migration. Copying
+                // them would resurrect rubbish at the new location.
+                if (relative.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var target = Path.Combine(destinationDirectory, relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
 
-                // overwrite: false - the destination had no database, so anything already there was put
-                // there deliberately and is not ours to replace.
+                // overwrite: false - the caller already established the destination was unoccupied, so
+                // anything here was put there deliberately and is not ours to replace.
                 File.Copy(file, target, overwrite: false);
                 copied++;
             }

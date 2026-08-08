@@ -17,6 +17,28 @@
     </security>
   </trustInfo>
 
+  <!--
+    Visual styles. Without this dependency the process gets no ComCtl32 v6 activation context, and
+    every dialog Windows draws for us - MessageBox above all - falls back to the pre-XP classic style:
+    flat square grey buttons, a classic caption, and MS Shell Dlg instead of Segoe UI. It looks like a
+    Windows 2000 application and the text is noticeably worse.
+
+    Easy to miss because it is normally invisible. The SDK injects this into the manifest it generates
+    for WinForms projects, and WPF's own rendering does not go through ComCtl32 at all - so a WPF app
+    looks perfectly modern right up to the first MessageBox. Supplying ApplicationManifest by hand, as
+    this project does for dpiAwareness, means supplying this too.
+  -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity type="win32"
+                        name="Microsoft.Windows.Common-Controls"
+                        version="6.0.0.0"
+                        processorArchitecture="*"
+                        publicKeyToken="6595b64144ccf1df"
+                        language="*" />
+    </dependentAssembly>
+  </dependency>
+
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
       <!-- Windows 10 / 11 -->

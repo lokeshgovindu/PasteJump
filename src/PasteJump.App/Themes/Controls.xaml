@@ -172,12 +172,30 @@
 
     <!-- ============================================================ buttons -->
 
+    <!--
+        Shaped after the Windows 11 push button, because that is the yardstick a user actually compares
+        against - the Run dialog sitting next to ours.
+
+        Three things carry that look, and the first is the one that matters most:
+
+        1. The default button is FILLED with the accent, not outlined with it. An outline-only default is
+           the pre-Windows-10 convention and is what makes an otherwise fine button read as dated.
+        2. CornerRadius 4 and MinHeight 32. Win11's button is 4px and roomier than WPF's default; a 3px
+           radius on a short button reads as "nearly square" rather than deliberately rounded.
+        3. A 1px border in a slightly darker tone than the fill, so the button has an edge at rest
+           instead of floating.
+
+        Triggered on IsDefault rather than IsDefaulted. IsDefaulted goes false whenever focus moves to
+        another focusable control, so the fill would flicker away as soon as the user tabbed - whereas
+        Win11 keeps its default button filled the whole time.
+    -->
     <Style TargetType="Button">
         <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="Padding" Value="14,5" />
+        <Setter Property="MinHeight" Value="32" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
@@ -186,13 +204,28 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="3">
-                        <ContentPresenter HorizontalAlignment="Center"
+                            CornerRadius="4">
+                        <ContentPresenter x:Name="Content"
+                                          HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           Margin="{TemplateBinding Padding}"
                                           RecognizesAccessKey="True" />
                     </Border>
                     <ControlTemplate.Triggers>
+                        <!--
+                            Ordering is load-bearing. WPF applies matching triggers in declaration order,
+                            so the default-button fill has to come BEFORE the hover and pressed triggers -
+                            otherwise a filled default button would revert to the plain grey hover colour
+                            the moment the pointer touched it.
+                        -->
+                        <Trigger Property="IsDefault" Value="True">
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush"
+                                    Value="{DynamicResource AccentBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+                        </Trigger>
+
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background"
                                     Value="{DynamicResource ControlHoverBrush}" />
@@ -201,15 +234,35 @@
                             <Setter TargetName="Chrome" Property="Background"
                                     Value="{DynamicResource ControlPressedBrush}" />
                         </Trigger>
-                        <Trigger Property="IsDefaulted" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush"
-                                    Value="{DynamicResource AccentBrush}" />
-                        </Trigger>
+
+                        <!-- Re-stated for the default button, since the two triggers above have just
+                             overwritten its fill with the neutral one. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsDefault" Value="True" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{DynamicResource AccentHoverBrush}" />
+                        </MultiTrigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsDefault" Value="True" />
+                                <Condition Property="IsPressed" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{DynamicResource AccentPressedBrush}" />
+                        </MultiTrigger>
+
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Chrome" Property="BorderBrush"
                                     Value="{DynamicResource AccentBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{DynamicResource ControlHoverBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush"
+                                    Value="{DynamicResource BorderBrush}" />
                             <Setter Property="Foreground"
                                     Value="{DynamicResource ControlDisabledTextBrush}" />
                         </Trigger>

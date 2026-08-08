@@ -39,10 +39,17 @@ artifacts/publish/PasteJump.exe
 It lives in the notification area. Left-click for history, right-click for the menu.
 
 Data goes in `data/` next to the executable, so the whole folder is portable — copy it to a USB
-stick and it takes its history with it. If that folder is not writable — unzipping under
-`C:\Program Files` is the usual way to find out — switch **Settings → System → Store clips and settings
-in** to *My user profile* and it moves to `%LOCALAPPDATA%\PasteJump`. PasteJump restarts, copies the
-data across, and leaves the old copy for you to delete.
+stick and it takes its history with it.
+
+**Settings → System** locates the clips and the settings independently:
+
+| Setting | Covers | Move it when |
+|---|---|---|
+| **Store clips in** | database, image blobs, logs | the program folder is not writable (unzipping under `C:\Program Files` is the usual way to find out), or you want one history shared across several copies |
+| **Store settings in** | `settings.json` | rarely — keeping it beside the program is what lets a portable copy carry its own configuration |
+
+Either can be *My user profile*, which is `%LOCALAPPDATA%\PasteJump`. PasteJump restarts, copies that
+half across, and leaves the old copy for you to delete.
 
 ### Running alongside another clipboard manager
 

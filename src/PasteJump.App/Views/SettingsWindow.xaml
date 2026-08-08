@@ -226,14 +226,32 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="190" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Store clips and settings in" />
-                        <ComboBox x:Name="DataLocationCombo"
+                        <TextBlock Grid.Column="0" Text="Store clips in" />
+                        <ComboBox x:Name="ClipsLocationCombo"
                                   Grid.Column="1"
                                   SelectionChanged="OnDataLocationChanged"
-                                  ToolTip="Where the database, blobs and settings live. Changing this needs a restart; the existing data is copied and the old copy is left in place." />
+                                  ToolTip="Where the clip database, the image blobs and the logs live. Changing this needs a restart; the existing data is copied and the old copy is left in place. Choose your user profile to share one history between a Debug and a Release build." />
                     </Grid>
 
-                    <TextBlock x:Name="DataLocationPathText"
+                    <TextBlock x:Name="ClipsLocationPathText"
+                               Margin="0,4,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               FontSize="11"
+                               FontFamily="Consolas" />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Store settings in" />
+                        <ComboBox x:Name="SettingsLocationCombo"
+                                  Grid.Column="1"
+                                  SelectionChanged="OnDataLocationChanged"
+                                  ToolTip="Where settings.json lives. Independent of the clips: keep settings beside the program so a portable copy carries its own configuration, while the clips live elsewhere." />
+                    </Grid>
+
+                    <TextBlock x:Name="SettingsLocationPathText"
                                Margin="0,4,0,0"
                                Foreground="{DynamicResource MutedTextBrush}"
                                FontSize="11"
@@ -329,12 +347,31 @@
                    Margin="0,10,0,0"
                    Visibility="Collapsed" />
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="OkButton" Click="OnOkClicked" Content="_OK" IsDefault="True"
-                    ToolTip="Apply and close" />
-            <Button x:Name="CancelButton" Click="OnCancelClicked" Content="_Cancel" IsCancel="True"
-                    ToolTip="Discard changes" />
-        </StackPanel>
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="AppliedText"
+                       Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       FontSize="11"
+                       Visibility="Collapsed" />
+
+            <!-- OK, Cancel, Apply - the Windows property-sheet order. Apply sits outermost because it is
+                 the one you press repeatedly, and Cancel between them is what every other settings dialog
+                 on the machine does. -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="OkButton" Click="OnOkClicked" Content="_OK" IsDefault="True"
+                        ToolTip="Save and close" />
+                <Button x:Name="CancelButton" Click="OnCancelClicked" Content="_Cancel" IsCancel="True"
+                        ToolTip="Close without saving anything not already applied" />
+                <Button x:Name="ApplyButton" Click="OnApplyClicked" Content="_Apply"
+                        ToolTip="Save now and keep this window open, so you can try a value and adjust it" />
+            </StackPanel>
+        </Grid>
 
     </Grid>
 </Window>

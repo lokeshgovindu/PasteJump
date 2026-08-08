@@ -22,6 +22,19 @@
     <SolidColorBrush x:Key="WarnBrush" Color="#FFB45309" />
     <SolidColorBrush x:Key="DangerBrush" Color="#FFC2321F" />
 
+    <!--
+        Accent as a *fill*, for the default button - Windows 11 fills its default button rather than
+        merely outlining it, which is the single biggest reason an outlined-only button reads as dated.
+
+        Hover goes lighter and pressed goes lighter still, matching the Fluent convention: an accent
+        button recedes on press instead of darkening, because darkening an already-dark fill reads as
+        disabled. AccentTextBrush is near-white rather than pure white so it does not vibrate against
+        the fill.
+    -->
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF3B76EE" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF6892F1" />
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFBFBFE" />
+
     <!-- Control chrome. Previously unthemed, which is why the dark UI looked broken: text boxes,
          combo boxes and grid headers kept WPF's default light styling against a dark window. -->
     <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FFFFFFFF" />

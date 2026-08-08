@@ -22,6 +22,18 @@
     <SolidColorBrush x:Key="WarnBrush" Color="#FFE0A030" />
     <SolidColorBrush x:Key="DangerBrush" Color="#FFE8695B" />
 
+    <!--
+        Accent fill for the default button. See the note in Light.xaml.
+
+        The text on it is dark, not light. The dark theme's accent is a pale blue - chosen so it stays
+        legible as *text* on a dark surface - and pale blue is far too light to carry white text. This is
+        the one place where the two themes invert rather than mirror, and using AccentTextBrush from the
+        light palette here would give unreadable white-on-pale-blue.
+    -->
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF83ADFB" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF5A85DC" />
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#FF10131C" />
+
     <!-- Control chrome -->
     <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FF17171B" />
     <SolidColorBrush x:Key="ControlBorderBrush" Color="#FF4A4A56" />

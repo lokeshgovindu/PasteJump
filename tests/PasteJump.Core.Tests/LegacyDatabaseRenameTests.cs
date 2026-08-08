@@ -34,7 +34,7 @@ public sealed class LegacyDatabaseRenameTests : IDisposable
         }
     }
 
-    private string LegacyPath => Path.Combine(_paths.DataDirectory, "clipjog.db");
+    private string LegacyPath => Path.Combine(_paths.ClipsDirectory, "clipjog.db");
 
     [Fact]
     public void A_legacy_database_is_renamed()

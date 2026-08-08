@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 248 passing (`dotnet test`) |
+| Tests | 256 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | ~134 MB self-contained `win-x64` |
 
@@ -63,7 +63,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      248 tests.
+tests/PasteJump.Core.Tests      256 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -122,12 +122,15 @@ that immediately caught two real bugs. Expect to do the same again.
   hence the `PasteKeystroke` setting and `Shift+Insert`. Two managers cannot share Ctrl+V.
 - **`Shift+Insert` needs `KEYEVENTF_EXTENDEDKEY`.** Insert shares a scan code with numpad 0; without the
   flag a scan-code reader sees a numpad keypress with Num Lock off. Same family of bug as `wScan == 0`.
-- **The data location cannot live in `settings.json`,** because `settings.json` is inside the directory it
-  selects. It lives in `data-location.json` beside the exe, read before anything else. The move itself is
-  deferred to the next start-up (`DataMigrator`) because SQLite has the database open at the moment the
-  user clicks OK, and the pointer records `migrateFrom` explicitly — inferring "there is a database over
-  there, adopt it" would swallow an unrelated history the first time someone unzips a fresh portable copy
-  on a machine that already has one. The source is never deleted.
+- **The data locations cannot live in `settings.json`,** because one of them decides where
+  `settings.json` is. They live in `data-location.json` beside the exe, read before anything else. Clips
+  and settings are located **independently** — `AppPaths` therefore has two roots, `ClipsRoot` and
+  `SettingsRoot`, and no `DataDirectory`; use `ClipsDirectory` or `SettingsDirectory` and be deliberate
+  about which. Blobs and logs follow the clips. The move is deferred to the next start-up
+  (`DataMigrator.AdoptClips` / `AdoptSettings`) because SQLite has the database open at the moment the
+  user clicks OK, and the pointer records `migrateFrom` per half explicitly — inferring "there is a
+  database over there, adopt it" would swallow an unrelated history the first time someone unzips a fresh
+  portable copy on a machine that already has one. The source is never deleted.
 - **Never send the paste keystroke unless the clipboard write succeeded.** `TryWrite` genuinely fails,
   and a Ctrl+V after a failed write pastes whatever was there before — silently, and looking exactly
   like the app choosing the wrong clip. `ClipboardPaster` owns this ordering; it lives in `Core`
@@ -156,6 +159,21 @@ that immediately caught two real bugs. Expect to do the same again.
 ### Theming landmines
 
 Every one of these compiles, builds clean, and silently defeats the theme.
+
+- **`app.manifest` must declare `Microsoft.Windows.Common-Controls` v6.** Without it the process has no
+  ComCtl32 v6 activation context and *every dialog Windows draws for us* — `MessageBox` above all —
+  renders in the pre-XP classic style: flat square grey buttons, classic caption, `MS Shell Dlg` instead
+  of Segoe UI. Nearly invisible in review, because WPF's own rendering never touches ComCtl32, so the app
+  looks perfectly modern right up to the first `MessageBox`. The SDK injects this into the manifest it
+  *generates*; supplying `ApplicationManifest` by hand, as this project does for `dpiAwareness`, means
+  supplying this too. It was missing for months.
+- **A default button must trigger on `IsDefault`, not `IsDefaulted`.** `IsDefaulted` goes false the moment
+  focus lands on any other focusable control, so an accent fill keyed to it flickers away as soon as the
+  user tabs. Windows 11 keeps its default button filled the whole time.
+- **Trigger order in a `ControlTemplate` is load-bearing.** WPF applies matching triggers in declaration
+  order, so the accent fill for the default button must come *before* the hover and pressed triggers, and
+  then be re-stated as `MultiTrigger`s — otherwise a filled default button reverts to neutral grey the
+  moment the pointer touches it.
 
 - **Palette references must be `DynamicResource`.** `ThemeManager` swaps the palette dictionary at
   `Application.Resources.MergedDictionaries[0]`; a `StaticResource` binds once and never follows.
@@ -212,7 +230,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 248 tests
+dotnet test                                         # 256 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
@@ -231,8 +249,13 @@ mutex silently prevents a newly built copy from starting.
 
 Handy while debugging capture: the app stores its database at `data/pastejump.db`, by default beside the
 executable, so a published folder can be inspected directly with any SQLite tool. Since the build output
-moved under `artifacts/`, a Debug run and a Release run have **separate** data folders — set the data
-location to the user profile (Settings, System) to give both one history.
+moved under `artifacts/`, a Debug run and a Release run have **separate** data folders — set **Store clips
+in** to the user profile (Settings, System) to give both one history, and leave **Store settings in** on
+the PasteJump folder so each build keeps its own configuration. Those two are independent settings.
+
+The settings dialog has **Apply** as well as OK, so a timing value can be nudged and its effect watched
+without reopening it. Apply moves the dialog's baseline: `_baseline` in `SettingsWindow` is deliberately
+not readonly, because after an Apply the applied values *are* what is in force.
 
 Read `PLAN.md` for the full design, the state-machine spec, and the two corrections made during
 implementation. `README.md` is the user-facing description.

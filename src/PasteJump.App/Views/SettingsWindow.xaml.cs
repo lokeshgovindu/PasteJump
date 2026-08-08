@@ -53,18 +53,32 @@ public partial class SettingsWindow : Window
         (DataLocation.UserProfile, "My user profile"),
     ];
 
-    private readonly PasteJumpSettings _original;
     private readonly FormatterRegistry _formatters;
-    private readonly DataLocation _originalLocation;
+
+    /// <summary>
+    /// What is currently in force. Advanced compares against this to mark changed settings, and the
+    /// location combos compare against it to decide whether a restart is still pending.
+    /// <para>
+    /// Not readonly, because Apply moves the baseline. Once a change has been applied it <em>is</em> in
+    /// force, so continuing to compare against the values the dialog opened with would keep flagging
+    /// settings that no longer differ and keep announcing a restart that has already been requested.
+    /// </para>
+    /// </summary>
+    private PasteJumpSettings _baseline;
+
+    private DataLocation _baselineClipsLocation;
+    private DataLocation _baselineSettingsLocation;
 
     public SettingsWindow(
         PasteJumpSettings settings,
         FormatterRegistry formatters,
-        DataLocation dataLocation = DataLocation.ApplicationFolder)
+        DataLocation clipsLocation = DataLocation.ApplicationFolder,
+        DataLocation settingsLocation = DataLocation.ApplicationFolder)
     {
-        _original = settings;
+        _baseline = settings;
         _formatters = formatters;
-        _originalLocation = dataLocation;
+        _baselineClipsLocation = clipsLocation;
+        _baselineSettingsLocation = settingsLocation;
 
         InitializeComponent();
         Load();
@@ -75,36 +89,38 @@ public partial class SettingsWindow : Window
     public event Action<PasteJumpSettings>? SettingsApplied;
 
     /// <summary>
-    /// Raised on accept only when the data location actually changed.
+    /// Raised on accept only when either data location actually changed, with the new clips location and
+    /// the new settings location in that order.
     /// <para>
-    /// Separate from <see cref="SettingsApplied"/> because it is not one of the settings: it lives in its
-    /// own file outside the data directory, and acting on it means moving the database and restarting
-    /// rather than applying a value in memory.
+    /// Separate from <see cref="SettingsApplied"/> because these are not settings: they live in their own
+    /// file outside both data directories - one of them decides where <c>settings.json</c> is, so neither
+    /// can be stored in it - and acting on them means moving files and restarting rather than applying a
+    /// value in memory.
     /// </para>
     /// </summary>
-    public event Action<DataLocation>? DataLocationChangeRequested;
+    public event Action<DataLocation, DataLocation>? DataLocationChangeRequested;
 
     private void Load()
     {
-        MonitorClipboardCheck.IsChecked = _original.MonitorClipboard;
-        StoreImagesCheck.IsChecked = _original.StoreImages;
-        AllowDuplicatesCheck.IsChecked = _original.AllowDuplicateClips;
-        MaxClipsBox.Text = _original.MaxClips.ToString(CultureInfo.CurrentCulture);
-        IgnoredProcessesBox.Text = string.Join(Environment.NewLine, _original.IgnoredProcesses);
+        MonitorClipboardCheck.IsChecked = _baseline.MonitorClipboard;
+        StoreImagesCheck.IsChecked = _baseline.StoreImages;
+        AllowDuplicatesCheck.IsChecked = _baseline.AllowDuplicateClips;
+        MaxClipsBox.Text = _baseline.MaxClips.ToString(CultureInfo.CurrentCulture);
+        IgnoredProcessesBox.Text = string.Join(Environment.NewLine, _baseline.IgnoredProcesses);
 
-        RecordHistoryCheck.IsChecked = _original.RecordHistory;
-        RetentionDaysBox.Text = _original.HistoryRetentionDays.ToString(CultureInfo.CurrentCulture);
+        RecordHistoryCheck.IsChecked = _baseline.RecordHistory;
+        RetentionDaysBox.Text = _baseline.HistoryRetentionDays.ToString(CultureInfo.CurrentCulture);
 
-        PreservePositionCheck.IsChecked = _original.PreserveClipPosition;
-        OpenSearchCheck.IsChecked = _original.OpenSearchImmediately;
-        ResetFormatterCheck.IsChecked = _original.ResetFormatterOnEntry;
+        PreservePositionCheck.IsChecked = _baseline.PreserveClipPosition;
+        OpenSearchCheck.IsChecked = _baseline.OpenSearchImmediately;
+        ResetFormatterCheck.IsChecked = _baseline.ResetFormatterOnEntry;
 
         foreach (var formatter in _formatters.All)
         {
             DefaultFormatterCombo.Items.Add(formatter.DisplayName);
         }
 
-        DefaultFormatterCombo.SelectedItem = _formatters.Resolve(_original.DefaultFormatterId).DisplayName;
+        DefaultFormatterCombo.SelectedItem = _formatters.Resolve(_baseline.DefaultFormatterId).DisplayName;
 
         foreach (var choice in PasteKeystrokeChoices)
         {
@@ -112,81 +128,142 @@ public partial class SettingsWindow : Window
         }
 
         PasteKeystrokeCombo.SelectedItem = PasteKeystrokeChoices
-            .First(c => c.Keystroke == _original.PasteKeystroke).Label;
+            .First(c => c.Keystroke == _baseline.PasteKeystroke).Label;
 
-        WarnAboutConflictCheck.IsChecked = _original.WarnAboutClipboardManagerConflict;
+        WarnAboutConflictCheck.IsChecked = _baseline.WarnAboutClipboardManagerConflict;
 
         foreach (var choice in ThemeChoices)
         {
             ThemeCombo.Items.Add(choice.Label);
         }
 
-        ThemeCombo.SelectedItem = ThemeChoices.First(c => c.Theme == _original.Theme).Label;
+        ThemeCombo.SelectedItem = ThemeChoices.First(c => c.Theme == _baseline.Theme).Label;
 
         foreach (var choice in DensityChoices)
         {
             DensityCombo.Items.Add(choice.Label);
         }
 
-        DensityCombo.SelectedItem = DensityChoices.First(c => c.Density == _original.GridDensity).Label;
+        DensityCombo.SelectedItem = DensityChoices.First(c => c.Density == _baseline.GridDensity).Label;
 
         VersionText.Text = $"PasteJump {AppVersion.Current}";
 
-        ShowCopyNotificationCheck.IsChecked = _original.ShowCopyNotification;
-        CopyNotificationMsBox.Text = _original.CopyNotificationMs.ToString(CultureInfo.CurrentCulture);
-        PasteSettleDelayBox.Text = _original.PasteSettleDelayMs.ToString(CultureInfo.CurrentCulture);
+        ShowCopyNotificationCheck.IsChecked = _baseline.ShowCopyNotification;
+        CopyNotificationMsBox.Text = _baseline.CopyNotificationMs.ToString(CultureInfo.CurrentCulture);
+        PasteSettleDelayBox.Text = _baseline.PasteSettleDelayMs.ToString(CultureInfo.CurrentCulture);
 
         // Reflect the real state of the shortcut, not just what settings claim. The user may have
         // deleted it from the Startup folder by hand since the last run.
-        RunAtLogonCheck.IsChecked = _original.RunAtLogon || StartupShortcut.Exists;
-        TextEditorBox.Text = _original.TextEditor;
+        RunAtLogonCheck.IsChecked = _baseline.RunAtLogon || StartupShortcut.Exists;
+        TextEditorBox.Text = _baseline.TextEditor;
 
         foreach (var choice in DataLocationChoices)
         {
-            DataLocationCombo.Items.Add(choice.Label);
+            ClipsLocationCombo.Items.Add(choice.Label);
+            SettingsLocationCombo.Items.Add(choice.Label);
         }
 
-        DataLocationCombo.SelectedItem = DataLocationChoices.First(c => c.Location == _originalLocation).Label;
+        ClipsLocationCombo.SelectedItem = DataLocationChoices
+            .First(c => c.Location == _baselineClipsLocation).Label;
+
+        SettingsLocationCombo.SelectedItem = DataLocationChoices
+            .First(c => c.Location == _baselineSettingsLocation).Label;
     }
 
-    /// <summary>The location currently picked in the combo, which may differ from the one in force.</summary>
-    private DataLocation SelectedDataLocation => DataLocationChoices
-        .FirstOrDefault(c => string.Equals(c.Label, DataLocationCombo.SelectedItem as string, StringComparison.Ordinal))
+    /// <summary>Clips location currently picked, which may differ from the one in force.</summary>
+    private DataLocation SelectedClipsLocation => LocationIn(ClipsLocationCombo);
+
+    /// <summary>Settings location currently picked, which may differ from the one in force.</summary>
+    private DataLocation SelectedSettingsLocation => LocationIn(SettingsLocationCombo);
+
+    private static DataLocation LocationIn(ComboBox combo) => DataLocationChoices
+        .FirstOrDefault(c => string.Equals(c.Label, combo.SelectedItem as string, StringComparison.Ordinal))
         .Location;
 
-    private void OnDataLocationChanged(object sender, SelectionChangedEventArgs e)
-    {
-        var selected = SelectedDataLocation;
+    /// <summary>
+    /// Both combos share this handler. It refreshes both labels rather than only the one that changed,
+    /// which keeps it correct regardless of which control raised the event.
+    /// </summary>
+    private void OnDataLocationChanged(object sender, SelectionChangedEventArgs e) => RefreshLocationHints();
 
-        DataLocationPathText.Text = Path.Combine(AppPaths.RootFor(selected), "data");
+    private void RefreshLocationHints()
+    {
+        ClipsLocationPathText.Text = Describe(SelectedClipsLocation, _baselineClipsLocation);
+        SettingsLocationPathText.Text = Describe(SelectedSettingsLocation, _baselineSettingsLocation);
 
         // Says so up front rather than only in the confirmation prompt, so the restart is not a surprise
         // discovered after clicking OK.
-        if (selected != _originalLocation)
+        static string Describe(DataLocation selected, DataLocation baseline)
         {
-            DataLocationPathText.Text += "   (restart required)";
+            var path = Path.Combine(AppPaths.RootFor(selected), "data");
+
+            return selected == baseline ? path : path + "   (restart required)";
         }
     }
 
-    private void OnOkClicked(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Validates and commits, without closing. Returns false when validation failed, in which case the
+    /// error is already on screen and the caller must not close the window.
+    /// </summary>
+    private bool TryApply()
     {
         if (!TryBuild(out var updated, out var error))
         {
             ValidationText.Text = error;
             ValidationText.Visibility = Visibility.Visible;
-            return;
+            AppliedText.Visibility = Visibility.Collapsed;
+            return false;
         }
+
+        ValidationText.Visibility = Visibility.Collapsed;
 
         SettingsApplied?.Invoke(updated);
 
-        // After SettingsApplied, so the settings are already saved to the old location before anything
-        // starts moving it. The handler may restart the process, which ends this method.
-        if (SelectedDataLocation != _originalLocation)
+        var clips = SelectedClipsLocation;
+        var settings = SelectedSettingsLocation;
+
+        // Raised after SettingsApplied, so the settings are saved to their current location before
+        // anything starts moving them. The handler may restart the process, which ends this method.
+        if (clips != _baselineClipsLocation || settings != _baselineSettingsLocation)
         {
-            DataLocationChangeRequested?.Invoke(SelectedDataLocation);
+            DataLocationChangeRequested?.Invoke(clips, settings);
         }
 
-        Close();
+        // The baseline moves to what is now in force. Without this, a second Apply would re-raise the
+        // location change and prompt to move data that has already been moved.
+        _baseline = updated;
+        _baselineClipsLocation = clips;
+        _baselineSettingsLocation = settings;
+
+        RefreshLocationHints();
+        RefreshAdvanced();
+        return true;
+    }
+
+    private void OnOkClicked(object sender, RoutedEventArgs e)
+    {
+        if (TryApply())
+        {
+            Close();
+        }
+    }
+
+    /// <summary>
+    /// Commits and stays open, so a setting can be nudged and its effect watched without reopening the
+    /// dialog each time - which matters most for the paste and notification timings, where finding the
+    /// right value means trying several.
+    /// </summary>
+    private void OnApplyClicked(object sender, RoutedEventArgs e)
+    {
+        if (!TryApply())
+        {
+            return;
+        }
+
+        // Explicit acknowledgement. Apply produces no visible change in the dialog itself, so without
+        // this there is no way to tell it from a click that missed.
+        AppliedText.Text = $"Applied at {DateTime.Now:HH:mm:ss}";
+        AppliedText.Visibility = Visibility.Visible;
     }
 
     private void OnCancelClicked(object sender, RoutedEventArgs e) => Close();
@@ -199,7 +276,7 @@ public partial class SettingsWindow : Window
     {
         // Falls back to the loaded settings when the form does not currently validate - the inventory
         // should still be readable while a text box holds a half-typed number.
-        var source = TryBuild(out var pending, out _) ? pending : _original;
+        var source = TryBuild(out var pending, out _) ? pending : _baseline;
 
         var filter = AdvancedFilterBox.Text;
 
@@ -306,7 +383,7 @@ public partial class SettingsWindow : Window
 
         // Carried forward, not surfaced: re-offering the legacy import after every settings change
         // would be maddening.
-        settings.LegacyImportCompleted = _original.LegacyImportCompleted;
+        settings.LegacyImportCompleted = _baseline.LegacyImportCompleted;
 
         settings.Normalise();
         return true;

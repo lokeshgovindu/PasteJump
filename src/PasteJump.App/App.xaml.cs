@@ -267,45 +267,78 @@ public partial class App : Application
     /// </summary>
     private void RunPendingDataMove()
     {
-        var pointer = Core.Settings.DataLocationPointer.Read(AppPaths.ApplicationDirectory);
+        var pointer = DataLocationPointer.Read(AppPaths.ApplicationDirectory);
 
-        if (pointer.MigrateFrom is not { } from)
+        if (pointer.PendingClipsMove is null && pointer.PendingSettingsMove is null)
         {
             return;
         }
 
-        var report = DataMigrator.Adopt(from, _paths.RootDirectory);
+        var problems = new List<string>();
 
-        pointer.MigrateFrom = null;
+        if (pointer.PendingClipsMove is { } clipsFrom)
+        {
+            Report(DataMigrator.AdoptClips(clipsFrom, _paths.ClipsRoot), "clips", clipsFrom);
+        }
+
+        if (pointer.PendingSettingsMove is { } settingsFrom)
+        {
+            Report(DataMigrator.AdoptSettings(settingsFrom, _paths.SettingsRoot), "settings", settingsFrom);
+        }
+
+        // Cleared whatever the outcome. A move that failed will fail again on the next launch, and
+        // retrying it silently at every start would hide the problem while slowing startup.
+        pointer.MigrateClipsFrom = null;
+        pointer.MigrateSettingsFrom = null;
+        pointer.LegacyMigrateFrom = null;
         pointer.TryWrite(AppPaths.ApplicationDirectory);
 
-        if (report.Error is { } error)
+        if (problems.Count > 0)
         {
             MessageBox.Show(
-                $"PasteJump could not finish moving its data to:\n\n{_paths.DataDirectory}\n\n{error}\n\n" +
-                $"Nothing was removed from the old location:\n\n{Path.Combine(from, "data")}",
+                "PasteJump could not finish moving its data.\n\n" +
+                string.Join("\n\n", problems) +
+                "\n\nNothing was removed from the old location.",
                 "PasteJump",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+
+        void Report(DataMigrationReport report, string what, string from)
+        {
+            if (report.Error is { } error)
+            {
+                problems.Add($"Moving {what} from {Path.Combine(from, "data")} failed: {error}");
+            }
+        }
     }
 
     /// <summary>
-    /// Tells the user when the data directory cannot be written to, rather than letting it surface as an
-    /// opaque database error. The overwhelmingly common cause is a portable folder unzipped somewhere
-    /// only an administrator can write, and switching the data location is the fix.
+    /// Tells the user when a data directory cannot be written to, rather than letting it surface as an
+    /// opaque database error. The overwhelmingly common cause is a portable folder unzipped somewhere only
+    /// an administrator can write, and switching that half's location is the fix.
+    /// <para>
+    /// Reports the two halves separately, because they can be in different places and the advice differs:
+    /// unwritable clips means nothing is saved at all, while unwritable settings only means changes do not
+    /// stick.
+    /// </para>
     /// </summary>
     private void WarnIfDataDirectoryIsReadOnly()
     {
-        if (_paths.IsWritable())
+        var (clipsOk, settingsOk) = _paths.CheckWritable();
+
+        if (clipsOk && settingsOk)
         {
             return;
         }
 
+        var message = !clipsOk
+            ? $"PasteJump cannot write to:\n\n{_paths.ClipsDirectory}\n\nClips will not be saved."
+            : $"PasteJump cannot write to:\n\n{_paths.SettingsDirectory}\n\nSettings changes will not be kept.";
+
         MessageBox.Show(
-            $"PasteJump cannot write to:\n\n{_paths.DataDirectory}\n\n" +
-            "Clips will not be saved. Open Settings and set the data location to your user profile, " +
-            "or move PasteJump to a folder you can write to.",
+            message + "\n\nOpen Settings and store that data in your user profile instead, or move " +
+            "PasteJump to a folder you can write to.",
             "PasteJump",
             MessageBoxButton.OK,
             MessageBoxImage.Warning);
@@ -461,6 +494,7 @@ public partial class App : Application
             onSettings: ShowSettings,
             onHelp: ShowShortcutHelp,
             onPauseToggle: TogglePaused,
+            onRestart: RestartFromMenu,
             onExit: ExitApplication,
             isPaused: !_settings.MonitorClipboard);
 
@@ -497,7 +531,8 @@ public partial class App : Application
     {
         if (_settingsWindow is null)
         {
-            _settingsWindow = Themed(new SettingsWindow(_settings, _formatters, _paths.Location));
+            _settingsWindow = Themed(new SettingsWindow(
+                _settings, _formatters, _paths.ClipsLocation, _paths.SettingsLocation));
             _settingsWindow.SettingsApplied += OnSettingsApplied;
             _settingsWindow.DataLocationChangeRequested += OnDataLocationChangeRequested;
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
@@ -574,14 +609,28 @@ public partial class App : Application
     /// startup path that is already exercised on every launch.
     /// </para>
     /// </summary>
-    private void OnDataLocationChangeRequested(Core.Settings.DataLocation location)
+    private void OnDataLocationChangeRequested(DataLocation clips, DataLocation settings)
     {
-        var target = AppPaths.RootFor(location);
+        var clipsChanged = clips != _paths.ClipsLocation;
+        var settingsChanged = settings != _paths.SettingsLocation;
+
+        var moves = new List<string>();
+
+        if (clipsChanged)
+        {
+            moves.Add($"Clips  →  {Path.Combine(AppPaths.RootFor(clips), "data")}");
+        }
+
+        if (settingsChanged)
+        {
+            moves.Add($"Settings  →  {Path.Combine(AppPaths.RootFor(settings), "data")}");
+        }
 
         var answer = MessageBox.Show(
-            $"PasteJump will restart and copy its clips and settings to:\n\n{Path.Combine(target, "data")}\n\n" +
-            $"The existing copy is left where it is, at:\n\n{_paths.DataDirectory}\n\n" +
-            "Delete that yourself once you are happy the move worked.",
+            "PasteJump will restart and copy to the new location:\n\n" +
+            string.Join("\n", moves) +
+            "\n\nThe existing copy is left where it is. Delete it yourself once you are happy the move " +
+            "worked.",
             "PasteJump - move data",
             MessageBoxButton.OKCancel,
             MessageBoxImage.Question);
@@ -591,13 +640,16 @@ public partial class App : Application
             return;
         }
 
-        var pointer = new Core.Settings.DataLocationPointer
+        var pointer = new DataLocationPointer
         {
-            Location = location,
+            ClipsLocation = clips,
+            SettingsLocation = settings,
 
-            // Recorded now, while we still know where the data currently is. After the restart the app
-            // resolves the new root and has no other way to find the old one.
-            MigrateFrom = _paths.RootDirectory,
+            // Recorded now, while we still know where each half currently is. After the restart the app
+            // resolves the new roots and has no other way to find the old ones. Only the half that
+            // actually moved is recorded, so an unchanged half is not needlessly re-examined.
+            MigrateClipsFrom = clipsChanged ? _paths.ClipsRoot : null,
+            MigrateSettingsFrom = settingsChanged ? _paths.SettingsRoot : null,
         };
 
         if (!pointer.TryWrite(AppPaths.ApplicationDirectory))
@@ -614,6 +666,16 @@ public partial class App : Application
 
         Restart();
     }
+
+    /// <summary>
+    /// Restart from the tray menu.
+    /// <para>
+    /// Unconfirmed on purpose. It is a menu item the user chose deliberately, it loses nothing - the store
+    /// is checkpointed on the way out by <see cref="OnExit"/> - and a confirmation prompt on a
+    /// two-second operation is friction rather than safety.
+    /// </para>
+    /// </summary>
+    private void RestartFromMenu() => Restart();
 
     /// <summary>
     /// Relaunches and exits. The new process has to wait for this one to release the single-instance

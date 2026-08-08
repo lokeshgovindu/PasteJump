@@ -14,30 +14,53 @@ namespace PasteJump.Core;
 /// </summary>
 public sealed class AppPaths
 {
-    private AppPaths(string rootDirectory, DataLocation location)
+    private AppPaths(
+        string clipsRoot,
+        string settingsRoot,
+        DataLocation clipsLocation,
+        DataLocation settingsLocation)
     {
-        RootDirectory = rootDirectory;
-        Location = location;
+        ClipsRoot = clipsRoot;
+        SettingsRoot = settingsRoot;
+        ClipsLocation = clipsLocation;
+        SettingsLocation = settingsLocation;
     }
 
-    /// <summary>Directory the <c>data</c> folder sits beneath.</summary>
-    public string RootDirectory { get; }
+    /// <summary>Directory the clips' <c>data</c> folder sits beneath.</summary>
+    public string ClipsRoot { get; }
 
-    /// <summary>Which of the two supported locations <see cref="RootDirectory"/> came from.</summary>
-    public DataLocation Location { get; }
+    /// <summary>Directory the settings' <c>data</c> folder sits beneath. Independent of <see cref="ClipsRoot"/>.</summary>
+    public string SettingsRoot { get; }
 
-    public string DataDirectory => Path.Combine(RootDirectory, "data");
+    /// <summary>Which of the supported locations <see cref="ClipsRoot"/> came from.</summary>
+    public DataLocation ClipsLocation { get; }
 
-    public string DatabaseFile => Path.Combine(DataDirectory, "pastejump.db");
+    /// <summary>Which of the supported locations <see cref="SettingsRoot"/> came from.</summary>
+    public DataLocation SettingsLocation { get; }
 
-    public string BlobsDirectory => Path.Combine(DataDirectory, "blobs");
+    /// <summary>
+    /// Holds the database, its write-ahead log sidecars, the blob store and the logs.
+    /// <para>
+    /// The log directory is grouped with the clips rather than the settings because it is the same kind
+    /// of thing: runtime output that grows, not configuration you would want travelling with a portable
+    /// copy of the program.
+    /// </para>
+    /// </summary>
+    public string ClipsDirectory => Path.Combine(ClipsRoot, "data");
 
-    public string SettingsFile => Path.Combine(DataDirectory, "settings.json");
+    /// <summary>Holds <c>settings.json</c>, and nothing else.</summary>
+    public string SettingsDirectory => Path.Combine(SettingsRoot, "data");
 
-    public string LogDirectory => Path.Combine(DataDirectory, "logs");
+    public string DatabaseFile => Path.Combine(ClipsDirectory, "pastejump.db");
 
-    /// <summary>Assets shipped alongside the executable, such as the two notification-area icons.</summary>
-    public string AssetsDirectory => Path.Combine(RootDirectory, "Assets");
+    public string BlobsDirectory => Path.Combine(ClipsDirectory, "blobs");
+
+    public string SettingsFile => Path.Combine(SettingsDirectory, "settings.json");
+
+    public string LogDirectory => Path.Combine(ClipsDirectory, "logs");
+
+    /// <summary>Assets shipped alongside the executable, such as the notification-area icon.</summary>
+    public string AssetsDirectory => Path.Combine(ApplicationDirectory, "Assets");
 
     /// <summary>Directory holding the executable. Also where the data-location pointer file lives.</summary>
     public static string ApplicationDirectory
@@ -70,40 +93,71 @@ public sealed class AppPaths
     /// </summary>
     public static AppPaths Resolve()
     {
-        var location = DataLocationPointer.Read(ApplicationDirectory).Location;
-        return new AppPaths(RootFor(location), location);
+        var pointer = DataLocationPointer.Read(ApplicationDirectory);
+
+        return new AppPaths(
+            RootFor(pointer.Clips),
+            RootFor(pointer.Settings),
+            pointer.Clips,
+            pointer.Settings);
     }
 
-    /// <summary>Standard portable layout: data sits next to the executable, ignoring any pointer.</summary>
+    /// <summary>Standard portable layout: everything next to the executable, ignoring any pointer.</summary>
     public static AppPaths Portable()
-        => new(ApplicationDirectory, DataLocation.ApplicationFolder);
+        => new(
+            ApplicationDirectory,
+            ApplicationDirectory,
+            DataLocation.ApplicationFolder,
+            DataLocation.ApplicationFolder);
 
-    /// <summary>Explicit root, for tests and for the importer's dry-run mode.</summary>
+    /// <summary>
+    /// One explicit root for both halves, for tests and for the importer's dry-run mode.
+    /// </summary>
     public static AppPaths At(string rootDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
-        return new AppPaths(Path.GetFullPath(rootDirectory), DataLocation.ApplicationFolder);
+
+        var full = Path.GetFullPath(rootDirectory);
+
+        return new AppPaths(full, full, DataLocation.ApplicationFolder, DataLocation.ApplicationFolder);
+    }
+
+    /// <summary>Separate roots, for tests that exercise the two halves living apart.</summary>
+    public static AppPaths At(string clipsRoot, string settingsRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clipsRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsRoot);
+
+        return new AppPaths(
+            Path.GetFullPath(clipsRoot),
+            Path.GetFullPath(settingsRoot),
+            DataLocation.ApplicationFolder,
+            DataLocation.ApplicationFolder);
     }
 
     /// <summary>
-    /// Whether the data directory can actually be created and written to.
+    /// Whether both data directories can actually be created and written to. Reports each half
+    /// separately, because they can now be in different places and only one of them may be the problem.
     /// <para>
     /// Worth checking rather than discovering it from a failed database open. Unzipping the portable
     /// folder under <c>C:\Program Files</c> is an obvious thing to do and leaves the app unable to write
     /// beside its own executable - which without this check surfaces as an opaque SQLite error at
-    /// startup rather than as advice to switch the data location.
+    /// startup rather than as advice to switch the location.
     /// </para>
     /// </summary>
-    public bool IsWritable()
+    public (bool Clips, bool Settings) CheckWritable()
+        => (IsWritable(ClipsDirectory), IsWritable(SettingsDirectory));
+
+    private static bool IsWritable(string directory)
     {
         try
         {
-            Directory.CreateDirectory(DataDirectory);
+            Directory.CreateDirectory(directory);
 
             // A real create-and-delete, because directory ACLs are not the only thing that can refuse:
             // read-only media and some redirected folders both accept CreateDirectory and then reject
             // the write.
-            var probe = Path.Combine(DataDirectory, $".write-probe-{Environment.ProcessId}");
+            var probe = Path.Combine(directory, $".write-probe-{Environment.ProcessId}");
             File.WriteAllBytes(probe, []);
             File.Delete(probe);
             return true;
@@ -116,9 +170,13 @@ public sealed class AppPaths
 
     public void EnsureCreated()
     {
-        Directory.CreateDirectory(DataDirectory);
+        Directory.CreateDirectory(ClipsDirectory);
         Directory.CreateDirectory(BlobsDirectory);
         Directory.CreateDirectory(LogDirectory);
+
+        // Separate call rather than folded in above: when the two halves are in the same place this is a
+        // no-op, and when they are not it is the only thing that creates the settings side.
+        Directory.CreateDirectory(SettingsDirectory);
     }
 
     /// <summary>Database name used before the app was renamed from Clipjog to PasteJump.</summary>
@@ -145,7 +203,7 @@ public sealed class AppPaths
     /// </summary>
     public bool TryMigrateLegacyDatabase()
     {
-        var legacy = Path.Combine(DataDirectory, LegacyDatabaseName);
+        var legacy = Path.Combine(ClipsDirectory, LegacyDatabaseName);
 
         if (!File.Exists(legacy) || File.Exists(DatabaseFile))
         {

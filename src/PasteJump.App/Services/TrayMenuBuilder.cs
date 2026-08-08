@@ -20,6 +20,7 @@ internal static class TrayMenuBuilder
         Action onSettings,
         Action onHelp,
         Action onPauseToggle,
+        Action onRestart,
         Action onExit,
         bool isPaused)
     {
@@ -37,6 +38,11 @@ internal static class TrayMenuBuilder
         menu.Items.Add(MenuItemFor("_Settings…", onSettings));
         menu.Items.Add(MenuItemFor("Paste-mode _keys…", onHelp));
         menu.Items.Add(new Separator());
+
+        // Immediately above Exit. Restart and Exit are the same kind of destructive-ish action, and
+        // grouping them puts the one you reach for by muscle memory at the very bottom where it has always
+        // been - inserting Restart last would have moved Exit and caused mis-clicks.
+        menu.Items.Add(MenuItemFor("_Restart PasteJump", onRestart));
         menu.Items.Add(MenuItemFor("E_xit PasteJump", onExit));
 
         return menu;
