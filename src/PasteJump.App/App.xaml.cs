@@ -983,55 +983,41 @@ public partial class App : Application
         _settings.LegacyImportCompleted = true;
         _settingsStore.Save(_settings);
 
-        if (candidate is null)
+        // Only offered unprompted when something was actually found. With nothing detected there is no
+        // question worth interrupting a first launch with - Settings, History has the button for anyone who
+        // knows they have a Clipjump somewhere.
+        if (candidate is not null)
         {
-            return;
-        }
-
-        var accepted = MessageDialog.Confirm(
-            $"An existing Clipjump installation was found at:\n\n{candidate}\n\n" +
-            "Only history is imported. Clip stacks are left alone, and nothing in the " +
-            "Clipjump folder is modified.\n\n" +
-            "You can also do this later from Settings, History.",
-            headline: "Import Clipjump's history?",
-            title: "PasteJump - import history");
-
-        if (accepted)
-        {
-            RunLegacyImport(candidate, owner: null);
+            ShowImportDialog(candidate, owner: null);
         }
     }
 
-    /// <summary>
-    /// Imports on demand, from the button in Settings. Locates the installation itself, and says so plainly
-    /// when there is nothing to import rather than silently doing nothing.
-    /// </summary>
+    /// <summary>Imports on demand, from the button in Settings.</summary>
     private void OnLegacyImportRequested()
+        => ShowImportDialog(Import.LegacyClipjumpLocator.FindLikelyInstallation(), _settingsWindow);
+
+    /// <summary>
+    /// Shows the import dialog, seeded with whatever the locator found.
+    /// <para>
+    /// The detected folder is a starting point rather than a verdict. Clipjump ships as a portable folder with
+    /// no installer and no registry footprint, so detection is a depth-limited search of plausible locations -
+    /// it can pick the wrong copy when there are several, and it can find nothing at all when the real one is
+    /// somewhere unusual. Both cases are handled by letting the user browse.
+    /// </para>
+    /// </summary>
+    private void ShowImportDialog(string? detected, Window? owner)
     {
-        var candidate = Import.LegacyClipjumpLocator.FindLikelyInstallation();
+        var dialog = Themed(new ImportDialog(detected));
 
-        if (candidate is null)
+        if (owner is { IsLoaded: true })
         {
-            MessageDialog.Show(
-                "No Clipjump installation was found. PasteJump looks in the usual places for a Clipjump " +
-                "folder containing a history database.",
-                headline: "Nothing to import",
-                owner: _settingsWindow);
-
-            return;
+            dialog.Owner = owner;
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         }
 
-        var accepted = MessageDialog.Confirm(
-            $"Import Clipjump's history from:\n\n{candidate}\n\n" +
-            "Only history is imported. Clip stacks are left alone, and nothing in the Clipjump folder is " +
-            "modified. Entries already imported are skipped, so running this twice is harmless.",
-            headline: "Import Clipjump's history?",
-            title: "PasteJump - import history",
-            owner: _settingsWindow);
-
-        if (accepted)
+        if (dialog.ShowDialog() == true)
         {
-            RunLegacyImport(candidate, _settingsWindow);
+            RunLegacyImport(dialog.SelectedFolder, owner);
         }
     }
 

@@ -127,7 +127,7 @@ public static class LegacyClipjumpLocator
             var name = Path.GetFileName(directory);
 
             // Reparse points would let a junction loop the walk back on itself.
-            if (name.StartsWith('$') || IsReparsePoint(directory))
+            if (name.StartsWith('$') || IsTransient(name) || IsReparsePoint(directory))
             {
                 continue;
             }
@@ -138,6 +138,22 @@ public static class LegacyClipjumpLocator
             }
         }
     }
+
+    /// <summary>
+    /// Directories that cannot hold an installation worth importing.
+    /// <para>
+    /// Temp is excluded because it is transient by definition: nobody keeps the Clipjump they actually use
+    /// there, but copies of it accumulate there constantly - unpacked archives, and this project's own
+    /// integration-test fixtures. Without this the locator offered
+    /// <c>%LOCALAPPDATA%\Temp\clipjog-import-tests\&lt;guid&gt;\Clipjump_x64</c> in preference to the real
+    /// installation, because <c>LocalApplicationData</c> is one of the roots and that path is within the
+    /// depth limit.
+    /// </para>
+    /// </summary>
+    private static bool IsTransient(string directoryName)
+        => directoryName.Equals("Temp", StringComparison.OrdinalIgnoreCase)
+            || directoryName.Equals("tmp", StringComparison.OrdinalIgnoreCase)
+            || directoryName.Equals("Windows", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsReparsePoint(string path)
     {

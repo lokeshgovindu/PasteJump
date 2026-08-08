@@ -97,6 +97,10 @@ internal static class Program
                     + "folder is modified.\n\nYou can also do this later from Settings, History.",
                     "Import Clipjump's history?",
                     DialogKind.Question));
+                // Seeded with a folder that does not exist, so the invalid branch of the validation is the one
+                // rendered - that is the state with the extra status line and the disabled Import button.
+                Check("ImportDialog", () => new ImportDialog(@"D:\Lokesh\DoNotMove\Clipjump_x64"));
+
                 Check("TagEditorWindow", () => new TagEditorWindow(["alpha", "beta"]));
 
                 Check("ToastWindow", () =>

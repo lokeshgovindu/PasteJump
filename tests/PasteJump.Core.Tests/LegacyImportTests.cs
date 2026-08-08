@@ -305,4 +305,50 @@ public sealed class LegacyImportTests : IDisposable
 
         Assert.Equal(1, report.Imported);
     }
+
+    // ---------------------------------------------------------------- locating an installation
+
+    [Fact]
+    public void The_locator_never_offers_a_folder_under_temp()
+    {
+        // It used to. LocalApplicationData is one of the search roots and %LOCALAPPDATA%\Temp sits inside the
+        // depth limit, so the locator offered this very test class's leftover fixtures - a folder named
+        // Clipjump_x64 under clipjog-import-tests - in preference to the user's real installation. Temp is
+        // transient by definition: copies of Clipjump land there, but nobody runs the one they use from there.
+        var found = LegacyClipjumpLocator.FindLikelyInstallation();
+
+        if (found is null)
+        {
+            return;
+        }
+
+        Assert.DoesNotContain(
+            Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar),
+            found,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void A_folder_qualifies_on_its_database_not_its_name()
+    {
+        // The name proves nothing: a folder called Clipjump with no cache\data.db has nothing to import, and
+        // one called anything else with a database has everything. This is what the import dialog validates
+        // a browsed folder against.
+        //
+        // The fixture folder starts without a database - the constructor only makes the cache directories -
+        // so it is unqualified until one exists, which is the negative case for free.
+        Assert.False(LegacyClipjumpLocator.IsClipjumpFolder(_legacyFolder));
+
+        CreateLegacyDatabase(connection =>
+            InsertLegacyRow(connection, "anything", 0, null, "2024-01-01 09:00:00", 8));
+
+        Assert.True(LegacyClipjumpFolderQualifies());
+
+        var namedButEmpty = Path.Combine(_root, "Clipjump-but-empty");
+        Directory.CreateDirectory(namedButEmpty);
+
+        Assert.False(LegacyClipjumpLocator.IsClipjumpFolder(namedButEmpty));
+
+        bool LegacyClipjumpFolderQualifies() => LegacyClipjumpLocator.IsClipjumpFolder(_legacyFolder);
+    }
 }
