@@ -10,6 +10,29 @@
     <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
+  <!--
+    All build output goes to artifacts/ at the repo root, so src/ and tests/ hold only sources.
+
+    This is the SDK's own mechanism rather than hand-set OutputPath/BaseIntermediateOutputPath: those
+    two have to be set in the right order relative to the SDK import to work at all, and setting
+    BaseIntermediateOutputPath late silently leaves obj/ behind because NuGet restore has already read
+    the old value. UseArtifactsOutput moves both, and only works from a Directory.Build.props sitting
+    beside the solution file - which is why this cannot move into the individual projects.
+
+    Layout is artifacts/bin/<project>/<config> and artifacts/obj/<project>/<config>. Two things about
+    that leaf folder catch out anything hard-coding a path: it is lowercase ("debug", not "Debug"), and
+    a project with a RuntimeIdentifier gets the RID appended with an underscore - so PasteJump.App
+    builds to "debug_win-x64" while PasteJump.Core builds to plain "debug".
+
+    Consequence worth knowing: Debug and Release now have separate data/ folders beneath their own
+    output directories, so a debug run and a release run no longer share a clipboard history. Set the
+    data location to the user profile (see AppPaths) if you want one history across both.
+  -->
+  <PropertyGroup Label="Output layout">
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+  </PropertyGroup>
+
   <PropertyGroup Label="Product identity">
     <Product>PasteJump</Product>
     <Company>PasteJump</Company>
