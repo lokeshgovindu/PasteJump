@@ -34,7 +34,23 @@ artifacts/publish/PasteJump.exe
 It lives in the notification area. Left-click for history, right-click for the menu.
 
 Data goes in `data/` next to the executable, so the whole folder is portable — copy it to a USB
-stick and it takes its history with it.
+stick and it takes its history with it. If that folder is not writable — unzipping under
+`C:\Program Files` is the usual way to find out — switch **Settings → System → Store clips and settings
+in** to *My user profile* and it moves to `%LOCALAPPDATA%\PasteJump`. PasteJump restarts, copies the
+data across, and leaves the old copy for you to delete.
+
+### Running alongside another clipboard manager
+
+You mostly cannot, and it is worth knowing why. Windows shows keystrokes that one program injects to
+*every* keyboard hook on the machine, so a second clipboard manager holding <kbd>Ctrl</kbd>+<kbd>V</kbd>
+intercepts the paste PasteJump sends before the application you are pasting into ever sees it. The
+symptom is distinctive: **copying keeps working and pasting silently does nothing**, because capture
+watches the clipboard rather than the keyboard.
+
+PasteJump detects the common managers at start-up and offers to send <kbd>Shift</kbd>+<kbd>Insert</kbd>
+instead — the legacy Windows paste chord, which almost every application still honours and no clipboard
+manager claims. It is under **Settings → Paste mode → Keystroke sent to paste**. Closing the other
+manager is still the better answer.
 
 ### Build and test
 

@@ -6,6 +6,7 @@ using PasteJump.Core.Capture;
 using PasteJump.Core.Formatting;
 using PasteJump.Core.Imaging;
 using PasteJump.Core.Model;
+using PasteJump.Core.Paste;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
@@ -47,6 +48,7 @@ public partial class App : Application
     private HistoryWindow? _historyWindow;
     private SettingsWindow? _settingsWindow;
     private ShortcutHelpWindow? _helpWindow;
+    private AboutWindow? _aboutWindow;
     private ToastWindow? _toast;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -83,12 +85,17 @@ public partial class App : Application
 
     private void Compose()
     {
-        _paths = AppPaths.Portable();
-        _paths.EnsureCreated();
+        _paths = AppPaths.Resolve();
 
-        // Before the store is opened, or it would create an empty database beside the old one and the
-        // user's history would appear to have vanished.
+        // Both before the store is opened. A pending move has to copy the database file itself, which is
+        // impossible once SQLite has it open, and the legacy rename would otherwise create an empty
+        // database beside the old one and make the user's history look like it had vanished.
+        RunPendingDataMove();
+
+        _paths.EnsureCreated();
         _paths.TryMigrateLegacyDatabase();
+
+        WarnIfDataDirectoryIsReadOnly();
 
         _settingsStore = new SettingsStore(_paths);
         _settings = _settingsStore.Load();
@@ -127,6 +134,7 @@ public partial class App : Application
         _pasteHost.HelpRequested += ShowShortcutHelp;
         _pasteHost.TransientMessage += OnTransientMessage;
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
+        _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
 
         _controller = new PasteModeController(
             new ClipStoreCatalog(_store),
@@ -173,14 +181,134 @@ public partial class App : Application
         _trayIcon.Activated += ShowHistory;
         _trayIcon.ContextMenuRequested += ShowTrayMenu;
 
-        // Before Show(), so the first icon the shell receives is already the right one rather than the
-        // coloured tile appearing briefly and being replaced.
+        // Before Show(), so the shell receives the crisply-sized icon from the start rather than the
+        // fixed 16x16 TrayIcon extracts from the executable as its fallback.
         ApplyTrayIcon();
         _trayIcon.Show();
 
-        _theme.TaskbarThemeChanged += ApplyTrayIcon;
-
         MaybeOfferLegacyImport();
+        MaybeOfferShiftInsert();
+    }
+
+    /// <summary>
+    /// Offers Shift+Insert when another clipboard manager is running and we are still sending Ctrl+V.
+    /// <para>
+    /// A prompt rather than a silent switch. Shift+Insert is not universally identical to Ctrl+V - a few
+    /// applications bind it to something else, and terminals historically used it for the X-style primary
+    /// selection - so changing the paste chord behind the user's back would trade one confusing failure
+    /// for another.
+    /// </para>
+    /// <para>
+    /// Asked at every start-up while the conflict persists, not once and then remembered. The app is
+    /// genuinely unable to paste in this state, and a one-time notice dismissed months ago is no help to
+    /// someone who has just installed the other manager. Accepting the offer settles it permanently,
+    /// since the condition includes the chord still being Ctrl+V.
+    /// </para>
+    /// </summary>
+    private void MaybeOfferShiftInsert()
+    {
+        if (!_settings.WarnAboutClipboardManagerConflict
+            || _settings.PasteKeystroke != PasteKeystroke.CtrlV)
+        {
+            return;
+        }
+
+        var rivals = RivalClipboardManagers.Detect(RunningProcessNames());
+
+        if (rivals.Count == 0)
+        {
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            RivalClipboardManagers.DescribeConflict(rivals),
+            "PasteJump - another clipboard manager is running",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _settings.PasteKeystroke = PasteKeystroke.ShiftInsert;
+        _settingsStore.Save(_settings);
+        _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
+    }
+
+    /// <summary>
+    /// Names of the processes currently running, for conflict detection.
+    /// <para>
+    /// Failures yield an empty list rather than propagating. Enumerating processes can throw when one
+    /// exits mid-enumeration or when a protected process refuses to be queried, and neither is worth
+    /// failing start-up over - the cost of a missed detection is one prompt not shown.
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<string> RunningProcessNames()
+    {
+        try
+        {
+            return [.. System.Diagnostics.Process.GetProcesses().Select(static p => p.ProcessName)];
+        }
+        catch (Exception)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Carries out a data move the settings dialog asked for, then clears the request.
+    /// <para>
+    /// Deferred to startup rather than done when the user clicks OK because the database is open at that
+    /// point and cannot be copied. The request is cleared whatever the outcome: a move that failed will
+    /// fail again on the next launch, and retrying it silently at every start would hide the problem
+    /// while making startup slow.
+    /// </para>
+    /// </summary>
+    private void RunPendingDataMove()
+    {
+        var pointer = Core.Settings.DataLocationPointer.Read(AppPaths.ApplicationDirectory);
+
+        if (pointer.MigrateFrom is not { } from)
+        {
+            return;
+        }
+
+        var report = DataMigrator.Adopt(from, _paths.RootDirectory);
+
+        pointer.MigrateFrom = null;
+        pointer.TryWrite(AppPaths.ApplicationDirectory);
+
+        if (report.Error is { } error)
+        {
+            MessageBox.Show(
+                $"PasteJump could not finish moving its data to:\n\n{_paths.DataDirectory}\n\n{error}\n\n" +
+                $"Nothing was removed from the old location:\n\n{Path.Combine(from, "data")}",
+                "PasteJump",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>
+    /// Tells the user when the data directory cannot be written to, rather than letting it surface as an
+    /// opaque database error. The overwhelmingly common cause is a portable folder unzipped somewhere
+    /// only an administrator can write, and switching the data location is the fix.
+    /// </summary>
+    private void WarnIfDataDirectoryIsReadOnly()
+    {
+        if (_paths.IsWritable())
+        {
+            return;
+        }
+
+        MessageBox.Show(
+            $"PasteJump cannot write to:\n\n{_paths.DataDirectory}\n\n" +
+            "Clips will not be saved. Open Settings and set the data location to your user profile, " +
+            "or move PasteJump to a folder you can write to.",
+            "PasteJump",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
     }
 
     /// <summary>
@@ -255,28 +383,26 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Points the tray icon at the monochrome glyph matching the taskbar's colour.
+    /// Points the tray icon at the application icon, so the notification area shows the same mark as
+    /// Explorer, the taskbar and every window title bar.
     /// <para>
-    /// The notification area is the only surface whose background changes under the icon, so it gets a
-    /// light-ink and a dark-ink variant chosen at runtime. This deliberately follows the <em>taskbar</em>
-    /// theme, not PasteJump's own: Windows defaults to light apps on a dark taskbar, and using the app
-    /// theme here would put dark ink on a dark taskbar for anyone on that default.
+    /// This replaced a pair of monochrome glyphs chosen at runtime from the taskbar colour. A coloured
+    /// tile does not need that: it reads against a light or a dark taskbar equally, which is the whole
+    /// reason the two-variant scheme existed. Dropping it also removed the app's only dependency on
+    /// <c>SystemUsesLightTheme</c>, and with it the third-party glyph artwork whose licence did not
+    /// cover redistribution.
     /// </para>
     /// <para>
-    /// If the file is missing, <c>TrayIcon</c> keeps the executable's own icon - a portable folder can
-    /// be copied incompletely, and no tray icon at all would leave the app running with no reachable
-    /// menu.
+    /// If the file is missing, <c>TrayIcon</c> keeps the icon it extracted from the executable - a
+    /// portable folder can be copied incompletely, and no tray icon at all would leave the app running
+    /// with no reachable menu.
     /// </para>
     /// </summary>
     private void ApplyTrayIcon()
-    {
-        var name = _theme.TaskbarIsDark ? "tray-on-dark.ico" : "tray-on-light.ico";
-
         // Through AppPaths, so this resolves off Environment.ProcessPath like every other path in the
         // app. AppContext.BaseDirectory would look correct and then break under a single-file publish,
         // where it points at the extraction directory rather than the folder holding the exe.
-        _trayIcon.SetIconFromFile(Path.Combine(_paths.AssetsDirectory, name));
-    }
+        => _trayIcon.SetIconFromFile(Path.Combine(_paths.AssetsDirectory, "pastejump.ico"));
 
     /// <summary>
     /// A repeat copy that was suppressed rather than stored. Still acknowledged, and labelled so the
@@ -330,6 +456,7 @@ public partial class App : Application
     private void ShowTrayMenu(int x, int y)
     {
         var menu = TrayMenuBuilder.Build(
+            onAbout: ShowAbout,
             onHistory: ShowHistory,
             onSettings: ShowSettings,
             onHelp: ShowShortcutHelp,
@@ -370,14 +497,29 @@ public partial class App : Application
     {
         if (_settingsWindow is null)
         {
-            _settingsWindow = Themed(new SettingsWindow(_settings, _formatters));
+            _settingsWindow = Themed(new SettingsWindow(_settings, _formatters, _paths.Location));
             _settingsWindow.SettingsApplied += OnSettingsApplied;
+            _settingsWindow.DataLocationChangeRequested += OnDataLocationChangeRequested;
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Show();
         }
         else
         {
             _settingsWindow.Activate();
+        }
+    }
+
+    private void ShowAbout()
+    {
+        if (_aboutWindow is null)
+        {
+            _aboutWindow = Themed(new AboutWindow());
+            _aboutWindow.Closed += (_, _) => _aboutWindow = null;
+            _aboutWindow.Show();
+        }
+        else
+        {
+            _aboutWindow.Activate();
         }
     }
 
@@ -402,6 +544,7 @@ public partial class App : Application
 
         _theme.Apply(_settings.Theme);
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
+        _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
 
         // An open history window follows the new density rather than needing to be reopened.
         _historyWindow?.ApplyDensity(_settings.GridDensity);
@@ -420,6 +563,97 @@ public partial class App : Application
             _settings.PasteModeOptions);
 
         _recognizer = new PasteGestureRecognizer(_controller);
+    }
+
+    /// <summary>
+    /// Records a new data location and restarts, which is what actually performs the move.
+    /// <para>
+    /// A restart rather than an in-process rebuild. The database, the blob store and the settings file are
+    /// all open and referenced by half the object graph; tearing that down and rebuilding it against a new
+    /// root is a great deal of code to get subtly wrong for a setting changed once. Restarting reuses the
+    /// startup path that is already exercised on every launch.
+    /// </para>
+    /// </summary>
+    private void OnDataLocationChangeRequested(Core.Settings.DataLocation location)
+    {
+        var target = AppPaths.RootFor(location);
+
+        var answer = MessageBox.Show(
+            $"PasteJump will restart and copy its clips and settings to:\n\n{Path.Combine(target, "data")}\n\n" +
+            $"The existing copy is left where it is, at:\n\n{_paths.DataDirectory}\n\n" +
+            "Delete that yourself once you are happy the move worked.",
+            "PasteJump - move data",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Question);
+
+        if (answer != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        var pointer = new Core.Settings.DataLocationPointer
+        {
+            Location = location,
+
+            // Recorded now, while we still know where the data currently is. After the restart the app
+            // resolves the new root and has no other way to find the old one.
+            MigrateFrom = _paths.RootDirectory,
+        };
+
+        if (!pointer.TryWrite(AppPaths.ApplicationDirectory))
+        {
+            MessageBox.Show(
+                "PasteJump could not save the new data location. The folder holding PasteJump.exe is " +
+                "not writable, so the choice would not survive a restart.\n\nNothing was changed.",
+                "PasteJump",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
+            return;
+        }
+
+        Restart();
+    }
+
+    /// <summary>
+    /// Relaunches and exits. The new process has to wait for this one to release the single-instance
+    /// mutex, which is what the short retry loop in the launched copy would otherwise be for - here it is
+    /// handled by starting the replacement only after <see cref="OnExit"/> has run.
+    /// </summary>
+    private void Restart()
+    {
+        var exePath = Environment.ProcessPath;
+
+        if (string.IsNullOrEmpty(exePath))
+        {
+            MessageBox.Show(
+                "PasteJump could not work out its own path to restart. Close and reopen it to finish " +
+                "moving the data.",
+                "PasteJump",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            return;
+        }
+
+        Exit += (_, _) =>
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = exePath,
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception)
+            {
+                // Nothing useful left to say: the UI is gone by the time this runs. The move still
+                // happens the next time the user starts PasteJump, because the pointer file is written.
+            }
+        };
+
+        Shutdown();
     }
 
     private void TogglePaused()

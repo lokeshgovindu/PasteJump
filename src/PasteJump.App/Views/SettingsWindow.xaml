@@ -127,6 +127,22 @@
                                   Grid.Column="1"
                                   ToolTip="Applied to every paste unless you cycle it with Z during the gesture." />
                     </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Keystroke sent to paste" />
+                        <ComboBox x:Name="PasteKeystrokeCombo"
+                                  Grid.Column="1"
+                                  ToolTip="Ctrl+V unless another clipboard manager is running. Windows shows injected keystrokes to every keyboard hook, so a manager holding Ctrl+V swallows ours before the target application sees it - copying keeps working while pasting silently does nothing. Shift+Insert is the legacy paste chord and is almost never claimed." />
+                    </Grid>
+
+                    <CheckBox x:Name="WarnAboutConflictCheck"
+                              Margin="0,12,0,0"
+                              Content="Warn me when another clipboard manager is running"
+                              ToolTip="Checked at start-up. Offers to switch to Shift+Insert if a manager known to claim Ctrl+V is found." />
                 </StackPanel>
             </TabItem>
 
@@ -204,6 +220,24 @@
                                  Grid.Column="1"
                                  ToolTip="Program launched when you press H during the gesture to edit a clip." />
                     </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Store clips and settings in" />
+                        <ComboBox x:Name="DataLocationCombo"
+                                  Grid.Column="1"
+                                  SelectionChanged="OnDataLocationChanged"
+                                  ToolTip="Where the database, blobs and settings live. Changing this needs a restart; the existing data is copied and the old copy is left in place." />
+                    </Grid>
+
+                    <TextBlock x:Name="DataLocationPathText"
+                               Margin="0,4,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               FontSize="11"
+                               FontFamily="Consolas" />
 
                     <TextBlock x:Name="VersionText"
                                Margin="0,16,0,0"

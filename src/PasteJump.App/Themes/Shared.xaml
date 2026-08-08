@@ -11,10 +11,13 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!--
-        Title-bar and Alt+Tab icon for every window, referenced by each Window.Icon.
+        The application mark: title-bar and Alt+Tab icon for every window, and the image in the About
+        window. Theme-independent, and so is the notification-area icon, which is now this same file -
+        a coloured tile reads against a light or a dark background alike, which is what retired the pair
+        of monochrome tray glyphs this used to be contrasted with.
 
-        Theme-independent, unlike the tray icon: a window's title bar is drawn by DWM over the window's
-        own frame, so one coloured icon is correct in both light and dark.
+        Note the tray cannot use this entry: it needs a filesystem path for LoadImage, and a pack:// URI
+        is not one. See the Content item in PasteJump.App.csproj.
     -->
     <BitmapImage x:Key="AppIcon" UriSource="pack://application:,,,/PasteJump;component/Assets/pastejump.ico" />
 

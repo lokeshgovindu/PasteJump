@@ -2,6 +2,7 @@ using PasteJump.Core.Abstractions;
 using PasteJump.Core.Capture;
 using PasteJump.Core.Imaging;
 using PasteJump.Core.Model;
+using PasteJump.Core.Settings;
 
 namespace PasteJump.Core.Paste;
 
@@ -31,6 +32,7 @@ public sealed class ClipboardPaster
     private readonly Action<TimeSpan, Action> _schedule;
 
     private TimeSpan _settleDelay = TimeSpan.FromMilliseconds(25);
+    private PasteKeystroke _keystroke = PasteKeystroke.CtrlV;
 
     /// <param name="schedule">
     /// Runs an action after a delay. Injected rather than using a timer directly because this code
@@ -75,6 +77,15 @@ public sealed class ClipboardPaster
     /// </summary>
     public void SetSettleDelay(int milliseconds)
         => _settleDelay = TimeSpan.FromMilliseconds(Math.Clamp(milliseconds, 0, 500));
+
+    /// <summary>
+    /// Chord used to make the target application paste. See <see cref="PasteKeystroke"/> for why this is
+    /// not simply always Ctrl+V.
+    /// </summary>
+    public void SetPasteKeystroke(PasteKeystroke keystroke) => _keystroke = keystroke;
+
+    /// <summary>The chord currently in use. Exposed so the setting can be asserted rather than assumed.</summary>
+    public PasteKeystroke Keystroke => _keystroke;
 
     /// <summary>Writes the payloads, then pastes if <paramref name="thenPaste"/> and the write worked.</summary>
     public void Write(IReadOnlyList<ClipPayload> payloads, bool thenPaste)
@@ -179,7 +190,7 @@ public sealed class ClipboardPaster
 
     private bool SendPaste()
     {
-        if (_sender.SendPaste())
+        if (_sender.SendPaste(_keystroke))
         {
             PasteCount++;
             return true;

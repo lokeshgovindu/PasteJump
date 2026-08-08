@@ -82,8 +82,9 @@ internal static class Program
                 // Cycles every tab. TabControl only realises the SELECTED tab's content, so without
                 // this the other tabs' templates are never instantiated and a broken one goes unseen -
                 // which is exactly the class of failure this harness exists to catch.
-                Check("SettingsWindow", () => new SettingsWindow(settings, formatters), CycleTabs);
+                Check("SettingsWindow", () => new SettingsWindow(settings, formatters, DataLocation.UserProfile), CycleTabs);
                 Check("ShortcutHelpWindow", () => new ShortcutHelpWindow());
+                Check("AboutWindow", () => new AboutWindow());
                 Check("TagEditorWindow", () => new TagEditorWindow(["alpha", "beta"]));
 
                 Check("ToastWindow", () =>

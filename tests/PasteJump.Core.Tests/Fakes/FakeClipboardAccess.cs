@@ -1,5 +1,6 @@
 using PasteJump.Core.Abstractions;
 using PasteJump.Core.Model;
+using PasteJump.Core.Settings;
 
 namespace PasteJump.Core.Tests.Fakes;
 
@@ -68,9 +69,13 @@ internal sealed class FakePasteSender : IPasteSender
     /// <summary>Set false to simulate UIPI refusing the keystroke.</summary>
     public bool Succeeds { get; set; } = true;
 
-    public bool SendPaste()
+    /// <summary>Chords requested, in order. Records which one, not just how many.</summary>
+    public List<PasteKeystroke> Sent { get; } = [];
+
+    public bool SendPaste(PasteKeystroke keystroke)
     {
         SendCount++;
+        Sent.Add(keystroke);
         return Succeeds;
     }
 }

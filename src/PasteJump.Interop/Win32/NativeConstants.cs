@@ -85,6 +85,7 @@ internal static class NativeConstants
     public const int VK_MENU = 0x12;
     public const int VK_ESCAPE = 0x1B;
     public const int VK_SPACE = 0x20;
+    public const int VK_INSERT = 0x2D;
     public const int VK_RETURN = 0x0D;
     public const int VK_HOME = 0x24;
     public const int VK_LEFT = 0x25;

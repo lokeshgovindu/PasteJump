@@ -86,6 +86,20 @@ public sealed class PasteJumpSettings
     /// </summary>
     public int PasteSettleDelayMs { get; set; } = 25;
 
+    /// <summary>
+    /// Chord sent to make the target application paste. See <see cref="Settings.PasteKeystroke"/> - the
+    /// short version is that another clipboard manager's keyboard hook can swallow Ctrl+V before the
+    /// target window sees it, and Shift+Insert is the way out.
+    /// </summary>
+    public PasteKeystroke PasteKeystroke { get; set; } = PasteKeystroke.CtrlV;
+
+    /// <summary>
+    /// Offer to switch to Shift+Insert at start-up when another clipboard manager is detected. On by
+    /// default: without the prompt the symptom is pasting that silently does nothing, which looks like a
+    /// PasteJump bug rather than a conflict.
+    /// </summary>
+    public bool WarnAboutClipboardManagerConflict { get; set; } = true;
+
     // ------------------------------------------------------------ appearance
 
     /// <summary>Colour scheme. Light by default.</summary>
@@ -146,6 +160,11 @@ public sealed class PasteJumpSettings
         if (!Enum.IsDefined(GridDensity))
         {
             GridDensity = GridDensity.Cozy;
+        }
+
+        if (!Enum.IsDefined(PasteKeystroke))
+        {
+            PasteKeystroke = PasteKeystroke.CtrlV;
         }
 
         if (string.IsNullOrWhiteSpace(DefaultFormatterId))

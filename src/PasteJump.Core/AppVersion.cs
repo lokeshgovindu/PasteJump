@@ -13,8 +13,20 @@ public static class AppVersion
 {
     private static readonly Lazy<string> Cached = new(Resolve);
 
+    private static readonly Lazy<string> CachedCopyright = new(ResolveCopyright);
+
     /// <summary>Version as <c>major.minor.build.revision</c>, e.g. <c>2026.1.0.0</c>.</summary>
     public static string Current => Cached.Value;
+
+    /// <summary>
+    /// Copyright line from the assembly, as set by <c>Directory.Build.props</c>.
+    /// <para>
+    /// Read from the attribute rather than written out again in the About window, for the same reason
+    /// the version is: two copies of the same string diverge the first time only one of them is
+    /// updated, and the stale one is the one on screen.
+    /// </para>
+    /// </summary>
+    public static string Copyright => CachedCopyright.Value;
 
     /// <summary>Short form for display, dropping a trailing zero revision: <c>2026.1.0</c>.</summary>
     public static string Display
@@ -45,5 +57,18 @@ public static class AppVersion
         }
 
         return assembly.GetName().Version?.ToString() ?? "0.0.0.0";
+    }
+
+    private static string ResolveCopyright()
+    {
+        // Own assembly, not the entry assembly. The version has to come from the entry assembly so a
+        // host reports its own number, but the copyright is the product's and every assembly in the
+        // build carries the same one - and reading it here keeps the UI smoke harness, whose entry
+        // assembly is the harness itself, from showing a blank line.
+        var copyright = typeof(AppVersion).Assembly
+            .GetCustomAttribute<AssemblyCopyrightAttribute>()
+            ?.Copyright;
+
+        return string.IsNullOrWhiteSpace(copyright) ? string.Empty : copyright;
     }
 }

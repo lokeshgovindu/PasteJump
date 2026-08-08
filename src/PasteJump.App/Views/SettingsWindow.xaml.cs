@@ -25,6 +25,16 @@ public partial class SettingsWindow : Window
         (AppTheme.System, "Same as Windows"),
     ];
 
+    /// <summary>
+    /// Paste-chord options. Labelled as the user would name the keys, with the reason for the second one
+    /// carried in the combo's tooltip rather than the label.
+    /// </summary>
+    private static readonly (PasteKeystroke Keystroke, string Label)[] PasteKeystrokeChoices =
+    [
+        (PasteKeystroke.CtrlV, "Ctrl+V"),
+        (PasteKeystroke.ShiftInsert, "Shift+Insert"),
+    ];
+
     /// <summary>Density options, labelled as Outlook and Explorer label them.</summary>
     private static readonly (GridDensity Density, string Label)[] DensityChoices =
     [
@@ -33,13 +43,28 @@ public partial class SettingsWindow : Window
         (GridDensity.Compact, "Compact"),
     ];
 
+    /// <summary>
+    /// Data-location options. Labelled by intent rather than by path, with the resolved path shown
+    /// beneath the combo - the paths are long and one of them differs per user.
+    /// </summary>
+    private static readonly (DataLocation Location, string Label)[] DataLocationChoices =
+    [
+        (DataLocation.ApplicationFolder, "The PasteJump folder"),
+        (DataLocation.UserProfile, "My user profile"),
+    ];
+
     private readonly PasteJumpSettings _original;
     private readonly FormatterRegistry _formatters;
+    private readonly DataLocation _originalLocation;
 
-    public SettingsWindow(PasteJumpSettings settings, FormatterRegistry formatters)
+    public SettingsWindow(
+        PasteJumpSettings settings,
+        FormatterRegistry formatters,
+        DataLocation dataLocation = DataLocation.ApplicationFolder)
     {
         _original = settings;
         _formatters = formatters;
+        _originalLocation = dataLocation;
 
         InitializeComponent();
         Load();
@@ -48,6 +73,16 @@ public partial class SettingsWindow : Window
 
     /// <summary>Raised with the new settings when the user accepts the dialog.</summary>
     public event Action<PasteJumpSettings>? SettingsApplied;
+
+    /// <summary>
+    /// Raised on accept only when the data location actually changed.
+    /// <para>
+    /// Separate from <see cref="SettingsApplied"/> because it is not one of the settings: it lives in its
+    /// own file outside the data directory, and acting on it means moving the database and restarting
+    /// rather than applying a value in memory.
+    /// </para>
+    /// </summary>
+    public event Action<DataLocation>? DataLocationChangeRequested;
 
     private void Load()
     {
@@ -70,6 +105,16 @@ public partial class SettingsWindow : Window
         }
 
         DefaultFormatterCombo.SelectedItem = _formatters.Resolve(_original.DefaultFormatterId).DisplayName;
+
+        foreach (var choice in PasteKeystrokeChoices)
+        {
+            PasteKeystrokeCombo.Items.Add(choice.Label);
+        }
+
+        PasteKeystrokeCombo.SelectedItem = PasteKeystrokeChoices
+            .First(c => c.Keystroke == _original.PasteKeystroke).Label;
+
+        WarnAboutConflictCheck.IsChecked = _original.WarnAboutClipboardManagerConflict;
 
         foreach (var choice in ThemeChoices)
         {
@@ -95,6 +140,32 @@ public partial class SettingsWindow : Window
         // deleted it from the Startup folder by hand since the last run.
         RunAtLogonCheck.IsChecked = _original.RunAtLogon || StartupShortcut.Exists;
         TextEditorBox.Text = _original.TextEditor;
+
+        foreach (var choice in DataLocationChoices)
+        {
+            DataLocationCombo.Items.Add(choice.Label);
+        }
+
+        DataLocationCombo.SelectedItem = DataLocationChoices.First(c => c.Location == _originalLocation).Label;
+    }
+
+    /// <summary>The location currently picked in the combo, which may differ from the one in force.</summary>
+    private DataLocation SelectedDataLocation => DataLocationChoices
+        .FirstOrDefault(c => string.Equals(c.Label, DataLocationCombo.SelectedItem as string, StringComparison.Ordinal))
+        .Location;
+
+    private void OnDataLocationChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var selected = SelectedDataLocation;
+
+        DataLocationPathText.Text = Path.Combine(AppPaths.RootFor(selected), "data");
+
+        // Says so up front rather than only in the confirmation prompt, so the restart is not a surprise
+        // discovered after clicking OK.
+        if (selected != _originalLocation)
+        {
+            DataLocationPathText.Text += "   (restart required)";
+        }
     }
 
     private void OnOkClicked(object sender, RoutedEventArgs e)
@@ -107,6 +178,14 @@ public partial class SettingsWindow : Window
         }
 
         SettingsApplied?.Invoke(updated);
+
+        // After SettingsApplied, so the settings are already saved to the old location before anything
+        // starts moving it. The handler may restart the process, which ends this method.
+        if (SelectedDataLocation != _originalLocation)
+        {
+            DataLocationChangeRequested?.Invoke(SelectedDataLocation);
+        }
+
         Close();
     }
 
@@ -214,6 +293,13 @@ public partial class SettingsWindow : Window
         settings.ShowCopyNotification = ShowCopyNotificationCheck.IsChecked == true;
         settings.CopyNotificationMs = toastMs;
         settings.PasteSettleDelayMs = settleMs;
+
+        var keystrokeLabel = PasteKeystrokeCombo.SelectedItem as string;
+        settings.PasteKeystroke = PasteKeystrokeChoices
+            .FirstOrDefault(c => string.Equals(c.Label, keystrokeLabel, StringComparison.Ordinal))
+            .Keystroke;
+
+        settings.WarnAboutClipboardManagerConflict = WarnAboutConflictCheck.IsChecked == true;
 
         settings.RunAtLogon = RunAtLogonCheck.IsChecked == true;
         settings.TextEditor = TextEditorBox.Text;

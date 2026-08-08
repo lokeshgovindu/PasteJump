@@ -15,6 +15,7 @@ namespace PasteJump.App.Services;
 internal static class TrayMenuBuilder
 {
     public static ContextMenu Build(
+        Action onAbout,
         Action onHistory,
         Action onSettings,
         Action onHelp,
@@ -24,7 +25,13 @@ internal static class TrayMenuBuilder
     {
         var menu = new ContextMenu();
 
-        menu.Items.Add(MenuItemFor("Clipboard _history…", onHistory, isDefault: true));
+        // About first and bold, as requested. Note that bold in a context menu conventionally marks the
+        // DEFAULT item - the one a double-click invokes - and that is still "Clipboard history", which
+        // is what a left-click on the tray icon opens. The emphasis here is presentational only; the
+        // tray's own activation behaviour is unchanged.
+        menu.Items.Add(MenuItemFor("_About PasteJump…", onAbout, emphasised: true));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MenuItemFor("Clipboard _history…", onHistory));
         menu.Items.Add(new Separator());
         menu.Items.Add(MenuItemFor(isPaused ? "_Resume monitoring" : "_Pause monitoring", onPauseToggle));
         menu.Items.Add(MenuItemFor("_Settings…", onSettings));
@@ -71,11 +78,11 @@ internal static class TrayMenuBuilder
         menu.IsOpen = true;
     }
 
-    private static MenuItem MenuItemFor(string header, Action action, bool isDefault = false)
+    private static MenuItem MenuItemFor(string header, Action action, bool emphasised = false)
     {
         var item = new MenuItem { Header = header };
 
-        if (isDefault)
+        if (emphasised)
         {
             item.FontWeight = FontWeights.SemiBold;
         }

@@ -1,4 +1,5 @@
 using PasteJump.Core.Abstractions;
+using PasteJump.Core.Settings;
 using PasteJump.Interop.Win32;
 
 namespace PasteJump.Interop;
@@ -27,31 +28,42 @@ public sealed class InputSender : IPasteSender
     public int SendFailureCount { get; private set; }
 
     /// <summary>
-    /// Sends Ctrl+V to the foreground window. False when <c>SendInput</c> was blocked - which
+    /// Sends the paste chord to the foreground window. False when <c>SendInput</c> was blocked - which
     /// happens when the foreground window belongs to a more privileged process, since UIPI silently
     /// discards synthetic input aimed at it.
     /// </summary>
-    public bool SendPaste()
+    public bool SendPaste(PasteKeystroke keystroke)
     {
         var inputs = new List<INPUT>(12);
 
-        // Lift anything the user is still holding that would alter the chord.
+        // Every modifier is lifted first, including the one the chord is about to use, so the sequence
+        // starts from a known state instead of depending on whether the user's own release has landed
+        // yet. Without this, a Shift still held from a paste-pop turns Ctrl+V into Ctrl+Shift+V, which
+        // many applications bind to something else entirely.
         AppendModifierRelease(inputs, NativeConstants.VK_LSHIFT);
         AppendModifierRelease(inputs, NativeConstants.VK_RSHIFT);
+        AppendModifierRelease(inputs, NativeConstants.VK_SHIFT);
         AppendModifierRelease(inputs, NativeConstants.VK_MENU);
         AppendModifierRelease(inputs, VK_LWIN);
         AppendModifierRelease(inputs, VK_RWIN);
-
-        // Also lift Ctrl, so the chord below starts from a known state rather than depending on
-        // whether the user's release has landed yet.
         AppendModifierRelease(inputs, NativeConstants.VK_LCONTROL);
         AppendModifierRelease(inputs, NativeConstants.VK_RCONTROL);
         AppendModifierRelease(inputs, NativeConstants.VK_CONTROL);
 
-        inputs.Add(KeyDown(NativeConstants.VK_CONTROL));
-        inputs.Add(KeyDown(NativeConstants.VK_V));
-        inputs.Add(KeyUp(NativeConstants.VK_V));
-        inputs.Add(KeyUp(NativeConstants.VK_CONTROL));
+        if (keystroke == PasteKeystroke.ShiftInsert)
+        {
+            inputs.Add(KeyDown(NativeConstants.VK_SHIFT));
+            inputs.Add(KeyDown(NativeConstants.VK_INSERT, extended: true));
+            inputs.Add(KeyUp(NativeConstants.VK_INSERT, extended: true));
+            inputs.Add(KeyUp(NativeConstants.VK_SHIFT));
+        }
+        else
+        {
+            inputs.Add(KeyDown(NativeConstants.VK_CONTROL));
+            inputs.Add(KeyDown(NativeConstants.VK_V));
+            inputs.Add(KeyUp(NativeConstants.VK_V));
+            inputs.Add(KeyUp(NativeConstants.VK_CONTROL));
+        }
 
         return Send(inputs);
     }
@@ -105,26 +117,33 @@ public sealed class InputSender : IPasteSender
     private static ushort ScanCodeFor(int virtualKey)
         => (ushort)NativeMethods.MapVirtualKey((uint)virtualKey, NativeConstants.MAPVK_VK_TO_VSC);
 
-    private static INPUT KeyDown(int virtualKey) => new()
+    /// <param name="extended">
+    /// Sets <c>KEYEVENTF_EXTENDEDKEY</c>. Required for Insert, and for the other keys on the grey island
+    /// between the main block and the numpad: they share a scan code with their numpad twin, and the
+    /// extended flag is the only thing that distinguishes Insert from numpad 0. Omit it and a scan-code
+    /// reader sees a numpad keypress with Num Lock off.
+    /// </param>
+    private static INPUT KeyDown(int virtualKey, bool extended = false) => new()
     {
         type = NativeConstants.INPUT_KEYBOARD,
         ki = new KEYBDINPUT
         {
             wVk = (ushort)virtualKey,
             wScan = ScanCodeFor(virtualKey),
-            dwFlags = 0,
+            dwFlags = extended ? NativeConstants.KEYEVENTF_EXTENDEDKEY : 0,
             dwExtraInfo = NativeConstants.PasteJumpInputSignature,
         },
     };
 
-    private static INPUT KeyUp(int virtualKey) => new()
+    private static INPUT KeyUp(int virtualKey, bool extended = false) => new()
     {
         type = NativeConstants.INPUT_KEYBOARD,
         ki = new KEYBDINPUT
         {
             wVk = (ushort)virtualKey,
             wScan = ScanCodeFor(virtualKey),
-            dwFlags = NativeConstants.KEYEVENTF_KEYUP,
+            dwFlags = NativeConstants.KEYEVENTF_KEYUP
+                | (extended ? NativeConstants.KEYEVENTF_EXTENDEDKEY : 0),
             dwExtraInfo = NativeConstants.PasteJumpInputSignature,
         },
     };

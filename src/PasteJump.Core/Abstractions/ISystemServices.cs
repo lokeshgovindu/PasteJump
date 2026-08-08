@@ -1,14 +1,20 @@
+using PasteJump.Core.Settings;
+
 namespace PasteJump.Core.Abstractions;
 
 /// <summary>Sends the actual paste keystroke to whatever window has focus.</summary>
 public interface IPasteSender
 {
     /// <summary>
-    /// Synthesises Ctrl+V into the foreground window. False when the keystroke could not be
-    /// delivered at all - most often because the target window is elevated and UIPI drops synthetic
-    /// input aimed at it.
+    /// Synthesises the given paste chord into the foreground window. False when the keystroke could
+    /// not be delivered at all - most often because the target window is elevated and UIPI drops
+    /// synthetic input aimed at it.
     /// </summary>
-    bool SendPaste();
+    /// <param name="keystroke">
+    /// Which chord to send. Configurable because another clipboard manager's hook can swallow Ctrl+V
+    /// before the target window sees it - see <see cref="PasteKeystroke"/>.
+    /// </param>
+    bool SendPaste(PasteKeystroke keystroke);
 }
 
 /// <summary>Identifies the window we would be pasting into.</summary>

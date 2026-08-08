@@ -25,17 +25,17 @@ public sealed class ThemeManager : IDisposable
 
     private const string PersonalizeKey = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
-    /// <summary>Governs application windows. What <see cref="AppTheme.System"/> follows.</summary>
-    private const string AppsUseLightThemeValue = "AppsUseLightTheme";
-
     /// <summary>
-    /// Governs the taskbar, notification area and Start menu. A genuinely separate setting - Windows
-    /// lets you run light apps on a dark taskbar, and that combination is the default on a fresh
-    /// install. The tray icon must follow this one, and it must do so regardless of the user's PasteJump
-    /// theme choice: reading AppsUseLightTheme here would give a dark-ink icon on a dark taskbar for
-    /// anyone using that default.
+    /// Governs application windows. What <see cref="AppTheme.System"/> follows.
+    /// <para>
+    /// Note this is <em>not</em> the setting the taskbar and notification area obey - that is
+    /// <c>SystemUsesLightTheme</c>, a genuinely independent value, and light-apps-on-a-dark-taskbar is
+    /// the Windows default. It used to be read here to pick between two monochrome tray glyphs. The
+    /// tray now shows the coloured application icon, which reads against either taskbar, so nothing in
+    /// the app needs that value any more.
+    /// </para>
     /// </summary>
-    private const string SystemUsesLightThemeValue = "SystemUsesLightTheme";
+    private const string AppsUseLightThemeValue = "AppsUseLightTheme";
 
     private static readonly Uri LightPalette = new("Themes/Light.xaml", UriKind.Relative);
     private static readonly Uri DarkPalette = new("Themes/Dark.xaml", UriKind.Relative);
@@ -48,25 +48,14 @@ public sealed class ThemeManager : IDisposable
     {
         _application = application ?? throw new ArgumentNullException(nameof(application));
 
-        TaskbarIsDark = SystemUsesDarkTaskbar();
-
-        // Subscribed unconditionally, not just while following the system theme. The tray icon tracks
-        // the taskbar colour whatever the app theme is set to, so these notifications are always
-        // relevant to something.
+        // Subscribed unconditionally rather than only while Theme is System. Keeping the subscription
+        // tied to the current setting would mean attaching and detaching it from Apply, and the handler
+        // already ignores everything it does not care about.
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
     }
 
-    /// <summary>Raised when the taskbar colour flips, so the tray icon can be swapped.</summary>
-    public event Action? TaskbarThemeChanged;
-
     /// <summary>The theme actually in force: never <see cref="AppTheme.System"/>, always resolved.</summary>
     public bool IsDark { get; private set; }
-
-    /// <summary>
-    /// Whether the taskbar and notification area are dark. Independent of <see cref="IsDark"/> - see
-    /// the note on <see cref="SystemUsesLightThemeValue"/>.
-    /// </summary>
-    public bool TaskbarIsDark { get; private set; }
 
     /// <summary>Applies a theme, resolving <see cref="AppTheme.System"/> against the OS setting.</summary>
     public void Apply(AppTheme theme)
@@ -136,35 +125,21 @@ public sealed class ThemeManager : IDisposable
 
     private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
     {
-        if (e.Category != UserPreferenceCategory.General)
+        if (e.Category != UserPreferenceCategory.General || _requested != AppTheme.System)
         {
             return;
         }
 
-        if (_requested == AppTheme.System)
+        var dark = SystemPrefersDark();
+
+        if (dark != IsDark)
         {
-            var dark = SystemPrefersDark();
-
-            if (dark != IsDark)
-            {
-                ApplyResolved(dark);
-            }
-        }
-
-        var taskbarDark = SystemUsesDarkTaskbar();
-
-        if (taskbarDark != TaskbarIsDark)
-        {
-            TaskbarIsDark = taskbarDark;
-            TaskbarThemeChanged?.Invoke();
+            ApplyResolved(dark);
         }
     }
 
     /// <summary>Reads the Windows "choose your mode" setting for apps.</summary>
     private static bool SystemPrefersDark() => ReadPrefersDark(AppsUseLightThemeValue);
-
-    /// <summary>Reads the Windows mode setting for the taskbar, Start menu and notification area.</summary>
-    private static bool SystemUsesDarkTaskbar() => ReadPrefersDark(SystemUsesLightThemeValue);
 
     /// <summary>
     /// True when the named Personalize value says "dark".

@@ -8,6 +8,7 @@
     <RootNamespace>PasteJump.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\pastejump.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!--
@@ -33,28 +34,23 @@
   </ItemGroup>
 
   <!--
-    The tray icons ship as loose files beside the executable, unlike the application icon which is
-    embedded in the PE and read back with ExtractIconEx. They have to be loose because there are two
-    of them and the choice is made at runtime from the taskbar colour - an embedded resource would
-    need a resource id, and LoadImage(LR_LOADFROMFILE) against a portable folder is simpler than
-    plumbing that through. The .png sources are build-time inputs to tools\generate-tray-icons.ps1
-    and are deliberately NOT copied.
-  -->
-  <ItemGroup>
-    <Content Include="Assets\tray-on-light.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\tray-on-dark.ico" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+    pastejump.ico is shipped three ways on purpose, and each one is reachable only by its own
+    mechanism - which is why this looks redundant and is not.
 
-  <!--
-    pastejump.ico is embedded twice on purpose, and both are needed.
-
-    ApplicationIcon puts it in the PE header, which is what Explorer and the taskbar read and what
-    TrayIcon pulls back out with ExtractIconEx. That copy is NOT reachable through a pack:// URI, so a
-    Window.Icon binding cannot use it. The Resource item below makes it addressable in XAML, which is
-    what gives the child dialogs their title-bar icon.
+    ApplicationIcon    puts it in the PE header. That is what Explorer, the taskbar and Alt+Tab read.
+                       NOT reachable through a pack:// URI, so XAML cannot bind to this copy.
+    Resource           makes it addressable as pack://application:,,,/PasteJump;component/... which is
+                       what Themes/Shared.xaml's AppIcon key - and therefore every window's title-bar
+                       icon - resolves against.
+    Content            copies it loose beside the executable, which is what the notification area
+                       needs: TrayIcon calls LoadImage(LR_LOADFROMFILE) so it can ask for the icon at
+                       the shell's current small-icon metric. Extracting the PE copy instead would
+                       hand back a fixed 16x16 that the shell then upscales, and at 150% scaling -
+                       where it wants 24 - that is visibly blurry.
   -->
   <ItemGroup>
     <Resource Include="Assets\pastejump.ico" />
+    <Content Include="Assets\pastejump.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
