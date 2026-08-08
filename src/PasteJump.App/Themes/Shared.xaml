@@ -26,18 +26,24 @@
         the taskbar button, Alt+Tab and Task Manager - which ask for 32 or more - all rendered a 16px image,
         visibly smaller than every neighbouring icon rather than merely soft.
 
-        Asking for 256 makes WPF take the largest frame instead, and Windows downsamples from it for the small
-        sizes. That is the right way round: downscaling is always cleaner than the reverse, which is the same
-        reasoning as AppIconLarge below. The cost is that the hand-tuned 16px frame is no longer used for the
-        title bar; a 256 frame reduced to 16 is a fair trade for the taskbar being correct.
+        32 rather than 256, and that correction was itself reported: asking for the largest frame fixed the size
+        and made the taskbar icon blurry instead, because ~8:1 is a brutal reduction for a mark with a 1px rim
+        and a one-pixel gap between its cards. "Downscaling beats upscaling" holds for photographs; for a
+        pixel-tuned icon the hand-authored frame at the requested size beats any resampling of a bigger one,
+        which is the entire reason multi-frame icons exist.
 
-        This does not affect Explorer or a pinned taskbar entry - those read the PE header, via ApplicationIcon
-        in the csproj, which still carries all nine frames and lets Windows pick per size.
+        32 is what the taskbar and Alt+Tab ask for - SM_CXICON - at 100% scaling, so at that scale the frame is
+        used as authored with no resampling at all, and the 16px title bar is a 2:1 reduction within the same
+        family. The honest limitation: at 150% the taskbar wants 48 and will upscale from 32, so this is tuned
+        for the common case rather than universally right. The better fix is to drop Window.Icon entirely and
+        let Windows choose from all nine frames in the PE header, which is what Explorer already does - not
+        taken here only because no screenshot can verify a taskbar button, and a wrong guess means windows with
+        no icon at all rather than a soft one.
     -->
     <BitmapImage x:Key="AppIcon"
                  UriSource="pack://application:,,,/PasteJump;component/Assets/pastejump.ico"
-                 DecodePixelWidth="256"
-                 DecodePixelHeight="256" />
+                 DecodePixelWidth="32"
+                 DecodePixelHeight="32" />
 
     <!--
         The mark for anything that *displays* it rather than using it as a window icon.
