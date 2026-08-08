@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using PasteJump.App.Services;
 using PasteJump.Core;
@@ -96,7 +98,73 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         Load();
         RefreshAdvanced();
+
+        // Wired after Load, so populating the controls does not itself count as a change.
+        //
+        // Three class handlers on the window rather than an event per control: these are routed events, so
+        // they reach here from any depth, and every editable control in this dialog is a TextBox, a
+        // ToggleButton (check box or radio) or a Selector (combo or list). Subscribing individually would
+        // mean ~30 subscriptions and a new setting silently not marking the dialog dirty - the same failure
+        // mode the Advanced tab avoids by using reflection instead of a hand-written list.
+        AddHandler(TextBoxBase.TextChangedEvent, new TextChangedEventHandler(OnAnyEdit));
+        AddHandler(ToggleButton.CheckedEvent, new RoutedEventHandler(OnAnyEdit));
+        AddHandler(ToggleButton.UncheckedEvent, new RoutedEventHandler(OnAnyEdit));
+        AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(OnAnyEdit));
+
+        // The excluded-apps list is mutated in code, not by the user typing into a control, so no routed
+        // event fires for it.
+        _excluded.CollectionChanged += (_, _) => RefreshApplyState();
+
+        RefreshApplyState();
     }
+
+    private void OnAnyEdit(object sender, RoutedEventArgs e) => RefreshApplyState();
+
+    /// <summary>
+    /// Enables Apply only when something differs from what is currently in force.
+    /// <para>
+    /// Apply is the one button here whose whole meaning is "commit the pending change", so offering it when
+    /// there is no pending change invites a click that appears to do nothing. It also gives the dialog a
+    /// reliable signal after a successful Apply: the baseline moves to the applied values, so this goes
+    /// straight back to disabled.
+    /// </para>
+    /// </summary>
+    private void RefreshApplyState() => ApplyButton.IsEnabled = HasPendingChanges();
+
+    private bool HasPendingChanges()
+    {
+        // Locations first: they live outside the settings object entirely, so no amount of comparing
+        // PasteJumpSettings would notice them.
+        if (SelectedClipsLocation != _baselineClipsLocation
+            || SelectedSettingsLocation != _baselineSettingsLocation)
+        {
+            return true;
+        }
+
+        if (!TryBuild(out var candidate, out _))
+        {
+            // A value that cannot be parsed is still a change from what is in force, and leaving Apply
+            // disabled here would mean a typo produced a dead button with no explanation. Enabled, so the
+            // click surfaces the validation message.
+            return true;
+        }
+
+        // Both sides are canonical, which is what makes comparing them meaningful: SettingsStore normalises
+        // on load and TryBuild normalises what it builds. The one gap is a hand-edited excluded-apps list
+        // that is not already normalised - Load canonicalises it into the list box, so it would differ from
+        // the baseline and Apply would start enabled. Harmless and self-correcting: one Apply writes the
+        // canonical form back.
+        return !JsonSerializer.Serialize(candidate, DirtyCheckOptions)
+            .Equals(JsonSerializer.Serialize(_baseline, DirtyCheckOptions), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Options for the dirty check only - never for persistence. Comparing the serialised form rather than
+    /// field by field is deliberate: it covers every property automatically, so adding a setting cannot
+    /// forget to mark the dialog dirty. <c>[JsonIgnore]</c> members are excluded for free, which is correct
+    /// here since they are all computed from members that are compared.
+    /// </summary>
+    private static readonly JsonSerializerOptions DirtyCheckOptions = new() { WriteIndented = false };
 
     /// <summary>Raised with the new settings when the user accepts the dialog.</summary>
     public event Action<PasteJumpSettings>? SettingsApplied;
@@ -296,6 +364,10 @@ public partial class SettingsWindow : Window
 
         RefreshLocationHints();
         RefreshAdvanced();
+
+        // The baseline has just moved to these values, so nothing is pending any more and Apply goes back to
+        // disabled until the next edit. This is the whole reason the check is computed rather than a flag.
+        RefreshApplyState();
         return true;
     }
 

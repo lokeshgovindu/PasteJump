@@ -746,7 +746,7 @@
     <!-- The marker itself. Hidden rather than blank so the column keeps its width and the rows stay aligned. -->
     <Style x:Key="ModifiedMarkerText" TargetType="TextBlock">
         <Setter Property="Text" Value="●" />
-        <Setter Property="FontSize" Value="9" />
+        <Setter Property="FontSize" Value="10" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
@@ -892,7 +892,8 @@
     -->
     <Style TargetType="TabItem">
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-        <Setter Property="FontSize" Value="12" />
+        <!-- Settings is the only TabControl in the app, so this tracks that dialog's text size. -->
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabItem">

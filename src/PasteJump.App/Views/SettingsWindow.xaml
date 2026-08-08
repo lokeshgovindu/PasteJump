@@ -9,7 +9,8 @@
         Background="{DynamicResource SurfaceBrush}"
         Icon="{DynamicResource AppIcon}"
         WindowStartupLocation="CenterScreen"
-        TextOptions.TextFormattingMode="Display">
+        TextOptions.TextFormattingMode="Display"
+        FontSize="13">
 
     <!--
         Tabbed rather than one long column. With five groups the single-column form ran taller than a
@@ -57,7 +58,7 @@
         -->
         <Style x:Key="SettingHelp" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="VerticalAlignment" Value="Top" />
             <Setter Property="Margin" Value="0,3,0,12" />
         </Style>
@@ -76,6 +77,17 @@
 
         <!-- Tab pages scroll. Inline help roughly doubles the height of every setting, and a page that
              silently cuts off its last control is worse than one you have to scroll. -->
+        <!--
+            The Advanced grid's headers, lifted to match this dialog's text. Overridden here rather than in
+            Themes/Controls.xaml because the DataGrid styles are shared with the History window and the app
+            picker, neither of which asked to grow. BasedOn is not optional: a window-level implicit style
+            replaces the app-level one outright rather than merging, so omitting it would discard the themed
+            template and leave WPF's built-in header chrome.
+        -->
+        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
         <Style x:Key="TabScroller" TargetType="ScrollViewer">
             <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
             <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
@@ -174,7 +186,7 @@
             </TabItem>
 
             <!-- ==================================================== Paste mode -->
-            <TabItem Header="_Paste mode">
+            <TabItem Header="_Paste Mode">
                 <ScrollViewer Style="{StaticResource TabScroller}">
                     <StackPanel>
 
@@ -252,7 +264,7 @@
             </TabItem>
 
             <!-- ==================================================== Excluded apps -->
-            <TabItem Header="E_xcluded apps">
+            <TabItem Header="E_xcluded Apps">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -575,7 +587,7 @@
                                Grid.Row="2"
                                Margin="2,8,0,0"
                                Foreground="{DynamicResource MutedTextBrush}"
-                               FontSize="11"
+                               FontSize="12"
                                TextWrapping="Wrap" />
                 </Grid>
             </TabItem>
@@ -599,7 +611,7 @@
                        Grid.Column="0"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource MutedTextBrush}"
-                       FontSize="11"
+                       FontSize="12"
                        Visibility="Collapsed" />
 
             <!-- OK, Cancel, Apply - the Windows property-sheet order. Apply sits outermost because it is
