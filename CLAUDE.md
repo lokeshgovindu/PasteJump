@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 333 passing (`dotnet test`) |
+| Tests | 343 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | ~134 MB self-contained `win-x64` |
 
@@ -63,7 +63,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      333 tests.
+tests/PasteJump.Core.Tests      343 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -148,6 +148,13 @@ that immediately caught two real bugs. Expect to do the same again.
 - **A new capture must reset the browse position.** Separate rule from `PreserveClipPosition`, which
   only governs surviving the *end of a session*. See `PLAN.md` §5 invariant 7 — omitting it made every
   Ctrl+V reopen on a stale clip.
+- **Pause and Disable are different things, and both tray items earn their place.** Pause stops capture and
+  persists, because it is a preference; the gesture still works on the clips already held. Disable also
+  uninstalls the keyboard hook and releases the global hotkey, so Ctrl+V reaches applications exactly as if
+  PasteJump were not running — which is how you hand the chord to another clipboard manager or rule
+  PasteJump out of a problem. Disable is deliberately **not** persisted: a clipboard manager that silently
+  starts up dead weeks later would look broken. Re-enabling must call `_capture.Prime()`, or the copy made
+  while it was off gets captured as a brand new clip the instant monitoring resumes.
 - **`RegisterHotKey`, not the hook, for the history hotkey.** The two are for opposite shapes: the hook
   exists because a registered hotkey cannot express "Ctrl is still down and V was tapped again", while the
   history hotkey fires once and does one thing. Putting it in the hook would add a second responsibility to
@@ -174,10 +181,21 @@ that immediately caught two real bugs. Expect to do the same again.
   again as `CF_DIBV5` and usually a third time as `System.Drawing.Bitmap`. The three differ only by header
   size (+84 for `BITMAPV5HEADER`, +14 for `BITMAPFILEHEADER`), so content addressing cannot dedupe them.
   This surfaced as a user asking why history said 15.2 MB for a 146 KB file; the number was truthful.
-  `BlobStore` therefore deflates at `CompressionLevel.Optimal` — measured 44x on a real store, 33 MB down
-  to 0.75 MB. **The duplicate formats are deliberately kept**: dropping them saves a further third at best
-  against a real risk, since `System.Drawing.Bitmap` is a registered format Windows will *not* synthesise
-  back, so an app asking only for it would paste nothing. Storing what the source published stays the rule.
+  Two independent fixes, and both were needed:
+  - `BlobStore` deflates at `CompressionLevel.Optimal` — measured 44x on a real store, 33 MB to 0.75 MB.
+  - `RedundantImageFormats.Prune` drops the duplicate encodings at **capture**, keeping `CF_DIBV5` over
+    `CF_DIB` (Windows synthesises either from the other, and only the V5 header describes alpha) and
+    dropping `System.Drawing.Bitmap` when a DIB survives. Roughly a third of the bytes survive, and it is
+    the only fix that moves the number the history window *reports* — compression alone changes the disk,
+    not `TotalBytes`.
+
+  I initially rejected the pruning as too risky and was wrong: `Clipjump`'s own clip files were the evidence
+  that settled it. Parsing `cache/clips/1007.avc` shows a single `CF_DIB` and no bitmap duplicate, so a
+  decade of shipped use says nothing real depends on the copies. Note this filters at capture, deliberately
+  departing from "store faithfully, filter on the way out" — the cost being avoided *is* the storage.
+- **Clipjump's history size column is its JPEG thumbnail, not its clip.** For one screenshot,
+  `thumbs/1007.jpg` was 85 KB while `clips/1007.avc` was 443 KB. Anyone comparing our reported size against
+  Clipjump's is comparing a lossy preview against a clipboard payload; do not "fix" our number to match.
 - **A blob's hash is over its *uncompressed* bytes,** and its on-disk length is therefore not its payload
   length. Anything asserting on file size to identify a payload is wrong — one test did exactly that. Blobs
   written before compression carry no `PJB1` marker and are read verbatim, so no migration is required;
@@ -197,6 +215,19 @@ that immediately caught two real bugs. Expect to do the same again.
 
 Every one of these compiles, builds clean, and silently defeats the theme.
 
+- **Small text needs `TextOptions.TextFormattingMode="Display"`.** WPF's default is `Ideal`, which preserves
+  exact glyph advances for faithful scaling and renders 11–12px UI text visibly soft. The overlay and the
+  toast are nothing but small text, so both set it. This is the actual cause when someone reports the toast
+  looking blurry — it bites at every DPI, including 100%.
+- **`AllowsTransparency="True"` costs you ClearType.** WPF drops subpixel antialiasing to greyscale on a
+  layered window, so the overlay and toast can never be quite as crisp as an opaque window. Requesting
+  `TextRenderingMode="ClearType"` is harmless but only helps where the compositor allows it. Escaping this
+  properly means giving up `AllowsTransparency` and getting rounded corners from
+  `DWMWA_WINDOW_CORNER_PREFERENCE` plus the system shadow instead — not done, but that is the route.
+- **Window positions must be snapped to whole device pixels.** Positions here are `physicalPixels / scale`;
+  at any fractional scale that lands on half a device pixel and WPF renders the entire window soft.
+  `UseLayoutRounding` does not help — it rounds layout *within* a window, not the window's own origin. See
+  `WindowInterop.SnapToDevicePixel`. Invisible at 100%, which is why it can sit unnoticed.
 - **`app.manifest` must declare `Microsoft.Windows.Common-Controls` v6.** Without it the process has no
   ComCtl32 v6 activation context and *every dialog Windows draws for us* — `MessageBox` above all —
   renders in the pre-XP classic style: flat square grey buttons, classic caption, `MS Shell Dlg` instead
@@ -274,7 +305,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 333 tests
+dotnet test                                         # 343 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

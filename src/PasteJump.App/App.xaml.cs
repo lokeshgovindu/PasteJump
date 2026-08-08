@@ -519,9 +519,11 @@ public partial class App : Application
             onSettings: ShowSettings,
             onHelp: ShowShortcutHelp,
             onPauseToggle: TogglePaused,
+            onDisableToggle: ToggleDisabled,
             onRestart: RestartFromMenu,
             onExit: ExitApplication,
-            isPaused: !_settings.MonitorClipboard);
+            isPaused: !_settings.MonitorClipboard,
+            isDisabled: !_keyboardHook.IsInstalled);
 
         TrayMenuBuilder.ShowAt(menu, x, y);
     }
@@ -785,6 +787,46 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// Makes PasteJump wholly inert, or brings it back.
+    /// <para>
+    /// Goes further than pausing: the keyboard hook is uninstalled and the global hotkey released, so
+    /// <c>Ctrl+V</c> reaches applications exactly as it would if PasteJump were not running. That is what
+    /// makes it useful - it is the way to hand the chord to another clipboard manager, and the way to rule
+    /// PasteJump out when something else on the machine is behaving oddly.
+    /// </para>
+    /// <para>
+    /// Deliberately not persisted. "Disabled" is a temporary state you enter to get the app out of the way,
+    /// and a clipboard manager that silently starts up dead - weeks later, with no memory of having switched
+    /// it off - would look thoroughly broken. Pausing persists because it is a preference; this is not.
+    /// </para>
+    /// </summary>
+    private void ToggleDisabled()
+    {
+        if (_keyboardHook.IsInstalled)
+        {
+            // The session is closed first, so the overlay cannot be left on screen with no way to dismiss
+            // it once the keys that would dismiss it are no longer being received.
+            _recognizer.Reset();
+
+            _keyboardHook.Uninstall();
+            _historyHotkey.Unregister();
+            _clipboardMonitor.Stop();
+        }
+        else
+        {
+            _keyboardHook.Install();
+            ApplyHistoryHotkey(announceFailure: false);
+            _clipboardMonitor.Start();
+
+            // Re-primed, so the clipboard change that happened while we were not listening is treated as the
+            // baseline rather than captured as a brand new clip the moment monitoring resumes.
+            _capture.Prime();
+        }
+
+        _trayIcon.SetTooltip(BuildTrayTooltip());
+    }
+
+    /// <summary>
     /// Tray tooltip: name, version, and the paused state when it applies.
     /// <para>
     /// Built in one place so the version cannot go missing from the paused variant - which is what
@@ -794,6 +836,13 @@ public partial class App : Application
     private string BuildTrayTooltip()
     {
         var text = $"PasteJump {AppVersion.Display}";
+
+        // Disabled outranks paused, because it is the stronger statement: a disabled PasteJump is not
+        // watching the clipboard either, so reporting "paused" would understate what is switched off.
+        if (_keyboardHook is { IsInstalled: false })
+        {
+            return text + " (disabled)";
+        }
 
         return _settings.MonitorClipboard ? text : text + " (paused)";
     }

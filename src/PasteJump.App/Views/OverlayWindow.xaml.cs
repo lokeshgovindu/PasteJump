@@ -208,7 +208,10 @@ public partial class OverlayWindow : Window
             desiredTop = (anchorY / scale) - height - 6;
         }
 
-        Left = Math.Max(bounds.Left, desiredLeft);
-        Top = Math.Max(bounds.Top, desiredTop);
+        // Snapped to whole device pixels. Everything above divides physical pixels by the scale factor, so
+        // at 150% the result routinely lands on a half pixel and WPF renders the whole window - text
+        // included - visibly soft.
+        Left = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Left, desiredLeft), scale);
+        Top = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Top, desiredTop), scale);
     }
 }

@@ -11,7 +11,15 @@
         Focusable="False"
         Topmost="True"
         SizeToContent="WidthAndHeight"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+
+    <!--
+        TextFormattingMode=Display, for the reason spelled out at length in ToastWindow.xaml: WPF's default
+        Ideal mode is tuned for large text and renders 11-12px UI text soft. This window is nothing but
+        small text, so it matters here most.
+    -->
 
     <!--
         ShowActivated=False and Focusable=False are necessary but not sufficient - WS_EX_NOACTIVATE
@@ -54,9 +62,15 @@
                                VerticalAlignment="Center"
                                Text="Clip 1 of 1" />
 
+                    <!--
+                        The right margin is load-bearing, not decoration. The window is SizeToContent, so
+                        with a short preview the star column has no slack to give and the last chip here -
+                        the source application's name - ends up flush against the formatter chip in the next
+                        column, reading as one run-together word.
+                    -->
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
-                                Margin="10,0,0,0"
+                                Margin="10,0,14,0"
                                 VerticalAlignment="Center">
                         <TextBlock x:Name="PinnedChip"
                                    Style="{StaticResource ChipText}"

@@ -80,10 +80,15 @@ public sealed class Win32ClipboardAccess : IClipboardAccess
                 return null;
             }
 
-            var text = ExtractText(payloads);
-            var kind = ClassifyKind(payloads, text);
+            // Applied at capture rather than at write, unlike FilterForWrite below. That is a deliberate
+            // departure from "store faithfully, filter on the way out": the cost being avoided here IS the
+            // storage, and filtering only on write would leave the duplicate megabytes on disk for ever.
+            var kept = RedundantImageFormats.Prune(payloads);
 
-            return new ClipboardSnapshot(payloads, text, kind, _foreground?.GetForegroundProcessName());
+            var text = ExtractText(kept);
+            var kind = ClassifyKind(kept, text);
+
+            return new ClipboardSnapshot(kept, text, kind, _foreground?.GetForegroundProcessName());
         }
         finally
         {

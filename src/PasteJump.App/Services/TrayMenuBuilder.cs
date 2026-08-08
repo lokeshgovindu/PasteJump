@@ -20,9 +20,11 @@ internal static class TrayMenuBuilder
         Action onSettings,
         Action onHelp,
         Action onPauseToggle,
+        Action onDisableToggle,
         Action onRestart,
         Action onExit,
-        bool isPaused)
+        bool isPaused,
+        bool isDisabled)
     {
         var menu = new ContextMenu();
 
@@ -39,9 +41,15 @@ internal static class TrayMenuBuilder
         menu.Items.Add(MenuItemFor("Paste-mode _keys…", onHelp));
         menu.Items.Add(new Separator());
 
-        // Immediately above Exit. Restart and Exit are the same kind of destructive-ish action, and
-        // grouping them puts the one you reach for by muscle memory at the very bottom where it has always
-        // been - inserting Restart last would have moved Exit and caused mis-clicks.
+        // Distinct from Pause above, and the difference is worth the two menu items. Pause stops capturing
+        // but keeps the gesture, so Ctrl+V still opens the overlay on the clips already held. Disable also
+        // releases the keyboard hook, handing Ctrl+V back to Windows untouched - which is what you want in
+        // order to use another clipboard manager, or to rule PasteJump out when something else misbehaves.
+        menu.Items.Add(MenuItemFor(isDisabled ? "_Enable PasteJump" : "_Disable PasteJump", onDisableToggle));
+
+        // Restart sits immediately above Exit. Both are the same kind of end-of-session action, and grouping
+        // them leaves Exit at the very bottom where muscle memory expects it - appending Restart last would
+        // have moved Exit and caused mis-clicks.
         menu.Items.Add(MenuItemFor("_Restart PasteJump", onRestart));
         menu.Items.Add(MenuItemFor("E_xit PasteJump", onExit));
 

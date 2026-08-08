@@ -148,7 +148,10 @@ public partial class ToastWindow : Window
             top = (cursorY / scale) - height - 8;
         }
 
-        Left = Math.Max(bounds.Left, left);
-        Top = Math.Max(bounds.Top, top);
+        // Snapped to whole device pixels - see WindowInterop.SnapToDevicePixel. Dividing physical pixels by
+        // a fractional scale lands on a half pixel often enough that this is the main reason the toast used
+        // to look soft.
+        Left = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Left, left), scale);
+        Top = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Top, top), scale);
     }
 }

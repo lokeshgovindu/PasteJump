@@ -84,6 +84,20 @@ internal static class WindowInterop
         SetWindowLongPtr(handle, GWL_EXSTYLE, new IntPtr(updated));
     }
 
+    /// <summary>
+    /// Rounds a device-independent coordinate so it lands on a whole device pixel.
+    /// <para>
+    /// Needed because window positions here are computed as <c>physicalPixels / scale</c>, which at any
+    /// non-integer scale factor produces a fractional result - at 150% a great many anchor positions land on
+    /// a half device pixel. WPF then renders the entire window, text included, offset by half a pixel, and
+    /// the result is a uniformly soft window that no amount of text-rendering configuration will sharpen.
+    /// <c>UseLayoutRounding</c> does not help: it rounds layout <em>within</em> the window, not the window's
+    /// own origin.
+    /// </para>
+    /// </summary>
+    public static double SnapToDevicePixel(double deviceIndependentValue, double scale)
+        => scale <= 0 ? deviceIndependentValue : Math.Round(deviceIndependentValue * scale) / scale;
+
     /// <summary>DPI scale factor (1.0 == 96 DPI) for the monitor containing a physical point.</summary>
     public static double GetScaleForPoint(int x, int y)
     {

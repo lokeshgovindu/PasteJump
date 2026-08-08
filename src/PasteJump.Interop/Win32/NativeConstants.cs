@@ -69,6 +69,9 @@ internal static class NativeConstants
     /// </summary>
     public static readonly uint[] SynthesisedFromUnicodeText = [CF_TEXT, CF_OEMTEXT, CF_LOCALE];
 
+    // Note: the rule for dropping duplicate image encodings lives in Core, as RedundantImageFormats, so it
+    // can be tested without a clipboard. It is applied by Win32ClipboardAccess at capture.
+
     // ---- global hotkeys
     public const int WM_HOTKEY = 0x0312;
 
