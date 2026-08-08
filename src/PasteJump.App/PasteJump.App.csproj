@@ -12,9 +12,19 @@
   </PropertyGroup>
 
   <!--
-    Self-contained portable-folder publish: no .NET runtime required on the
-    target machine. Trimming and NativeAOT are BOTH unsupported with WPF -
-    do not enable them, the ~110-150 MB output is the cost of the UI framework.
+    Self-contained single-file publish: one PasteJump.exe, no .NET runtime required on the target machine
+    and nothing beside it.
+
+    Trimming and NativeAOT are BOTH unsupported with WPF - do not enable them. That is what fixes the floor
+    at tens of megabytes: unlike a .NET Framework app, which can be a few MB because Windows already carries
+    its runtime, this has to bring the whole of .NET and WPF with it.
+
+    EnableCompressionInSingleFile roughly halves the result - measured 143 MB down to 65 MB - at the cost of
+    decompressing assemblies on each start. Worth it for an app launched once per logon and then resident.
+
+    IncludeAllContentForSelfExtract is not optional. Without it the Assets\*.ico files stay loose beside the
+    exe and the publish is no longer a single file; with it they are bundled and extracted, which is why
+    AppPaths.AssetsDirectory probes the extraction directory as well as the exe's own folder.
   -->
   <PropertyGroup>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -22,6 +32,11 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishTrimmed>false</PublishTrimmed>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <!--

@@ -21,7 +21,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | Build | Release, 0 warnings, 0 errors |
 | Tests | 343 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
-| Publish | ~134 MB self-contained `win-x64` |
+| Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
 A round of user testing found several real bugs — all fixed, all now covered by tests. They share one
 shape, and it is the thing to watch for here: **a plausible implementation of behaviour that was never
@@ -211,9 +211,13 @@ that immediately caught two real bugs. Expect to do the same again.
 - **`Microsoft.Data.Sqlite` pools connections**, so the native handle outlives `Dispose`. The
   importer sets `Pooling = false` or its temp database copy can never be deleted.
 - **WPF's implicit usings omit `System.IO`** — added once via `<Using>` in `PasteJump.App.csproj`.
-- **Never use `Assembly.Location`.** All paths go through `AppPaths`, which uses
-  `Environment.ProcessPath`, so switching to `PublishSingleFile` stays a csproj change.
-  `AppContext.BaseDirectory` has the same trap: under single-file it is the extraction directory.
+- **Never use `Assembly.Location`,** and be careful with `AppContext.BaseDirectory`. The publish *is* now
+  single-file, so this is live rather than hypothetical: under single-file `Assembly.Location` is empty and
+  `AppContext.BaseDirectory` is the **extraction** directory, not the folder holding the exe. All paths go
+  through `AppPaths`, which uses `Environment.ProcessPath` — that is what keeps the clip database beside the
+  exe instead of in a temp folder. The single deliberate exception is `AppPaths.AssetsDirectory`, where the
+  extraction directory is where the bundled `Assets` folder genuinely is; it probes both locations rather
+  than testing how the app was published.
 
 ### Theming landmines
 
@@ -278,9 +282,18 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ## Constraints, already decided
 
-- **WPF supports neither trimming nor NativeAOT.** ~134 MB is the accepted price; do not try to
-  shrink it without replacing the UI framework.
-- Portable folder deployment, `win-x64` only. ARM needs a separate publish.
+- **Publish is a single self-contained `PasteJump.exe`, ~65 MB, with nothing beside it.**
+  `PublishSingleFile` plus `EnableCompressionInSingleFile`, which measured 143 MB down to 65 MB in exchange
+  for decompressing assemblies at each start — the right trade for an app launched once per logon.
+  `IncludeAllContentForSelfExtract` is required, or the `Assets\*.ico` files stay loose beside the exe and it
+  is no longer one file.
+- **WPF supports neither trimming nor NativeAOT**, and that is what fixes the floor in the tens of
+  megabytes. Do not compare against a .NET Framework app: Carnac.exe is 4 MB because Windows already carries
+  its runtime and Costura.Fody only had to embed a dozen managed DLLs. .NET 10 is not in Windows, so a
+  genuinely dependency-free build has to bring all of .NET and WPF with it. The only route to single-digit
+  megabytes is a framework-dependent publish, which trades away the "no runtime needed" property.
+- Portable single-file deployment, `win-x64` only. ARM needs a separate publish. Data still lands beside the
+  exe, because `AppPaths` resolves off `Environment.ProcessPath` rather than the extraction directory.
 - Out of scope on purpose: channels, plugins, localisation, Action Mode. Because channels are gone,
   the paste-mode Up/Down/PitSwap keys do not exist and the `X` cycle has no Move/Copy stages.
 - **Three Clipjump settings are deliberately not implemented**, having been audited and rejected rather

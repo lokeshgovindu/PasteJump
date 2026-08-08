@@ -10,8 +10,8 @@ A keyboard-driven multiple-clipboard manager for Windows.
 Hold <kbd>Ctrl</kbd>, tap <kbd>V</kbd> to step back through what you have copied, release to paste.
 That gesture — a *jog wheel* for your clipboard — is the whole point.
 
-Built with .NET 10 and WPF. Ships as a self-contained portable folder: **no .NET runtime needed on
-the target machine, and nothing to install.**
+Built with .NET 10 and WPF. Ships as **a single self-contained `PasteJump.exe`** — no .NET runtime
+needed on the target machine, nothing to install, and nothing beside it.
 
 ---
 
@@ -38,8 +38,12 @@ artifacts/publish/PasteJump.exe
 
 It lives in the notification area. Left-click for history, right-click for the menu.
 
-Data goes in `data/` next to the executable, so the whole folder is portable — copy it to a USB
-stick and it takes its history with it.
+That produces one file and nothing else. Data goes in a `data/` folder next to the executable, so it stays
+portable — copy the exe to a USB stick and it takes its history with it.
+
+~65 MB is the floor, not laziness: WPF supports neither trimming nor NativeAOT, and .NET 10 is not part of
+Windows, so a build that needs no runtime installed has to carry all of it. (A .NET Framework app can be a
+few MB precisely because Windows already ships its runtime.)
 
 **Settings → System** locates the clips and the settings independently:
 
@@ -209,8 +213,9 @@ reverse-engineerable but not worth it for data that turns over in days.
 - **Elevated windows.** A non-elevated keyboard hook cannot see keystrokes in elevated windows, so
   the gesture does not work in them. Running PasteJump elevated via a scheduled task fixes it, at the
   cost of a UAC prompt at setup.
-- **~134 MB on disk.** WPF supports neither trimming nor NativeAOT, so a self-contained build is
-  large. This was an accepted trade: the alternative was hand-writing every window in Win32.
+- **~65 MB on disk**, compressed from 143 MB. WPF supports neither trimming nor NativeAOT, so a build that
+  needs no runtime installed is large. Accepted trade: the alternative was hand-writing every window in
+  Win32. Compression also means each start decompresses assemblies, which costs a little launch time.
 - **The application icon is a generated placeholder** (`tools/generate-icon.ps1`), not a designed
   asset.
 - **Windows on ARM** needs a separate `win-arm64` publish; only `win-x64` is built today.
