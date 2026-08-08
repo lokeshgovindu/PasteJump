@@ -59,10 +59,17 @@ intercepts the paste PasteJump sends before the application you are pasting into
 symptom is distinctive: **copying keeps working and pasting silently does nothing**, because capture
 watches the clipboard rather than the keyboard.
 
-PasteJump detects the common managers at start-up and offers to send <kbd>Shift</kbd>+<kbd>Insert</kbd>
-instead — the legacy Windows paste chord, which almost every application still honours and no clipboard
-manager claims. It is under **Settings → Paste mode → Keystroke sent to paste**. Closing the other
-manager is still the better answer.
+PasteJump detects the common managers at start-up and offers a way out. There are two, and they fix
+opposite halves of the problem — both under **Settings → Paste mode**:
+
+- **Keystroke sent to paste** → <kbd>Shift</kbd>+<kbd>Insert</kbd>. Changes what PasteJump *sends*, so the
+  other manager's hook cannot swallow it. The legacy Windows paste chord; almost every application still
+  honours it and no clipboard manager claims it.
+- **Hold Ctrl and tap this key** → any free letter. Changes what PasteJump *listens for*, so the two stop
+  competing for <kbd>Ctrl</kbd>+<kbd>V</kbd> at all. The cleaner fix of the two, at the cost of retraining
+  your fingers.
+
+Closing the other manager is still the best answer.
 
 ### Build and test
 
@@ -102,6 +109,11 @@ While Ctrl is down:
 
 In search mode you can let go of Ctrl and just type; it filters on clip content **and** tags.
 <kbd>Enter</kbd> pastes the match, <kbd>Esc</kbd> cancels.
+
+<kbd>V</kbd> is only the default. **Settings → Paste mode → Hold Ctrl and tap this key** will move the
+gesture to any letter not already used above — useful if something else on your machine owns
+<kbd>Ctrl</kbd>+<kbd>V</kbd>. There is also an optional system-wide shortcut for the history window under
+**Open history with**, off by default since a global hotkey takes that chord from every other application.
 
 Paste formats: Original, Plain text, Collapse whitespace, Sentence case, Unindent.
 

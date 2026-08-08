@@ -191,6 +191,19 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out POINT lpPoint);
 
+    /// <summary>
+    /// Claims a system-wide chord. Fails when another process already owns it, which is ordinary and must
+    /// be reported to the user rather than treated as an error - the whole point of a global hotkey is
+    /// that it is exclusive, so somebody has to lose.
+    /// </summary>
+    [DllImport(User32, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport(User32, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
     [DllImport(User32, SetLastError = true)]
     public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 

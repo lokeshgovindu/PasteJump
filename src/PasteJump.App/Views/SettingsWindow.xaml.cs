@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using PasteJump.App.Services;
 using PasteJump.Core;
 using PasteJump.Core.Formatting;
+using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 
 namespace PasteJump.App.Views;
@@ -132,6 +133,15 @@ public partial class SettingsWindow : Window
 
         WarnAboutConflictCheck.IsChecked = _baseline.WarnAboutClipboardManagerConflict;
 
+        foreach (var key in TriggerKey.Available)
+        {
+            TriggerKeyCombo.Items.Add(key.ToString());
+        }
+
+        TriggerKeyCombo.SelectedItem = TriggerKey.Normalise(_baseline.PasteModeTriggerKey).ToString();
+
+        HistoryHotkeyBox.Text = _baseline.HistoryHotkey;
+
         foreach (var choice in ThemeChoices)
         {
             ThemeCombo.Items.Add(choice.Label);
@@ -152,10 +162,14 @@ public partial class SettingsWindow : Window
         CopyNotificationMsBox.Text = _baseline.CopyNotificationMs.ToString(CultureInfo.CurrentCulture);
         PasteSettleDelayBox.Text = _baseline.PasteSettleDelayMs.ToString(CultureInfo.CurrentCulture);
 
+        BeepOnCopyCheck.IsChecked = _baseline.BeepOnCopy;
+        BeepFrequencyBox.Text = _baseline.BeepFrequencyHz.ToString(CultureInfo.CurrentCulture);
+
         // Reflect the real state of the shortcut, not just what settings claim. The user may have
         // deleted it from the Startup folder by hand since the last run.
         RunAtLogonCheck.IsChecked = _baseline.RunAtLogon || StartupShortcut.Exists;
         TextEditorBox.Text = _baseline.TextEditor;
+        ImageEditorBox.Text = _baseline.ImageEditor;
 
         foreach (var choice in DataLocationChoices)
         {
@@ -185,6 +199,20 @@ public partial class SettingsWindow : Window
     /// which keeps it correct regardless of which control raised the event.
     /// </summary>
     private void OnDataLocationChanged(object sender, SelectionChangedEventArgs e) => RefreshLocationHints();
+
+    /// <summary>
+    /// Spells out the chord and warns when it is no longer the original's. Worth saying out loud: changing
+    /// this changes the one gesture the whole application is built around, and muscle memory will not have
+    /// been consulted.
+    /// </summary>
+    private void OnTriggerKeyChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var key = TriggerKey.Normalise(TriggerKeyCombo.SelectedItem as string);
+
+        TriggerKeyHintText.Text = key == TriggerKey.Default
+            ? $"{TriggerKey.Describe(key)} opens paste mode, and tapping {key} again steps further back."
+            : $"{TriggerKey.Describe(key)} opens paste mode. Ctrl+V goes back to being an ordinary paste.";
+    }
 
     private void RefreshLocationHints()
     {
@@ -280,7 +308,7 @@ public partial class SettingsWindow : Window
 
         var filter = AdvancedFilterBox.Text;
 
-        var rows = SettingsInspector.Describe(source)
+        var rows = SettingsInspector.Describe(source, SelectedClipsLocation, SelectedSettingsLocation)
             .Where(r => string.IsNullOrWhiteSpace(filter)
                 || r.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
                 || r.Value.Contains(filter, StringComparison.OrdinalIgnoreCase))
@@ -292,7 +320,8 @@ public partial class SettingsWindow : Window
 
         AdvancedStatus.Text =
             $"{rows.Count} setting{(rows.Count == 1 ? string.Empty : "s")}, {modified} changed from default. " +
-            "Read-only here - edit on the other tabs, or in data\\settings.json while PasteJump is closed.";
+            "Read-only here - edit on the other tabs, or in data\\settings.json while PasteJump is closed. " +
+            $"Rows marked {DataLocationPointer.FileName} live in that file instead, beside PasteJump.exe.";
 
         AdvancedFilterCue.Visibility = string.IsNullOrEmpty(filter)
             ? Visibility.Visible
@@ -331,6 +360,26 @@ public partial class SettingsWindow : Window
             || settleMs is < 0 or > 500)
         {
             error = "Pause before pasting must be between 0 and 500 milliseconds.";
+            return false;
+        }
+
+        if (!int.TryParse(BeepFrequencyBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var beepHz)
+            || beepHz is < 37 or > 32_767)
+        {
+            error = "Beep pitch must be between 37 and 32767 hertz.";
+            return false;
+        }
+
+        // Rejected rather than silently blanked. A hotkey the user typed and that then vanished from the
+        // box reads as the dialog losing input, whereas being told what is wrong is actionable.
+        var hotkeyText = HistoryHotkeyBox.Text?.Trim() ?? string.Empty;
+
+        if (hotkeyText.Length > 0 && !HotkeySpec.TryParse(hotkeyText, out _))
+        {
+            error = HotkeySpec.ParseOrNone(hotkeyText).IsSet
+                ? "The history shortcut needs at least one of Ctrl, Alt, Shift or Win."
+                : "The history shortcut is not one PasteJump can register. Try something like Ctrl+Shift+H.";
+
             return false;
         }
 
@@ -378,8 +427,20 @@ public partial class SettingsWindow : Window
 
         settings.WarnAboutClipboardManagerConflict = WarnAboutConflictCheck.IsChecked == true;
 
+        settings.PasteModeTriggerKey = TriggerKey
+            .Normalise(TriggerKeyCombo.SelectedItem as string)
+            .ToString();
+
+        // Canonicalised on the way in, so "control+shift+h" is stored the same way the combo would render
+        // it and the Advanced tab does not report a spurious difference from the default.
+        settings.HistoryHotkey = HotkeySpec.ParseOrNone(hotkeyText).ToString();
+
+        settings.BeepOnCopy = BeepOnCopyCheck.IsChecked == true;
+        settings.BeepFrequencyHz = beepHz;
+
         settings.RunAtLogon = RunAtLogonCheck.IsChecked == true;
         settings.TextEditor = TextEditorBox.Text;
+        settings.ImageEditor = ImageEditorBox.Text;
 
         // Carried forward, not surfaced: re-offering the legacy import after every settings change
         // would be maddening.

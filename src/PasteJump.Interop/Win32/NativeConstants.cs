@@ -69,6 +69,20 @@ internal static class NativeConstants
     /// </summary>
     public static readonly uint[] SynthesisedFromUnicodeText = [CF_TEXT, CF_OEMTEXT, CF_LOCALE];
 
+    // ---- global hotkeys
+    public const int WM_HOTKEY = 0x0312;
+
+    public const uint MOD_ALT = 0x0001;
+    public const uint MOD_CONTROL = 0x0002;
+    public const uint MOD_SHIFT = 0x0004;
+    public const uint MOD_WIN = 0x0008;
+
+    /// <summary>
+    /// Suppresses auto-repeat while the chord is held. Without it, holding the history hotkey down
+    /// delivers a stream of WM_HOTKEY messages and the window is asked to open dozens of times.
+    /// </summary>
+    public const uint MOD_NOREPEAT = 0x4000;
+
     // ---- hooks
     public const int WH_KEYBOARD_LL = 13;
     public const int HC_ACTION = 0;

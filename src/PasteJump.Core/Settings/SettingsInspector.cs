@@ -33,12 +33,28 @@ public static class SettingsInspector
     /// All settings, ordered by name. Defaults come from a freshly constructed
     /// <see cref="PasteJumpSettings"/>, which is the single definition of "default" in the app.
     /// </summary>
-    public static IReadOnlyList<SettingRow> Describe(PasteJumpSettings settings)
+    /// <param name="clipsLocation">
+    /// Where clips are stored. Passed in rather than reflected, because it does not live in
+    /// <see cref="PasteJumpSettings"/> - it is in <c>data-location.json</c>, since one of the two decides
+    /// where <c>settings.json</c> itself is. Without these two arguments the Advanced page would be
+    /// silently incomplete, which is worse than showing nothing: it invites the reader to conclude the
+    /// setting does not exist.
+    /// </param>
+    /// <param name="settingsLocation">Where <c>settings.json</c> is stored. See <paramref name="clipsLocation"/>.</param>
+    public static IReadOnlyList<SettingRow> Describe(
+        PasteJumpSettings settings,
+        DataLocation clipsLocation = DataLocation.ApplicationFolder,
+        DataLocation settingsLocation = DataLocation.ApplicationFolder)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
         var defaults = new PasteJumpSettings();
-        var rows = new List<SettingRow>();
+
+        var rows = new List<SettingRow>
+        {
+            DescribeLocation("ClipsLocation", clipsLocation),
+            DescribeLocation("SettingsLocation", settingsLocation),
+        };
 
         foreach (var property in typeof(PasteJumpSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -64,6 +80,18 @@ public static class SettingsInspector
 
         return [.. rows.OrderBy(static r => r.Name, StringComparer.Ordinal)];
     }
+
+    /// <summary>
+    /// A data-location row, formatted like the reflected ones so it does not read as a different kind of
+    /// thing. Marked with its file, since it is not in <c>settings.json</c> and someone looking for it there
+    /// would not find it.
+    /// </summary>
+    private static SettingRow DescribeLocation(string name, DataLocation value) => new(
+        $"{name} ({DataLocationPointer.FileName})",
+        string.Join(" | ", Enum.GetNames<DataLocation>()),
+        value.ToString(),
+        DataLocation.ApplicationFolder.ToString(),
+        value != DataLocation.ApplicationFolder);
 
     private static string FriendlyTypeName(Type type)
     {

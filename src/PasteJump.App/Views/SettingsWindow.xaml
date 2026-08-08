@@ -133,6 +133,34 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="190" />
                         </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Hold Ctrl and tap this key" />
+                        <ComboBox x:Name="TriggerKeyCombo"
+                                  Grid.Column="1"
+                                  SelectionChanged="OnTriggerKeyChanged"
+                                  ToolTip="The key that opens paste mode and steps to an older clip. Change it to stop competing with another clipboard manager for Ctrl+V. Only keys not already used by another paste-mode action are listed." />
+                    </Grid>
+
+                    <TextBlock x:Name="TriggerKeyHintText"
+                               Margin="0,4,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               FontSize="11" />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Open history with" />
+                        <TextBox x:Name="HistoryHotkeyBox"
+                                 Grid.Column="1"
+                                 ToolTip="A system-wide shortcut that opens the clipboard history window, e.g. Ctrl+Shift+H. Leave empty for none. Must include at least one of Ctrl, Alt, Shift or Win." />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Keystroke sent to paste" />
                         <ComboBox x:Name="PasteKeystrokeCombo"
                                   Grid.Column="1"
@@ -186,6 +214,22 @@
                                  ToolTip="Between 250 and 10000 milliseconds." />
                     </Grid>
 
+                    <CheckBox x:Name="BeepOnCopyCheck"
+                              Margin="0,12,0,5"
+                              Content="Beep on each copy"
+                              ToolTip="A short tone when a clip is captured. Useful when the notification is off, or the copy happened on a monitor you were not looking at." />
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="96" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Beep pitch (Hz)" />
+                        <TextBox x:Name="BeepFrequencyBox"
+                                 Grid.Column="1"
+                                 ToolTip="Between 37 and 32767 hertz. Clipjump used 1500." />
+                    </Grid>
+
                     <TextBlock Margin="0,14,0,0"
                                Foreground="{DynamicResource MutedTextBrush}"
                                FontSize="11"
@@ -215,10 +259,21 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="190" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Editor used by the H key" />
+                        <TextBlock Grid.Column="0" Text="Editor for text clips (H key)" />
                         <TextBox x:Name="TextEditorBox"
                                  Grid.Column="1"
-                                 ToolTip="Program launched when you press H during the gesture to edit a clip." />
+                                 ToolTip="Program launched when you press H during the gesture to edit a text clip." />
+                    </Grid>
+
+                    <Grid Style="{StaticResource SettingRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="190" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Editor for image clips (H key)" />
+                        <TextBox x:Name="ImageEditorBox"
+                                 Grid.Column="1"
+                                 ToolTip="Program launched when you press H on an image clip. The clip is written to a temporary .bmp first." />
                     </Grid>
 
                     <Grid Style="{StaticResource SettingRow}">

@@ -70,6 +70,15 @@ public sealed class PasteJumpSettings
     /// </summary>
     public string? DefaultFormatterId { get; set; } = FormatterRegistry.DefaultId;
 
+    /// <summary>
+    /// Letter that, held with Ctrl, opens paste mode. Original: <c>paste_k</c>.
+    /// <para>
+    /// See <see cref="PasteMode.TriggerKey"/>. Only letters not already bound to a paste-mode action are
+    /// accepted; anything else is coerced back to <c>V</c> by <see cref="Normalise"/>.
+    /// </para>
+    /// </summary>
+    public string PasteModeTriggerKey { get; set; } = PasteMode.TriggerKey.Default.ToString();
+
     /// <summary>Fixed overlay position. Null means "follow the caret, else the cursor".</summary>
     public int? OverlayX { get; set; }
 
@@ -114,13 +123,44 @@ public sealed class PasteJumpSettings
     /// <summary>How long the copy notification stays on screen, in milliseconds.</summary>
     public int CopyNotificationMs { get; set; } = 1200;
 
+    /// <summary>
+    /// Sound a short tone on each capture. Original: <c>CopyBeep</c>, off by default there too.
+    /// <para>
+    /// Useful when the notification is off or the copy happened on a monitor you were not looking at -
+    /// which is the case it exists for, rather than as decoration.
+    /// </para>
+    /// </summary>
+    public bool BeepOnCopy { get; set; }
+
+    /// <summary>Pitch of that tone in hertz. Original: <c>beepFrequency</c>, also 1500.</summary>
+    public int BeepFrequencyHz { get; set; } = 1500;
+
     // ------------------------------------------------------------ system
 
     /// <summary>Start with Windows via a shortcut in the user's Startup folder.</summary>
     public bool RunAtLogon { get; set; }
 
-    /// <summary>External editor used by the <c>H</c> key.</summary>
+    /// <summary>External editor used by the <c>H</c> key on a text clip.</summary>
     public string TextEditor { get; set; } = "notepad.exe";
+
+    /// <summary>
+    /// External editor used by the <c>H</c> key on an image clip. Original: <c>default_image_editor</c>.
+    /// <para>
+    /// A second setting rather than reusing <see cref="TextEditor"/>: Notepad opening a bitmap is useless,
+    /// and before this existed the <c>H</c> key simply refused on image clips.
+    /// </para>
+    /// </summary>
+    public string ImageEditor { get; set; } = "mspaint.exe";
+
+    /// <summary>
+    /// System-wide hotkey that opens the clipboard history window, e.g. <c>Ctrl+Shift+H</c>. Empty means
+    /// none. Original: <c>history_k</c>, also empty by default.
+    /// <para>
+    /// Empty by default deliberately. A global hotkey takes that chord away from every other application
+    /// on the desktop, which is not a thing to do to someone without being asked.
+    /// </para>
+    /// </summary>
+    public string HistoryHotkey { get; set; } = string.Empty;
 
     /// <summary>Whether the legacy Clipjump import has already run, so it is not offered twice.</summary>
     public bool LegacyImportCompleted { get; set; }
@@ -148,6 +188,20 @@ public sealed class PasteJumpSettings
         {
             TextEditor = "notepad.exe";
         }
+
+        if (string.IsNullOrWhiteSpace(ImageEditor))
+        {
+            ImageEditor = "mspaint.exe";
+        }
+
+        // Coerced to a usable letter rather than rejected, since a hand-edited file could hold anything.
+        PasteModeTriggerKey = PasteMode.TriggerKey.Normalise(PasteModeTriggerKey).ToString();
+
+        // Re-rendered through the parser, so a hand-typed "control + shift + h" becomes the canonical
+        // "Ctrl+Shift+H" and anything unparseable becomes empty rather than sitting there looking valid.
+        HistoryHotkey = HotkeySpec.ParseOrNone(HistoryHotkey).ToString();
+
+        BeepFrequencyHz = Math.Clamp(BeepFrequencyHz, 37, 32_767);
 
         PasteSettleDelayMs = Math.Clamp(PasteSettleDelayMs, 0, 500);
         CopyNotificationMs = Math.Clamp(CopyNotificationMs, 250, 10_000);

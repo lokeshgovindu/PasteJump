@@ -11,10 +11,31 @@ namespace PasteJump.Interop;
 public static class VirtualKeyTranslator
 {
     /// <summary>
-    /// The default key bindings, matching the original Clipjump layout minus the channel keys
-    /// (Up / Down / PitSwap), which have no meaning without channels.
+    /// The key bindings, matching the original Clipjump layout minus the channel keys (Up / Down /
+    /// PitSwap), which have no meaning without channels.
     /// </summary>
-    public static GestureKey ToGestureKey(int virtualKey) => virtualKey switch
+    /// <param name="triggerVirtualKey">
+    /// Virtual key of the configurable trigger - the key that opens a session and, once open, steps to an
+    /// older clip. Checked before everything else so it always wins, and <c>V</c> is therefore <em>not</em>
+    /// in the table below: when V is the trigger the first check catches it, and when it is not, V must
+    /// fall through to <see cref="GestureKey.None"/> so it can be typed into the search box like any other
+    /// unbound letter.
+    /// </param>
+    public static GestureKey ToGestureKey(int virtualKey, int triggerVirtualKey)
+    {
+        if (virtualKey == triggerVirtualKey)
+        {
+            return GestureKey.Paste;
+        }
+
+        return Map(virtualKey);
+    }
+
+    /// <summary>Bindings with the default <c>V</c> trigger, for the probe harness and for tests.</summary>
+    public static GestureKey ToGestureKey(int virtualKey)
+        => ToGestureKey(virtualKey, NativeConstants.VK_V);
+
+    private static GestureKey Map(int virtualKey) => virtualKey switch
     {
         NativeConstants.VK_CONTROL or NativeConstants.VK_LCONTROL or NativeConstants.VK_RCONTROL
             => GestureKey.Control,
@@ -22,7 +43,6 @@ public static class VirtualKeyTranslator
         NativeConstants.VK_SHIFT or NativeConstants.VK_LSHIFT or NativeConstants.VK_RSHIFT
             => GestureKey.Shift,
 
-        NativeConstants.VK_V => GestureKey.Paste,
         NativeConstants.VK_C => GestureKey.Back,
         NativeConstants.VK_X => GestureKey.CycleCommitMode,
         NativeConstants.VK_A => GestureKey.JumpToNewest,

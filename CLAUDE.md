@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 256 passing (`dotnet test`) |
+| Tests | 315 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | ~134 MB self-contained `win-x64` |
 
@@ -63,7 +63,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      256 tests.
+tests/PasteJump.Core.Tests      315 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -120,6 +120,16 @@ that immediately caught two real bugs. Expect to do the same again.
   hook, makes it strictly worse: returning 1 removes the event from the chain **and** from delivery to
   the target window, so nothing pastes anywhere. The only avenue is a chord the rival has not claimed,
   hence the `PasteKeystroke` setting and `Shift+Insert`. Two managers cannot share Ctrl+V.
+- **The trigger key is configurable, so nothing may hard-code `V` or "Ctrl+V".** `TriggerKey` in `Core`
+  owns the rules; `VirtualKeyTranslator.ToGestureKey` takes the trigger VK and checks it *first*, and `V` is
+  deliberately absent from the binding table so it falls through to search input when it is not the
+  trigger. The letter doubles as "step to an older clip", so it cannot be one already bound to another
+  action — `TriggerKey.Reserved` is that list and it **must** be kept in step with the translator's map,
+  or a new action becomes silently stealable. `ShortcutHelpWindow` takes the letter as a constructor
+  argument for the same reason, and `OnSettingsApplied` closes an open copy when it changes.
+- **Two settings now govern the paste chord and they are not the same thing.** `PasteModeTriggerKey` is
+  what we *listen for*; `PasteKeystroke` is what we *send*. Changing the trigger is the fix for a rival
+  manager stealing the incoming chord; changing the keystroke is the fix for it stealing the outgoing one.
 - **`Shift+Insert` needs `KEYEVENTF_EXTENDEDKEY`.** Insert shares a scan code with numpad 0; without the
   flag a scan-code reader sees a numpad keypress with Num Lock off. Same family of bug as `wScan == 0`.
 - **The data locations cannot live in `settings.json`,** because one of them decides where
@@ -138,6 +148,19 @@ that immediately caught two real bugs. Expect to do the same again.
 - **A new capture must reset the browse position.** Separate rule from `PreserveClipPosition`, which
   only governs surviving the *end of a session*. See `PLAN.md` §5 invariant 7 — omitting it made every
   Ctrl+V reopen on a stale clip.
+- **`RegisterHotKey`, not the hook, for the history hotkey.** The two are for opposite shapes: the hook
+  exists because a registered hotkey cannot express "Ctrl is still down and V was tapped again", while the
+  history hotkey fires once and does one thing. Putting it in the hook would add a second responsibility to
+  a callback that blocks all keyboard input machine-wide. `MOD_NOREPEAT` is not optional — without it,
+  holding the chord opens the window dozens of times. A refused registration means another process owns the
+  chord and must be reported, or the symptom is a hotkey that silently does nothing.
+- **Everything the app uses must appear on the Advanced tab.** Reflection over `PasteJumpSettings` gives
+  that for free, so a new setting belongs on that class rather than in a field somewhere. The two data
+  locations are the exception — they are in `data-location.json` — so `SettingsInspector.Describe` takes
+  them as arguments and labels the rows with their file.
+- **`Console.Beep` is synchronous.** It returns only when the tone has finished, so the copy beep goes
+  through `CopyBeep.Play`, which hops to the thread pool. Called inline it would freeze the UI for 150 ms
+  per copy, and the capture path is reachable from the hook, where that is halfway to `LowLevelHooksTimeout`.
 - **An empty store must pass Ctrl+V through.** The hook swallows Ctrl+V to build the gesture, so
   without `PasteCommitKind.PassedThrough` an empty store silently breaks Ctrl+V system-wide.
 - **The overlay must never take focus.** `WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW`
@@ -211,6 +234,13 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 - Portable folder deployment, `win-x64` only. ARM needs a separate publish.
 - Out of scope on purpose: channels, plugins, localisation, Action Mode. Because channels are gone,
   the paste-mode Up/Down/PitSwap keys do not exist and the `X` cycle has no Move/Copy stages.
+- **Three Clipjump settings are deliberately not implemented**, having been audited and rejected rather
+  than missed. `Threshold` is the batch size for compacting its one-file-per-clip store
+  (`Clipjump.ahk:1147`); SQLite plus `EvictBeyond` replaces the whole mechanism.
+  `Quality_of_Thumbnail_Previews` tunes the lossy `.jpg` thumbnail it writes per image clip
+  (`Clipjump.ahk:1198`); we keep the original DIB and render previews on demand, so adding the knob would be
+  a regression. `RAM_Flush` and `Priority` are `EmptyWorkingSet` and process priority — the former is a
+  well-known anti-pattern that makes an app slower by forcing page faults, and nothing here is CPU-bound.
 - **One icon, three delivery mechanisms.** `Assets/pastejump.ico` is generated by
   `tools/generate-icon.ps1` (coloured tile, 9 frames) and referenced three times in
   `PasteJump.App.csproj`, because none of the three is reachable by the others' mechanism:
@@ -230,7 +260,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 256 tests
+dotnet test                                         # 315 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

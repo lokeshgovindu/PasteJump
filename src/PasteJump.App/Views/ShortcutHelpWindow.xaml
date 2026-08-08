@@ -35,10 +35,11 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="16">
 
-            <TextBlock Foreground="{DynamicResource TextBrush}"
+            <!-- Text set in code-behind: the trigger key is configurable, so it cannot be literal here. -->
+            <TextBlock x:Name="IntroText"
+                       Foreground="{DynamicResource TextBrush}"
                        FontSize="13"
-                       TextWrapping="Wrap"
-                       Text="Press Ctrl+V and keep Ctrl held. The overlay appears; tap keys to act on the stack. Release Ctrl to commit." />
+                       TextWrapping="Wrap" />
 
             <TextBlock Style="{StaticResource SectionStyle}" Text="MOVING THROUGH CLIPS" />
             <Grid>
@@ -50,7 +51,7 @@
                     <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="V" />
+                <TextBlock x:Name="TriggerKeyText" Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Step to an older clip" />
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="C" />
@@ -134,7 +135,7 @@
                 <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste the match" />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Ctrl+V / Ctrl+C" />
+                <TextBlock x:Name="SearchStepText" Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Move between matches while searching" />
 
                 <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Esc" />

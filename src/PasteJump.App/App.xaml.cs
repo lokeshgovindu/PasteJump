@@ -34,7 +34,15 @@ public partial class App : Application
     private ClipboardMonitor _clipboardMonitor = null!;
     private Win32ClipboardAccess _clipboard = null!;
     private LowLevelKeyboardHook _keyboardHook = null!;
+    private GlobalHotkey _historyHotkey = null!;
     private TrayIcon _trayIcon = null!;
+
+    /// <summary>
+    /// Virtual key of the configured paste-mode trigger, resolved once per settings change rather than on
+    /// every keystroke. <see cref="OnKeyEvent"/> runs inside the hook callback, which blocks all keyboard
+    /// input machine-wide, so it does no parsing.
+    /// </summary>
+    private int _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Default);
 
     private SelfWriteGuard _selfWrites = null!;
     private FormatterRegistry _formatters = null!;
@@ -174,8 +182,14 @@ public partial class App : Application
         _clipboardMonitor.ClipboardChanged += _capture.OnClipboardChanged;
         _clipboardMonitor.Start();
 
+        _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
+
         _keyboardHook = new LowLevelKeyboardHook(OnKeyEvent);
         _keyboardHook.Install();
+
+        _historyHotkey = new GlobalHotkey(_messageWindow);
+        _historyHotkey.Pressed += ShowHistory;
+        ApplyHistoryHotkey(announceFailure: true);
 
         _trayIcon = new TrayIcon(BuildTrayTooltip(), _messageWindow);
         _trayIcon.Activated += ShowHistory;
@@ -363,7 +377,7 @@ public partial class App : Application
             return false;
         }
 
-        var key = VirtualKeyTranslator.ToGestureKey(e.VirtualKey);
+        var key = VirtualKeyTranslator.ToGestureKey(e.VirtualKey, _triggerVirtualKey);
 
         if (key != GestureKey.None && _recognizer.Handle(key, e.IsKeyDown))
         {
@@ -389,6 +403,13 @@ public partial class App : Application
     private void OnClipCaptured(Clip clip)
     {
         _historyWindow?.QueueRefresh();
+
+        // Before the notification checks below, and independent of them: the beep exists precisely for the
+        // case where the toast is off or on a monitor you are not looking at.
+        if (_settings.BeepOnCopy)
+        {
+            CopyBeep.Play(_settings.BeepFrequencyHz);
+        }
 
         // A new copy makes the next Ctrl+V open on the newest clip. Without this the remembered
         // position persisted for ever, so after browsing to the fifth clip once, every subsequent
@@ -558,11 +579,38 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Applies the configured history hotkey.
+    /// <para>
+    /// A refused registration is reported rather than swallowed. The only realistic cause is another
+    /// application already owning the chord, and the symptom otherwise is a hotkey that simply does
+    /// nothing - indistinguishable from a setting that failed to save.
+    /// </para>
+    /// </summary>
+    private void ApplyHistoryHotkey(bool announceFailure)
+    {
+        var spec = HotkeySpec.ParseOrNone(_settings.HistoryHotkey);
+
+        if (_historyHotkey.TryRegister(spec) || !announceFailure)
+        {
+            return;
+        }
+
+        MessageBox.Show(
+            $"Windows would not give PasteJump the hotkey {spec}.\n\n" +
+            "Another program has already claimed it. Choose a different combination under Settings, " +
+            "Paste mode.",
+            "PasteJump",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
     private void ShowShortcutHelp()
     {
         if (_helpWindow is null)
         {
-            _helpWindow = Themed(new ShortcutHelpWindow());
+            _helpWindow = Themed(new ShortcutHelpWindow(
+                TriggerKey.Normalise(_settings.PasteModeTriggerKey)));
             _helpWindow.Closed += (_, _) => _helpWindow = null;
             _helpWindow.Show();
         }
@@ -580,6 +628,12 @@ public partial class App : Application
         _theme.Apply(_settings.Theme);
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
+
+        _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
+        ApplyHistoryHotkey(announceFailure: true);
+
+        // The help window lists the trigger key by name, so a change to it makes an open copy wrong.
+        _helpWindow?.Close();
 
         // An open history window follows the new density rather than needing to be reopened.
         _historyWindow?.ApplyDensity(_settings.GridDensity);
@@ -751,32 +805,58 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Opens a clip in an external editor, picking the editor from what the clip actually holds.
+    /// <para>
+    /// Text is preferred over the image when a clip carries both, which is common - copying a table from a
+    /// browser publishes HTML, plain text and a bitmap together, and the text is what someone pressing
+    /// "edit" almost always means.
+    /// </para>
+    /// </summary>
     private void OnClipEditorRequested(Clip clip)
     {
         try
         {
             var payloads = _store.GetPayloads(clip.Id);
-            var text = Win32ClipboardAccess.ExtractText(payloads);
 
-            if (text is null)
+            if (Win32ClipboardAccess.ExtractText(payloads) is { } text)
             {
-                MessageBox.Show("This clip has no text to edit.", "PasteJump");
+                LaunchEditor(_settings.TextEditor, $"pastejump-{clip.Id}.txt", File.WriteAllBytes, Encode(text));
                 return;
             }
 
-            var tempPath = Path.Combine(Path.GetTempPath(), $"pastejump-{clip.Id}.txt");
-            File.WriteAllText(tempPath, text);
+            // CF_DIB or CF_DIBV5. Rendered to a real .bmp file with the header an image editor expects -
+            // the clipboard's DIB has no BITMAPFILEHEADER, so writing the raw bytes out would produce a
+            // file nothing can open. DibConverter already does this for the export path.
+            var dib = payloads.FirstOrDefault(static p => p.FormatId is 8 or 17);
+            var bitmap = dib is null ? null : DibConverter.TryCreateBitmapFile(dib.Data);
 
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            if (bitmap is null)
             {
-                FileName = _settings.TextEditor,
-                Arguments = $"\"{tempPath}\"",
-                UseShellExecute = true,
-            });
+                MessageBox.Show("This clip has nothing that can be edited.", "PasteJump");
+                return;
+            }
+
+            LaunchEditor(_settings.ImageEditor, $"pastejump-{clip.Id}.bmp", File.WriteAllBytes, bitmap);
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Could not open the editor.\n\n{ex.Message}", "PasteJump");
+        }
+
+        static byte[] Encode(string text) => System.Text.Encoding.UTF8.GetBytes(text);
+
+        static void LaunchEditor(string editor, string fileName, Action<string, byte[]> write, byte[] content)
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), fileName);
+            write(tempPath, content);
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = editor,
+                Arguments = $"\"{tempPath}\"",
+                UseShellExecute = true,
+            });
         }
     }
 
@@ -892,6 +972,7 @@ public partial class App : Application
         // Ordered teardown: stop taking input first, then stop capturing, then release the store.
         _recognizer?.Reset();
         _keyboardHook?.Dispose();
+        _historyHotkey?.Dispose();
 
         _toast?.HideNow();
 
