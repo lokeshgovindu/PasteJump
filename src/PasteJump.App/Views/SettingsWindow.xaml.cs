@@ -116,7 +116,9 @@ public partial class SettingsWindow : Window
         MonitorClipboardCheck.IsChecked = _baseline.MonitorClipboard;
         StoreImagesCheck.IsChecked = _baseline.StoreImages;
         AllowDuplicatesCheck.IsChecked = _baseline.AllowDuplicateClips;
+        LimitMaxClipsCheck.IsChecked = _baseline.LimitMaxClips;
         MaxClipsBox.Text = _baseline.MaxClips.ToString(CultureInfo.CurrentCulture);
+        RefreshMaxClipsEnabled();
         IgnoredProcessesBox.Text = string.Join(Environment.NewLine, _baseline.IgnoredProcesses);
 
         RecordHistoryCheck.IsChecked = _baseline.RecordHistory;
@@ -308,6 +310,23 @@ public partial class SettingsWindow : Window
 
     private void OnImportClicked(object sender, RoutedEventArgs e) => LegacyImportRequested?.Invoke();
 
+    private void OnLimitMaxClipsChanged(object sender, RoutedEventArgs e) => RefreshMaxClipsEnabled();
+
+    /// <summary>
+    /// Greys the count while the limit is off, so it is obvious the number is not in force.
+    /// <para>
+    /// The label is dimmed as well as the box. Disabling only the input leaves a full-strength label beside a
+    /// greyed field, which reads as a rendering fault rather than as a deliberate state.
+    /// </para>
+    /// </summary>
+    private void RefreshMaxClipsEnabled()
+    {
+        var limiting = LimitMaxClipsCheck.IsChecked == true;
+
+        MaxClipsBox.IsEnabled = limiting;
+        MaxClipsLabel.IsEnabled = limiting;
+    }
+
     /// <summary>
     /// Rebuilds the Advanced list from the settings currently entered in the dialog, so it reflects
     /// pending edits rather than only what was on disk when the window opened.
@@ -403,6 +422,7 @@ public partial class SettingsWindow : Window
         settings.MonitorClipboard = MonitorClipboardCheck.IsChecked == true;
         settings.StoreImages = StoreImagesCheck.IsChecked == true;
         settings.AllowDuplicateClips = AllowDuplicatesCheck.IsChecked == true;
+        settings.LimitMaxClips = LimitMaxClipsCheck.IsChecked == true;
         settings.MaxClips = maxClips;
 
         settings.IgnoredProcesses = IgnoredProcessesBox.Text

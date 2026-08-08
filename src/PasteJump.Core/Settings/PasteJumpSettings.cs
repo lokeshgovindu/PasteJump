@@ -21,6 +21,29 @@ public sealed class PasteJumpSettings
     /// <summary>Maximum clips kept in the working stack. Pinned clips are exempt.</summary>
     public int MaxClips { get; set; } = 200;
 
+    /// <summary>
+    /// Whether <see cref="MaxClips"/> is enforced at all. Original: <c>limit_MaxClips</c>.
+    /// <para>
+    /// On by default, and worth leaving on. With the limit off the stack grows without bound, and clips are not
+    /// uniformly small - the clipboard hands out images uncompressed, so a handful of screenshots costs more
+    /// than thousands of text clips. Nothing else caps this store: <see cref="HistoryRetentionDays"/> prunes
+    /// the history archive, which is a separate thing.
+    /// </para>
+    /// </summary>
+    public bool LimitMaxClips { get; set; } = true;
+
+    /// <summary>
+    /// The cap to actually apply: <see cref="MaxClips"/> when limiting, otherwise 0.
+    /// <para>
+    /// Zero rather than <see cref="int.MaxValue"/>, because <c>ClipStore.EvictBeyond</c> already treats a
+    /// non-positive cap as "do nothing" - so the unlimited case skips the query entirely instead of running an
+    /// eviction that can never match. Every caller goes through here so the rule lives in one place; a call
+    /// site reading <c>MaxClips</c> directly would silently ignore the setting.
+    /// </para>
+    /// </summary>
+    [JsonIgnore]
+    public int EffectiveMaxClips => LimitMaxClips ? MaxClips : 0;
+
     /// <summary>Watch the clipboard at all. Turning this off makes the app inert but resident.</summary>
     public bool MonitorClipboard { get; set; } = true;
 

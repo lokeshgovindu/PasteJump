@@ -165,7 +165,7 @@ public sealed class LegacyImportTests : IDisposable
             InsertLegacyRow(connection, "second legacy clip", 0, null, "2024-01-02 09:00:00", 21);
         });
 
-        var report = LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        var report = RunImport(_legacyFolder);
 
         Assert.Equal(2, report.Imported);
         Assert.Empty(report.Errors);
@@ -178,7 +178,7 @@ public sealed class LegacyImportTests : IDisposable
         CreateLegacyDatabase(connection =>
             InsertLegacyRow(connection, "connection string for production", 0, null, "2024-01-01 09:00:00", 32));
 
-        LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        RunImport(_legacyFolder);
 
         var hits = _store.SearchHistory("connection");
 
@@ -193,7 +193,7 @@ public sealed class LegacyImportTests : IDisposable
             InsertLegacyRow(connection, "legacy", 0, null, "2024-01-01 09:00:00", 6));
 
         _store.AddHistory(DateTimeOffset.UtcNow, ClipKind.Text, "native entry", null, 12);
-        LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        RunImport(_legacyFolder);
 
         var all = _store.SearchHistory(null);
 
@@ -214,7 +214,7 @@ public sealed class LegacyImportTests : IDisposable
         CreateLegacyDatabase(connection =>
             InsertLegacyRow(connection, "[IMAGE]", 1, relativePath, "2024-01-01 09:00:00", imageBytes.Length));
 
-        var report = LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        var report = RunImport(_legacyFolder);
 
         Assert.Equal(1, report.Imported);
 
@@ -230,7 +230,7 @@ public sealed class LegacyImportTests : IDisposable
         CreateLegacyDatabase(connection =>
             InsertLegacyRow(connection, "[IMAGE]", 1, @"cache\history\gone.jpg", "2024-01-01 09:00:00", 100));
 
-        var report = LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        var report = RunImport(_legacyFolder);
 
         // The file is gone but the record is still history worth keeping.
         Assert.Equal(1, report.Imported);
@@ -243,7 +243,7 @@ public sealed class LegacyImportTests : IDisposable
         CreateLegacyDatabase(connection =>
             InsertLegacyRow(connection, "[IMAGE]", 1, @"..\..\..\Windows\System32\config\SAM", "2024-01-01 09:00:00", 1));
 
-        var report = LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        var report = RunImport(_legacyFolder);
 
         // Imported as a record, but the traversal must not have read anything.
         Assert.Equal(1, report.Imported);
@@ -260,7 +260,7 @@ public sealed class LegacyImportTests : IDisposable
             InsertLegacyRow(connection, "real content", 0, null, "2024-01-01 09:00:00", 12);
         });
 
-        var report = LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        var report = RunImport(_legacyFolder);
 
         Assert.Equal(1, report.Imported);
         Assert.Equal(2, report.Skipped);
@@ -269,7 +269,7 @@ public sealed class LegacyImportTests : IDisposable
     [Fact]
     public void MissingDatabase_ReportsAnErrorRatherThanThrowing()
     {
-        var report = LegacyClipjumpImporter.ImportHistory(Path.Combine(_root, "nowhere"), _store);
+        var report = RunImport(Path.Combine(_root, "nowhere"));
 
         Assert.Equal(0, report.Imported);
         Assert.NotEmpty(report.Errors);
@@ -284,7 +284,7 @@ public sealed class LegacyImportTests : IDisposable
         var before = File.GetLastWriteTimeUtc(databasePath);
         var sizeBefore = new FileInfo(databasePath).Length;
 
-        LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        RunImport(_legacyFolder);
 
         // The importer copies the database before reading precisely so an existing Clipjump
         // installation cannot be disturbed by a failed or partial import.
@@ -301,9 +301,123 @@ public sealed class LegacyImportTests : IDisposable
         // Simulates Clipjump still running and holding its database.
         using var holder = new FileStream(databasePath, FileMode.Open, FileAccess.Read, FileShare.Read);
 
-        var report = LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store);
+        var report = RunImport(_legacyFolder);
 
         Assert.Equal(1, report.Imported);
+    }
+
+    /// <summary>
+    /// Runs an import, threading xUnit's own cancellation token through.
+    /// <para>
+    /// A helper rather than the raw call at ten sites: the importer takes a <c>CancellationToken</c>, and
+    /// xUnit's analyser rightly wants the test's token passed so a cancelled run stops the work too.
+    /// </para>
+    /// </summary>
+    private ImportReport RunImport(string folder, IProgress<ImportProgress>? progress = null)
+        => LegacyClipjumpImporter.ImportHistory(
+            folder,
+            _store,
+            progress,
+            TestContext.Current.CancellationToken);
+
+    // ---------------------------------------------------------------- cancellation and progress
+
+    /// <summary>
+    /// Synchronous progress sink, deliberately not <see cref="Progress{T}"/>.
+    /// <para>
+    /// <c>Progress&lt;T&gt;</c> marshals through the captured synchronisation context, and a test has none - so
+    /// callbacks land on pool threads, arriving after the import has returned and racing each other into
+    /// whatever collection they append to. That is right for the UI and useless for asserting on.
+    /// </para>
+    /// </summary>
+    private sealed class RecordingProgress : IProgress<ImportProgress>
+    {
+        public List<ImportProgress> Reports { get; } = [];
+
+        public Action<ImportProgress>? OnReport { get; init; }
+
+        public void Report(ImportProgress value)
+        {
+            Reports.Add(value);
+            OnReport?.Invoke(value);
+        }
+    }
+
+    [Fact]
+    public void An_import_reports_progress_for_every_row()
+    {
+        CreateLegacyDatabase(connection =>
+        {
+            for (var i = 0; i < 5; i++)
+            {
+                InsertLegacyRow(connection, $"row {i}", 0, null, "2024-01-01 09:00:00", 10);
+            }
+        });
+
+        var progress = new RecordingProgress();
+
+        var report = RunImport(_legacyFolder, progress);
+
+        Assert.Equal(5, report.Imported);
+        Assert.Equal([1, 2, 3, 4, 5], progress.Reports.Select(static p => p.Processed));
+        Assert.All(progress.Reports, p => Assert.Equal(5, p.Total));
+    }
+
+    [Fact]
+    public void A_cancelled_import_stops_and_says_so()
+    {
+        CreateLegacyDatabase(connection =>
+        {
+            for (var i = 0; i < 50; i++)
+            {
+                InsertLegacyRow(connection, $"row {i}", 0, null, "2024-01-01 09:00:00", 10);
+            }
+        });
+
+        using var cancellation = new CancellationTokenSource();
+
+        // Cancelled from inside the progress callback, which is the closest a test gets to the user pressing
+        // Cancel part-way through - and being synchronous, it happens at a known row.
+        var progress = new RecordingProgress
+        {
+            OnReport = p =>
+            {
+                if (p.Processed == 3)
+                {
+                    cancellation.Cancel();
+                }
+            },
+        };
+
+        var report = LegacyClipjumpImporter.ImportHistory(
+            _legacyFolder, _store, progress, cancellation.Token);
+
+        Assert.True(report.Cancelled);
+
+        // Stopped at the row after the cancel, not at the end. Whatever was imported is kept, because the
+        // import is idempotent and re-running resumes rather than duplicating - discarding the partial work
+        // would make a slow import unresumable.
+        Assert.Equal(3, report.Imported);
+        Assert.Equal(3, progress.Reports.Count);
+    }
+
+    [Fact]
+    public void An_import_cancelled_before_it_starts_imports_nothing()
+    {
+        CreateLegacyDatabase(connection =>
+            InsertLegacyRow(connection, "never read", 0, null, "2024-01-01 09:00:00", 10));
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var report = LegacyClipjumpImporter.ImportHistory(_legacyFolder, _store, null, cancellation.Token);
+
+        Assert.True(report.Cancelled);
+        Assert.Equal(0, report.Imported);
+
+        // Cancellation is not an error: the report carries the flag, not a message the UI would show as a
+        // failure.
+        Assert.Empty(report.Errors);
     }
 
     // ---------------------------------------------------------------- locating an installation

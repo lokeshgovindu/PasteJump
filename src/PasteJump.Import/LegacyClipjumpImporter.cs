@@ -12,8 +12,19 @@ public sealed class ImportReport
 
     public int Skipped { get; set; }
 
+    /// <summary>
+    /// Set when the user stopped the run part-way. Whatever had already been imported is kept: the import is
+    /// idempotent, so resuming later simply skips those rows rather than duplicating them.
+    /// </summary>
+    public bool Cancelled { get; set; }
+
     public List<string> Errors { get; } = [];
 }
+
+/// <summary>How far an import has got, for a progress display.</summary>
+/// <param name="Processed">Rows read so far.</param>
+/// <param name="Total">Rows in the source, or 0 when it could not be counted.</param>
+public readonly record struct ImportProgress(int Processed, int Total);
 
 /// <summary>
 /// Imports Clipjump 12.x history into a PasteJump store.
@@ -33,7 +44,20 @@ public static class LegacyClipjumpImporter
     /// <summary>Marker written to imported rows so they can be identified or rolled back later.</summary>
     public const string ProvenanceTag = "clipjump-12.5";
 
-    public static ImportReport ImportHistory(string clipjumpFolder, ClipStore target)
+    /// <param name="progress">Reported after each row, for a progress display. Optional.</param>
+    /// <param name="cancellationToken">
+    /// Stops the run at the next row boundary, and interrupts the initial database copy between chunks.
+    /// <para>
+    /// Cancellation is not a nicety here. A Clipjump folder can live in OneDrive, where every file is a cloud
+    /// placeholder until something opens it - so the database copy and each image read can each block on a
+    /// download. Without a token the only way out of a slow import is killing the process.
+    /// </para>
+    /// </param>
+    public static ImportReport ImportHistory(
+        string clipjumpFolder,
+        ClipStore target,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clipjumpFolder);
         ArgumentNullException.ThrowIfNull(target);
@@ -53,8 +77,12 @@ public static class LegacyClipjumpImporter
 
         try
         {
-            File.Copy(databasePath, tempCopy, overwrite: true);
-            ImportFrom(tempCopy, clipjumpFolder, target, report);
+            CopyCancellable(databasePath, tempCopy, cancellationToken);
+            ImportFrom(tempCopy, clipjumpFolder, target, report, progress, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            report.Cancelled = true;
         }
         catch (Exception ex)
         {
@@ -68,7 +96,36 @@ public static class LegacyClipjumpImporter
         return report;
     }
 
-    private static void ImportFrom(string databasePath, string clipjumpFolder, ClipStore target, ImportReport report)
+    /// <summary>
+    /// Copies in chunks, checking the token between them.
+    /// <para>
+    /// <see cref="File.Copy(string, string)"/> cannot be interrupted, and on a cloud-backed folder it is the
+    /// single longest blocking call in the whole import - the database has to be downloaded in full before the
+    /// first row can be read. Chunking is the only way to make that stretch abandonable.
+    /// </para>
+    /// </summary>
+    private static void CopyCancellable(string source, string destination, CancellationToken cancellationToken)
+    {
+        using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None);
+
+        var buffer = new byte[64 * 1024];
+        int read;
+
+        while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            output.Write(buffer, 0, read);
+        }
+    }
+
+    private static void ImportFrom(
+        string databasePath,
+        string clipjumpFolder,
+        ClipStore target,
+        ImportReport report,
+        IProgress<ImportProgress>? progress,
+        CancellationToken cancellationToken)
     {
         var connectionString = new SqliteConnectionStringBuilder
         {
@@ -85,6 +142,9 @@ public static class LegacyClipjumpImporter
         using var connection = new SqliteConnection(connectionString);
         connection.Open();
 
+        var total = CountRows(connection);
+        var processed = 0;
+
         using var command = connection.CreateCommand();
 
         // Column set from Clipjump's createHisTable (History GUI Plug.ahk:638):
@@ -96,6 +156,14 @@ public static class LegacyClipjumpImporter
 
         while (reader.Read())
         {
+            // Checked per row rather than per batch. On a cloud-backed folder a single image row can block for
+            // seconds on its download, so the gap between checks is already as long as it should be.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                report.Cancelled = true;
+                break;
+            }
+
             try
             {
                 var type = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
@@ -140,6 +208,27 @@ public static class LegacyClipjumpImporter
                     report.Errors.Add(ex.Message);
                 }
             }
+
+            // Outside the try, so a row that threw still advances the count and the bar cannot stall on a run
+            // that is making progress through failures.
+            progress?.Report(new ImportProgress(++processed, total));
+        }
+    }
+
+    /// <summary>Row count for the progress display, or 0 when the source will not give one.</summary>
+    private static int CountRows(SqliteConnection connection)
+    {
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM history;";
+
+            return Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+        catch (SqliteException)
+        {
+            // A determinate bar is a nicety; failing the whole import for the want of one is not.
+            return 0;
         }
     }
 

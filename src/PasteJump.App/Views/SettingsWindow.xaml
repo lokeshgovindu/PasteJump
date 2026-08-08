@@ -63,12 +63,20 @@
                               Content="Record a repeated copy as a new clip"
                               ToolTip="Off (recommended): re-copying something promotes the existing clip instead of adding another. On: every copy becomes a new entry." />
 
-                    <Grid Style="{StaticResource SettingRow}">
+                    <CheckBox x:Name="LimitMaxClipsCheck"
+                              Content="Limit the number of clips kept"
+                              Checked="OnLimitMaxClipsChanged"
+                              Unchecked="OnLimitMaxClipsChanged"
+                              ToolTip="Off keeps every clip for ever. Worth leaving on: images arrive from the clipboard uncompressed, so a handful of screenshots costs more than thousands of text clips, and nothing else caps this store." />
+
+                    <!-- Indented under its checkbox, as the original arranges it: the number only means
+                         anything while the limit is switched on. -->
+                    <Grid Style="{StaticResource SettingRow}" Margin="20,7,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="96" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Maximum clips kept" />
+                        <TextBlock x:Name="MaxClipsLabel" Grid.Column="0" Text="Maximum clips kept" />
                         <TextBox x:Name="MaxClipsBox"
                                  Grid.Column="1"
                                  ToolTip="How many clips the stack holds before the oldest are evicted. Pinned clips are exempt." />

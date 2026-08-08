@@ -122,7 +122,7 @@ public partial class App : Application
         // Retention runs at startup rather than on a timer: this is a logon-resident app, so
         // startup happens at least daily, and a timer would be a wakeup for no user benefit.
         _store.PruneHistoryOlderThan(_settings.HistoryRetentionDays);
-        _store.EvictBeyond(_settings.MaxClips);
+        _store.EvictBeyond(_settings.EffectiveMaxClips);
 
         // After eviction, so blobs that are about to be discarded are not compressed first. Bounded
         // internally, and a no-op once the store has been converted.
@@ -652,7 +652,7 @@ public partial class App : Application
         StartupShortcut.Apply(_settings.RunAtLogon);
 
         _store.PruneHistoryOlderThan(_settings.HistoryRetentionDays);
-        _store.EvictBeyond(_settings.MaxClips);
+        _store.EvictBeyond(_settings.EffectiveMaxClips);
 
         // Paste-mode options are captured at construction, so the controller is rebuilt rather
         // than mutated. Cheap, and it avoids a half-applied configuration.
@@ -1021,28 +1021,58 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Runs the import behind a cancellable progress dialog.
+    /// <para>
+    /// Not inline. A Clipjump folder can live in OneDrive, where every file is a cloud placeholder until
+    /// something opens it - so the database copy and each image row can block on a download. Run on the UI
+    /// thread that presented as PasteJump hanging, with no way out but killing the process.
+    /// </para>
+    /// </summary>
     private void RunLegacyImport(string candidate, Window? owner)
     {
-        try
-        {
-            var report = Import.LegacyClipjumpImporter.ImportHistory(candidate, _store);
+        var report = ImportProgressDialog.Run(
+            (progress, token) => Import.LegacyClipjumpImporter.ImportHistory(candidate, _store, progress, token),
+            owner);
 
+        // Refreshed before the summary, so the numbers on screen already match what the dialog is about to
+        // claim - and it happens for a cancelled run too, which still imported everything up to the stop.
+        _historyWindow?.QueueRefresh();
+
+        var summary = $"Imported {report.Imported} entries.\nSkipped {report.Skipped}." +
+            (report.Errors.Count > 0
+                ? $"\n\nProblems:\n{string.Join('\n', report.Errors.Take(5))}"
+                : string.Empty);
+
+        if (report.Cancelled)
+        {
             MessageDialog.Show(
-                $"Imported {report.Imported} entries.\nSkipped {report.Skipped}." +
-                (report.Errors.Count > 0 ? $"\n\nProblems:\n{string.Join('\n', report.Errors.Take(5))}" : string.Empty),
-                headline: "Import complete",
+                summary + "\n\nWhatever was imported has been kept. Running the import again picks up where " +
+                "this left off - entries already imported are skipped.",
+                headline: "Import stopped",
                 title: "PasteJump - import history",
                 owner: owner);
 
-            _historyWindow?.QueueRefresh();
+            return;
         }
-        catch (Exception ex)
+
+        // Errors with nothing imported means the source was unusable rather than partly awkward, so it is
+        // reported as a failure rather than as a completed run that happens to have problems.
+        if (report is { Imported: 0, Errors.Count: > 0 })
         {
-            // Reading someone else's database can fail in ways we do not control - a schema we do not
-            // recognise, a file held open by a running Clipjump. Reported rather than allowed to reach the
-            // dispatcher's unhandled handler and take the app down.
-            MessageDialog.Warn(ex.Message, headline: "Import failed", owner: owner);
+            MessageDialog.Warn(
+                string.Join('\n', report.Errors.Take(5)),
+                headline: "Import failed",
+                owner: owner);
+
+            return;
         }
+
+        MessageDialog.Show(
+            summary,
+            headline: "Import complete",
+            title: "PasteJump - import history",
+            owner: owner);
     }
 
     private void ExitApplication() => Shutdown();

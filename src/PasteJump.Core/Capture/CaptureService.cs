@@ -201,7 +201,7 @@ public sealed class CaptureService
             RecordHistory(snapshot);
         }
 
-        _store.EvictBeyond(settings.MaxClips);
+        _store.EvictBeyond(settings.EffectiveMaxClips);
 
         ClipCaptured?.Invoke(clip);
     }
