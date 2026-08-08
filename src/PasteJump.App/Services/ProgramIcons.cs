@@ -65,19 +65,62 @@ internal static class ProgramIcons
             return null;
         }
 
+        return FromExtractIconEx(executablePath) ?? FromShell(executablePath);
+    }
+
+    /// <summary>The icon embedded in the executable itself.</summary>
+    private static BitmapSource? FromExtractIconEx(string executablePath)
+    {
         var small = new IntPtr[1];
 
-        // Small icon specifically: this renders at 16-20px in a list, and the large icon downscaled to that
-        // is visibly worse than the frame the author drew for the size.
         if (ExtractIconEx(executablePath, 0, null, small, 1) <= 0 || small[0] == IntPtr.Zero)
         {
             return null;
         }
 
+        return Convert(small[0]);
+    }
+
+    /// <summary>
+    /// Asks the shell instead, which knows things the executable does not.
+    /// <para>
+    /// Needed for packaged applications. Windows Terminal, the Settings host and the input host all ship an
+    /// executable with no icon resource - the icon lives in the app package - so
+    /// <see cref="ExtractIconEx"/> returns nothing and those rows came up blank. The shell resolves them.
+    /// </para>
+    /// </summary>
+    private static BitmapSource? FromShell(string executablePath)
+    {
+        var info = default(SHFILEINFO);
+
+        if (SHGetFileInfo(
+                executablePath,
+                0,
+                ref info,
+                (uint)Marshal.SizeOf<SHFILEINFO>(),
+                SHGFI_ICON | SHGFI_SMALLICON) == IntPtr.Zero
+            || info.hIcon == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        return Convert(info.hIcon);
+    }
+
+    /// <summary>
+    /// Turns an <c>HICON</c> into a frozen bitmap and releases the handle.
+    /// <para>
+    /// Note the source keeps whatever size the icon actually is - often 32x32 even when the small icon was
+    /// requested. Callers must scale rather than crop; an <c>Image</c> with <c>Stretch="None"</c> in a 16x16
+    /// box renders the icon's top-left quarter, which is how this first shipped.
+    /// </para>
+    /// </summary>
+    private static BitmapSource? Convert(IntPtr icon)
+    {
         try
         {
             var source = Imaging.CreateBitmapSourceFromHIcon(
-                small[0],
+                icon,
                 Int32Rect.Empty,
                 BitmapSizeOptions.FromEmptyOptions());
 
@@ -92,7 +135,7 @@ internal static class ProgramIcons
         finally
         {
             // Destroyed only after the conversion, which copies the pixels rather than referencing them.
-            DestroyIcon(small[0]);
+            DestroyIcon(icon);
         }
     }
 
@@ -111,6 +154,31 @@ internal static class ProgramIcons
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int ExtractIconEx(string file, int index, IntPtr[]? large, IntPtr[]? small, int icons);
+
+    private const uint SHGFI_ICON = 0x000000100;
+    private const uint SHGFI_SMALLICON = 0x000000001;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct SHFILEINFO
+    {
+        public IntPtr hIcon;
+        public int iIcon;
+        public uint dwAttributes;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string szDisplayName;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
+        public string szTypeName;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SHGetFileInfo(
+        string path,
+        uint fileAttributes,
+        ref SHFILEINFO info,
+        uint sizeOfInfo,
+        uint flags);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

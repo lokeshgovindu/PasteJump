@@ -124,19 +124,35 @@ public sealed class BlobStore
             return 0;
         }
 
+        // Once a full pass has found nothing left to convert, there never will be anything again: every write
+        // since compression was introduced goes out compressed, so an uncompressed blob can only be a leftover
+        // from before. Without this the pass still opened every blob in the store at each start-up to discover
+        // that - measured at 75 ms of the 204 ms spent in Compose, making it the single largest item there, for
+        // no benefit whatsoever.
+        var sentinel = Path.Combine(_root, ConvertedMarkerFileName);
+
+        if (File.Exists(sentinel))
+        {
+            return 0;
+        }
+
         var converted = 0;
         long spent = 0;
+        var withinBudget = true;
 
         foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
         {
             if (spent >= byteBudget)
             {
+                // Stopped early, so the store has not been proven converted and no sentinel is written.
+                withinBudget = false;
                 break;
             }
 
             var name = Path.GetFileName(file);
 
-            if (name.Contains(".tmp-", StringComparison.Ordinal))
+            if (name.Contains(".tmp-", StringComparison.Ordinal)
+                || name.Equals(ConvertedMarkerFileName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -180,8 +196,27 @@ public sealed class BlobStore
             }
         }
 
+        if (withinBudget)
+        {
+            try
+            {
+                File.WriteAllBytes(sentinel, []);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Failing to write it only costs one wasted pass per launch, so it is not worth reporting.
+            }
+        }
+
         return converted;
     }
+
+    /// <summary>
+    /// Written into the blob root once every blob is known to be compressed, so later start-ups can skip the
+    /// pass without opening anything. Must be excluded from garbage collection, which otherwise deletes it as
+    /// a file whose name is not a live hash - and it would then be rewritten on the next start, forever.
+    /// </summary>
+    private const string ConvertedMarkerFileName = ".compressed";
 
     private static bool HasMarker(ReadOnlySpan<byte> stored)
         => stored.Length >= CompressedMarker.Length
@@ -292,6 +327,13 @@ public sealed class BlobStore
             if (name.Contains(".tmp-", StringComparison.Ordinal))
             {
                 TryDelete(file);
+                continue;
+            }
+
+            // Not a blob, so not garbage. Deleting it would silently reinstate a full compaction pass at every
+            // start-up, since the next launch would find no sentinel and rewrite it.
+            if (name.Equals(ConvertedMarkerFileName, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
             }
 

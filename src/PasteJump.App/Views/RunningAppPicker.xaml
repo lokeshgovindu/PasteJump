@@ -65,12 +65,16 @@
                 <DataGridTemplateColumn Header="" Width="30" CanUserSort="False" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <!-- Stretch=None so a 32px frame is not blown up to fill the cell; the icon is
-                                 already the size the author drew for a list. -->
+                            <!--
+                                Uniform, NOT None. CreateBitmapSourceFromHIcon hands back the icon at whatever
+                                size the executable actually provides, commonly 32x32 - and Stretch=None does
+                                not scale it down to the 16x16 box, it CROPS it, so every icon rendered as its
+                                own top-left quarter. Uniform fits whatever arrives.
+                            -->
                             <Image Source="{Binding Icon}"
                                    Width="16"
                                    Height="16"
-                                   Stretch="None"
+                                   Stretch="Uniform"
                                    HorizontalAlignment="Center"
                                    RenderOptions.BitmapScalingMode="HighQuality" />
                         </DataTemplate>

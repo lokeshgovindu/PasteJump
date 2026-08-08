@@ -202,6 +202,60 @@ public sealed class BlobCompressionTests : IDisposable
     }
 
     [Fact]
+    public void A_completed_pass_leaves_a_marker_so_later_starts_do_no_work()
+    {
+        // Measured at 75 ms of the 204 ms spent in Compose - the largest single item there - opening every blob
+        // in the store to discover there was nothing to do. Once a pass completes there never will be, because
+        // every write since compression was introduced goes out compressed.
+        WriteLegacy(FakeDib(1000));
+        _blobs.Write(FakeDib(2000));
+
+        Assert.Equal(1, _blobs.CompactLegacyBlobs());
+        Assert.True(File.Exists(Path.Combine(_root, ".compressed")));
+
+        // Proven by removing the blobs entirely, leaving only the marker: a pass that still enumerated the
+        // store would find nothing and report 0 either way, but one that respects the marker cannot even look.
+        // Deleting the fan-out directories is the closest a test gets to "must not enumerate".
+        foreach (var fanOut in Directory.GetDirectories(_root))
+        {
+            Directory.Delete(fanOut, recursive: true);
+        }
+
+        Assert.Equal(0, _blobs.CompactLegacyBlobs());
+        Assert.True(File.Exists(Path.Combine(_root, ".compressed")));
+    }
+
+    [Fact]
+    public void Stopping_on_the_budget_does_not_claim_the_store_is_converted()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            WriteLegacy(FakeDib(50_000 + i));
+        }
+
+        Assert.Equal(1, _blobs.CompactLegacyBlobs(byteBudget: 1));
+
+        // No marker, or the remaining two would never be converted.
+        Assert.False(File.Exists(Path.Combine(_root, ".compressed")));
+        Assert.Equal(2, _blobs.CompactLegacyBlobs());
+    }
+
+    [Fact]
+    public void Garbage_collection_keeps_the_marker()
+    {
+        // It is not a blob, so its name is not a live hash - and deleting it would silently reinstate a full
+        // compaction pass at every start-up.
+        _blobs.CompactLegacyBlobs();
+
+        var marker = Path.Combine(_root, ".compressed");
+        Assert.True(File.Exists(marker));
+
+        _blobs.CollectGarbage(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.True(File.Exists(marker));
+    }
+
+    [Fact]
     public void Compacting_leaves_already_compressed_blobs_alone()
     {
         var hash = _blobs.Write(FakeDib(1000));
