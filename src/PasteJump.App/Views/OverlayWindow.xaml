@@ -4,8 +4,7 @@
         Title="PasteJump Overlay"
         WindowStyle="None"
         ResizeMode="NoResize"
-        AllowsTransparency="True"
-        Background="Transparent"
+        Background="{DynamicResource SurfaceBrush}"
         ShowInTaskbar="False"
         ShowActivated="False"
         Focusable="False"
@@ -16,9 +15,19 @@
         TextOptions.TextRenderingMode="ClearType">
 
     <!--
-        TextFormattingMode=Display, for the reason spelled out at length in ToastWindow.xaml: WPF's default
-        Ideal mode is tuned for large text and renders 11-12px UI text soft. This window is nothing but
-        small text, so it matters here most.
+        Two things make this text legible, and the second one is the larger half.
+
+        TextFormattingMode=Display: WPF's default Ideal mode is tuned for large text and renders 11-12px UI
+        text soft. This window is nothing but small text, so it matters here most.
+
+        And NO AllowsTransparency. WPF renders a layered window's text with greyscale antialiasing instead of
+        ClearType, so the TextRenderingMode request below is only honoured because this window is opaque. The
+        rounded corners and the drop shadow come from DWM instead - see WindowInterop.ApplyRoundedCorners. Do
+        not reintroduce AllowsTransparency to get a CornerRadius back; that is the trade that made this soft.
+
+        This window is also click-through, via WS_EX_TRANSPARENT in code-behind. That is a hit-testing flag
+        and is unrelated to AllowsTransparency, which is about per-pixel alpha - dropping one does not affect
+        the other, despite the shared word.
     -->
 
     <!--
@@ -28,24 +37,21 @@
         instead of the user's document.
     -->
 
+    <!-- No CornerRadius and no DropShadowEffect: DWM provides both for the window itself now. A rounded
+         Border inside a square opaque window would only show the window's own background in the corners. -->
     <Border Background="{DynamicResource SurfaceBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
-            CornerRadius="6"
             Padding="0"
             MaxWidth="560">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="12"
-                              ShadowDepth="2"
-                              Opacity="0.45"
-                              Color="{DynamicResource ShadowColor}" />
-        </Border.Effect>
 
         <StackPanel>
 
             <!-- Header: position, mode, formatter, flags -->
+            <!-- Square: DWM clips the window to its rounded shape, so the top corners are already taken care
+                 of. A CornerRadius here would round the header inside an already-rounded window and leave two
+                 slivers of the outer Border's fill showing. -->
             <Border Background="{DynamicResource SurfaceRaisedBrush}"
-                    CornerRadius="5,5,0,0"
                     Padding="10,6">
                 <Grid>
                     <Grid.ColumnDefinitions>

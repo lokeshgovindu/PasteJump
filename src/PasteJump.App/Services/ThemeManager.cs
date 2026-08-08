@@ -97,6 +97,10 @@ public sealed class ThemeManager : IDisposable
         {
             ApplyTitleBar(window);
         }
+
+        // The overlay's and toast's borders are drawn by DWM too, from a colour pushed through an API call
+        // rather than bound - so they need the same nudge for the same reason.
+        WindowInterop.RefreshThemedBorders();
     }
 
     /// <summary>

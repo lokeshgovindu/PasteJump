@@ -1,6 +1,6 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using PasteJump.App.Services;
 
@@ -16,7 +16,11 @@ namespace PasteJump.App.Views;
 /// </summary>
 public partial class ToastWindow : Window
 {
+    private static readonly TimeSpan FadeDuration = TimeSpan.FromMilliseconds(220);
+
     private readonly DispatcherTimer _dismissTimer;
+    private readonly DispatcherTimer _fadeTimer;
+    private readonly Stopwatch _fadeClock = new();
     private bool _stylesApplied;
 
     public ToastWindow()
@@ -26,8 +30,16 @@ public partial class ToastWindow : Window
         _dismissTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
         _dismissTimer.Tick += (_, _) => BeginFadeOut();
 
+        _fadeTimer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(16),
+        };
+        _fadeTimer.Tick += (_, _) => StepFade();
+
         SourceInitialized += OnSourceInitialized;
     }
+
+    private IntPtr Handle => new WindowInteropHelper(this).Handle;
 
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -39,9 +51,8 @@ public partial class ToastWindow : Window
         WindowInterop.MakeNonActivating(handle);
 
         // Rounded corners and the drop shadow now come from DWM rather than from AllowsTransparency, which
-        // would cost ClearType on every glyph in the window. Border colour taken from the palette so it
-        // follows the theme instead of the system accent.
-        WindowInterop.ApplyRoundedCorners(handle, ThemeBorderColor());
+        // would cost ClearType on every glyph in the window.
+        WindowInterop.ApplyRoundedCorners(this);
 
         _stylesApplied = true;
     }
@@ -67,9 +78,8 @@ public partial class ToastWindow : Window
         }
 
         // Cancel any in-flight fade before repositioning, or a burst of copies leaves the window
-        // stuck part-way through an animation with a stale opacity.
-        BeginAnimation(OpacityProperty, null);
-        Opacity = 1;
+        // stuck part-way through the fade at a stale alpha.
+        StopFade();
 
         _dismissTimer.Stop();
 
@@ -77,6 +87,9 @@ public partial class ToastWindow : Window
         {
             Show();
         }
+
+        // After Show(), so the handle exists on the very first notification.
+        WindowInterop.SetWindowAlpha(Handle, 1);
 
         // Measure before positioning: SizeToContent leaves ActualWidth stale until layout has run,
         // and clamping against a stale size puts the window partly off-screen.
@@ -93,45 +106,60 @@ public partial class ToastWindow : Window
         _dismissTimer.Start();
     }
 
-    /// <summary>
-    /// The palette's border colour, for the DWM border. Falls back to a mid grey if the resource is missing,
-    /// which only happens in a host that composed the resource set by hand and forgot one.
-    /// </summary>
-    private System.Windows.Media.Color ThemeBorderColor()
-        => TryFindResource("BorderBrush") is System.Windows.Media.SolidColorBrush brush
-            ? brush.Color
-            : System.Windows.Media.Color.FromRgb(0x80, 0x80, 0x80);
-
     /// <summary>Hides immediately, without the fade. For shutdown and for entering paste mode.</summary>
     public void HideNow()
     {
         _dismissTimer.Stop();
-        BeginAnimation(OpacityProperty, null);
+        StopFade();
         Hide();
     }
 
+    /// <summary>
+    /// Fades out over <see cref="FadeDuration"/> and hides.
+    /// <para>
+    /// This drives alpha through Win32 rather than animating <see cref="UIElement.Opacity"/>, because this
+    /// window has no <c>AllowsTransparency</c> - see <see cref="WindowInterop.SetWindowAlpha"/>. A WPF opacity
+    /// animation here runs to completion and changes the property while the window stays solid on screen, so
+    /// the fade becomes an abrupt disappearance and nothing about the code looks wrong.
+    /// </para>
+    /// </summary>
     private void BeginFadeOut()
     {
         _dismissTimer.Stop();
+        _fadeClock.Restart();
+        _fadeTimer.Start();
+    }
 
-        var fade = new DoubleAnimation
+    private void StepFade()
+    {
+        var progress = _fadeClock.Elapsed.TotalMilliseconds / FadeDuration.TotalMilliseconds;
+
+        if (progress >= 1)
         {
-            To = 0,
-            Duration = TimeSpan.FromMilliseconds(220),
-            FillBehavior = FillBehavior.HoldEnd,
-        };
+            // Hide before StopFade restores full alpha, or the last frame of the fade is a fully opaque
+            // toast flashing back into view.
+            Hide();
+            StopFade();
+            return;
+        }
 
-        fade.Completed += (_, _) =>
+        WindowInterop.SetWindowAlpha(Handle, 1 - progress);
+    }
+
+    /// <summary>
+    /// Stops a fade in progress and restores full alpha. Always restores, even when no fade was running: a
+    /// window left part-way faded would come back translucent on the next <c>Show()</c>, and the alpha lives
+    /// in the window style rather than in a property WPF resets for us.
+    /// </summary>
+    private void StopFade()
+    {
+        _fadeTimer.Stop();
+        _fadeClock.Reset();
+
+        if (Handle != IntPtr.Zero)
         {
-            // Guard against a new notification having arrived during the fade: it will have reset
-            // Opacity to 1, and hiding here would swallow it.
-            if (Opacity < 0.05)
-            {
-                Hide();
-            }
-        };
-
-        BeginAnimation(OpacityProperty, fade);
+            WindowInterop.SetWindowAlpha(Handle, 1);
+        }
     }
 
     /// <summary>

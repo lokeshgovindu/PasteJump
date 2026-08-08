@@ -30,6 +30,10 @@ public partial class OverlayWindow : Window
         // NOACTIVATE keeps clicks from focusing us, TRANSPARENT makes the window ignore hit
         // testing entirely, and TOOLWINDOW keeps it out of Alt+Tab.
         WindowInterop.MakeNonActivating(handle);
+
+        // Rounded corners and the drop shadow come from DWM rather than from AllowsTransparency, which would
+        // cost ClearType on every glyph in a window that is nothing but 11-12px text.
+        WindowInterop.ApplyRoundedCorners(this);
     }
 
     /// <summary>Applies a frame and positions the window at the anchor, clamped to the work area.</summary>

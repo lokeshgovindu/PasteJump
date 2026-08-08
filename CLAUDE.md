@@ -246,12 +246,29 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   looking blurry — it bites at every DPI, including 100%.
 - **`AllowsTransparency="True"` costs you ClearType, and that is the bigger half of "blurry text".** WPF drops
   subpixel antialiasing to greyscale on a layered window, so asking for `TextRenderingMode="ClearType"` there
-  achieves precisely nothing. `ToastWindow` has therefore **given up transparency**: it is opaque, and its
-  rounded corners and drop shadow come from DWM via `WindowInterop.ApplyRoundedCorners`
-  (`DWMWA_WINDOW_CORNER_PREFERENCE`, `DWMWA_BORDER_COLOR`). Do not reintroduce `AllowsTransparency` to a text
-  window to get a corner radius back — that is the trade that made the text soft. Windows 11 only; on 10 the
-  calls fail and the window is a plain rectangle, which is what Windows 10's own notifications look like.
-  `OverlayWindow` still uses transparency and could follow the same route.
+  achieves precisely nothing. **Both** `ToastWindow` and `OverlayWindow` have therefore **given up
+  transparency**: they are opaque, and their rounded corners and drop shadow come from DWM via
+  `WindowInterop.ApplyRoundedCorners` (`DWMWA_WINDOW_CORNER_PREFERENCE`, `DWMWA_BORDER_COLOR`). Do not
+  reintroduce `AllowsTransparency` to a text window to get a corner radius back — that is the trade that made
+  the text soft. Windows 11 only; on 10 the calls fail and the window is a plain rectangle, which is what
+  Windows 10's own notifications look like. Two consequences that are easy to miss:
+  - **An inner `Border` must lose its `CornerRadius` too.** DWM clips the *window* to a rounded shape, so a
+    rounded border inside it only reveals the window's own fill in the corners. Same for a header band that
+    was rounded to follow the old outer radius.
+  - **`WS_EX_TRANSPARENT` is unrelated** and must stay. It is a hit-testing flag — it is what makes the
+    overlay click-through — and shares nothing but the word with per-pixel alpha.
+- **`Window.Opacity` does nothing without `AllowsTransparency`.** No alpha channel exists for WPF to composite
+  into, so a `DoubleAnimation` on it runs to completion, reports the right values, fires `Completed`, and the
+  window sits there fully solid until something hides it. Dropping transparency from the toast for ClearType
+  therefore turned its fade-out into a pop, and nothing in the code looked wrong — the animation was still
+  there and still working. Fades on an opaque window go through `WindowInterop.SetWindowAlpha`, which is
+  `WS_EX_LAYERED` + `SetLayeredWindowAttributes(LWA_ALPHA)`: a different mechanism that does **not** cost
+  ClearType, because WPF still renders opaquely and the compositor applies one alpha to the finished surface.
+  The alpha lives in the window style rather than a property WPF resets, so it must be restored to full on
+  every path that shows the window again.
+- **A DWM border colour does not follow a palette swap**, because it was handed over once through an API call
+  rather than bound. `WindowInterop.RefreshThemedBorders` re-pushes it and `ThemeManager.ApplyResolved` calls
+  it, next to the title-bar loop that exists for exactly the same reason.
 - **Window positions must be snapped to whole device pixels.** Positions here are `physicalPixels / scale`;
   at any fractional scale that lands on half a device pixel and WPF renders the entire window soft.
   `UseLayoutRounding` does not help — it rounds layout *within* a window, not the window's own origin. See
