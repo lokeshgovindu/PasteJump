@@ -3,6 +3,7 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#getting-started)
 [![Deployment](https://img.shields.io/badge/deployment-self--contained%20portable-success)](#run-it)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
 A keyboard-driven multiple-clipboard manager for Windows.
 
@@ -196,3 +197,12 @@ reverse-engineerable but not worth it for data that turns over in days.
 The interaction design is Avi Aryan's. [Clipjump](https://github.com/aviaryan/Clipjump) is
 Apache-2.0; this is an independent implementation of its observed behaviour and carries none of its
 code.
+
+---
+
+## Licence
+
+[MIT](LICENSE). Copyright (c) 2026 Lokesh Govindu.
+
+The generated application icon (`tools/generate-icon.ps1`) is covered by the same terms — it is drawn
+from primitives by that script, not taken from an icon set.
