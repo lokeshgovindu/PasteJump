@@ -34,16 +34,18 @@ internal static class TrayMenuBuilder
         // tray's own activation behaviour is unchanged.
         menu.Items.Add(MenuItemFor("_About PasteJump…", onAbout, emphasised: true));
         menu.Items.Add(new Separator());
-        menu.Items.Add(MenuItemFor("Clipboard _history…", onHistory));
+        menu.Items.Add(MenuItemFor("Clipboard _History…", onHistory));
         menu.Items.Add(new Separator());
         // The parenthetical is the whole point of the wording. "Pause monitoring" next to "Disable PasteJump"
         // was reported as two names for one command, because the two differ in exactly one respect - whether
         // Ctrl+V still works - and nothing in either label said so.
+        // Title case for the command, sentence case inside the parentheses. The parenthetical is an
+        // explanatory phrase rather than a label, and "(Keep Pasting)" reads as a second command.
         menu.Items.Add(MenuItemFor(
-            isPaused ? "_Resume capture" : "_Pause capture (keep pasting)",
+            isPaused ? "_Resume Capture" : "_Pause Capture (keep pasting)",
             onPauseToggle));
         menu.Items.Add(MenuItemFor("_Settings…", onSettings));
-        menu.Items.Add(MenuItemFor("Paste-mode _keys…", onHelp));
+        menu.Items.Add(MenuItemFor("Paste-Mode _Keys…", onHelp));
         menu.Items.Add(new Separator());
 
         // Distinct from Pause above, and the difference is worth the two menu items. Pause stops capturing

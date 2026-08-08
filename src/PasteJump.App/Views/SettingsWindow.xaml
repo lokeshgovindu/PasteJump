@@ -109,20 +109,20 @@
                 <ScrollViewer Style="{StaticResource TabScroller}">
                     <StackPanel>
 
-                        <CheckBox x:Name="MonitorClipboardCheck" Content="Watch the clipboard" />
+                        <CheckBox x:Name="MonitorClipboardCheck" Content="Watch the Clipboard" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="When off, PasteJump stops recording what you copy but stays running, and the Ctrl+V gesture still works on the clips it already holds. Identical to Pause in the tray menu." />
 
-                        <CheckBox x:Name="StoreImagesCheck" Content="Store images" />
+                        <CheckBox x:Name="StoreImagesCheck" Content="Store Images" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Images arrive from the clipboard uncompressed, so a screenshot can be several megabytes where a page of text is a few kilobytes. Turn this off to keep only text and file lists." />
 
-                        <CheckBox x:Name="AllowDuplicatesCheck" Content="Record a repeated copy as a new clip" />
+                        <CheckBox x:Name="AllowDuplicatesCheck" Content="Record a Repeated Copy as a New Clip" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Off, recommended: copying the same thing twice moves the existing clip back to the front instead of adding a second copy. On: every copy becomes its own entry, so the stack fills with duplicates." />
 
                         <CheckBox x:Name="LimitMaxClipsCheck"
-                                  Content="Limit the number of clips kept"
+                                  Content="Limit the Number of Clips Kept"
                                   Checked="OnLimitMaxClipsChanged"
                                   Unchecked="OnLimitMaxClipsChanged" />
                         <TextBlock Style="{StaticResource CheckHelp}"
@@ -136,7 +136,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="MaxClipsLabel" Grid.Column="0" Text="Clips kept in the stack" />
+                            <TextBlock x:Name="MaxClipsLabel" Grid.Column="0" Text="Clips Kept in the Stack" />
                             <TextBox x:Name="MaxClipsBox" Grid.Column="1" />
                         </Grid>
 
@@ -153,7 +153,7 @@
                 <ScrollViewer Style="{StaticResource TabScroller}">
                     <StackPanel>
 
-                        <CheckBox x:Name="RecordHistoryCheck" Content="Keep a searchable history archive" />
+                        <CheckBox x:Name="RecordHistoryCheck" Content="Keep a Searchable History Archive" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="A long-term log, separate from the clip stack: entries stay here after they have been pushed out of the stack, and it is what the history window searches. Turn this off to keep only the stack." />
 
@@ -162,7 +162,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Days of history to keep" />
+                            <TextBlock Grid.Column="0" Text="Days of History to Keep" />
                             <TextBox x:Name="RetentionDaysBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
@@ -175,7 +175,7 @@
 
                         <Button x:Name="ImportButton"
                                 Click="OnImportClicked"
-                                Content="_Import Clipjump history…"
+                                Content="_Import Clipjump History…"
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,0"
                                 MinWidth="200"
@@ -195,7 +195,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Hold Ctrl and tap this key" />
+                            <TextBlock Grid.Column="0" Text="Hold Ctrl and Tap This Key" />
                             <ComboBox x:Name="TriggerKeyCombo"
                                       Grid.Column="1"
                                       SelectionChanged="OnTriggerKeyChanged" />
@@ -212,7 +212,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Keystroke sent to paste" />
+                            <TextBlock Grid.Column="0" Text="Keystroke Sent to Paste" />
                             <ComboBox x:Name="PasteKeystrokeCombo" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
@@ -223,23 +223,23 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Open history with" />
+                            <TextBlock Grid.Column="0" Text="Open History With" />
                             <TextBox x:Name="HistoryHotkeyBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="A system-wide shortcut that opens the clipboard history window, for example Ctrl+Shift+H. Leave it empty for none. It must include at least one of Ctrl, Alt, Shift or Win — a bare key would be taken away from every other program on the machine." />
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="During the gesture" />
+                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="During the Gesture" />
 
-                        <CheckBox x:Name="PreservePositionCheck" Content="Reopen on the clip I was last on" />
+                        <CheckBox x:Name="PreservePositionCheck" Content="Reopen on the Clip I Was Last On" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="On: the next gesture resumes at the clip you left off on. Off: it always starts at the newest clip. Either way a new copy resets the position to the front." />
 
-                        <CheckBox x:Name="OpenSearchCheck" Content="Open straight into search" />
+                        <CheckBox x:Name="OpenSearchCheck" Content="Open Straight into Search" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Goes directly to the search box instead of the clip list, as though you had pressed F. Useful with a large history; a nuisance if you mostly step back one or two clips." />
 
-                        <CheckBox x:Name="ResetFormatterCheck" Content="Reset the paste format on every entry" />
+                        <CheckBox x:Name="ResetFormatterCheck" Content="Reset the Paste Format on Every Entry" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="On: the format returns to the default each time the gesture opens. Off: whatever you last chose with Z is remembered for next time." />
 
@@ -248,14 +248,14 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Default paste format" />
+                            <TextBlock Grid.Column="0" Text="Default Paste Format" />
                             <ComboBox x:Name="DefaultFormatterCombo" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="Applied to every paste unless you cycle it with Z during the gesture. Original pastes exactly what was copied, keeping formatting; the others strip or reshape the text." />
 
                         <CheckBox x:Name="WarnAboutConflictCheck"
-                                  Content="Tell me when another clipboard manager is running" />
+                                  Content="Tell Me When Another Clipboard Manager Is Running" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Shows a brief notification at start-up if a manager known to claim Ctrl+V is running. It is only a hint — PasteJump cannot tell whether the other program's paste shortcut is actually switched on, so it says what to check rather than claiming anything is broken." />
 
@@ -298,13 +298,13 @@
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
                             <Button x:Name="AddFromRunningButton"
                                     Click="OnAddFromRunningClicked"
-                                    Content="Add from _running…"
+                                    Content="Add from _Running…"
                                     Margin="0,0,0,6"
                                     MinWidth="150"
                                     ToolTip="Pick from the programs currently open, so you do not have to know the executable name." />
                             <Button x:Name="BrowseExcludedButton"
                                     Click="OnBrowseExcludedClicked"
-                                    Content="_Browse for a program…"
+                                    Content="_Browse for a Program…"
                                     Margin="0,0,0,6"
                                     MinWidth="150"
                                     ToolTip="Choose an .exe on disk. Only its file name is stored, not the path." />
@@ -370,16 +370,16 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="History list density" />
+                            <TextBlock Grid.Column="0" Text="History List Density" />
                             <ComboBox x:Name="DensityCombo" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="Row spacing in the history window. Compact fits the most rows on screen; Roomy is the easiest to hit with a mouse. An open history window follows the change without reopening." />
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="After each copy" />
+                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="After Each Copy" />
 
                         <CheckBox x:Name="ShowCopyNotificationCheck"
-                                  Content="Show a brief notification" />
+                                  Content="Show a Brief Notification" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Margin="23,3,0,4"
                                    Text="A small popup near the cursor confirming the copy was recorded, with the clip count and a preview. It never takes focus, and it is suppressed while the paste overlay is open." />
@@ -389,7 +389,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="How long it stays (ms)" />
+                            <TextBlock Grid.Column="0" Text="How Long It Stays (ms)" />
                             <TextBox x:Name="CopyNotificationMsBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource CheckHelp}"
@@ -420,7 +420,7 @@
                 <ScrollViewer Style="{StaticResource TabScroller}">
                     <StackPanel>
 
-                        <CheckBox x:Name="RunAtLogonCheck" Content="Start PasteJump when I sign in" />
+                        <CheckBox x:Name="RunAtLogonCheck" Content="Start PasteJump When I Sign In" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Adds a shortcut to your Startup folder. No scheduled task and no elevation, so it cannot see keystrokes in windows running as administrator." />
 
@@ -429,7 +429,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Pause before pasting (ms)" />
+                            <TextBlock Grid.Column="0" Text="Pause Before Pasting (ms)" />
                             <TextBox x:Name="PasteSettleDelayBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
@@ -440,7 +440,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Editor for text clips (H key)" />
+                            <TextBlock Grid.Column="0" Text="Editor for Text Clips (H key)" />
                             <TextBox x:Name="TextEditorBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
@@ -451,13 +451,13 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Editor for image clips (H key)" />
+                            <TextBlock Grid.Column="0" Text="Editor for Image Clips (H key)" />
                             <TextBox x:Name="ImageEditorBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="The same, for a clip that holds a picture. The clip is written to a temporary .bmp first. Text wins when a clip carries both, which is common — copying a table from a browser gives you text and a bitmap at once." />
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="Where data is kept" />
+                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="Where Data Is Kept" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Margin="0,3,0,6"
                                    Text="These two are independent. Changing either needs a restart: PasteJump copies the data across and leaves the old copy behind for you to delete once you are satisfied." />
@@ -467,7 +467,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Store clips in" />
+                            <TextBlock Grid.Column="0" Text="Store Clips In" />
                             <ComboBox x:Name="ClipsLocationCombo"
                                       Grid.Column="1"
                                       SelectionChanged="OnDataLocationChanged" />
@@ -484,7 +484,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Store settings in" />
+                            <TextBlock Grid.Column="0" Text="Store Settings In" />
                             <ComboBox x:Name="SettingsLocationCombo"
                                       Grid.Column="1"
                                       SelectionChanged="OnDataLocationChanged" />
@@ -522,7 +522,7 @@
                                  ToolTip="Filter by setting name or value" />
 
                         <TextBlock x:Name="AdvancedFilterCue"
-                                   Text="Search settings…"
+                                   Text="Search Settings…"
                                    Foreground="{DynamicResource MutedTextBrush}"
                                    Margin="7,0,0,0"
                                    VerticalAlignment="Center"

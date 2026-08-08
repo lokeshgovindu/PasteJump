@@ -75,7 +75,7 @@
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
             <Button x:Name="CopyDetailsButton"
                     Click="OnCopyDetailsClicked"
-                    Content="Copy _details"
+                    Content="Copy _Details"
                     MinWidth="96"
                     Padding="14,5"
                     ToolTip="Copies the version and environment details, for pasting into a bug report" />

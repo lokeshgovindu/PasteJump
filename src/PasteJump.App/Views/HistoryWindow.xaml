@@ -53,7 +53,7 @@
                         ToolTip="Remove the selected entries from history (Delete)" />
                 <Button x:Name="ClearButton"
                         Click="OnClearClicked"
-                        Content="Clear _all"
+                        Content="Clear _All"
                         ToolTip="Remove every entry from history. This cannot be undone." />
             </StackPanel>
 
