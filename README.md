@@ -1,5 +1,9 @@
 # PasteJump
 
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#getting-started)
+[![Deployment](https://img.shields.io/badge/deployment-self--contained%20portable-success)](#run-it)
+
 A keyboard-driven multiple-clipboard manager for Windows.
 
 Hold <kbd>Ctrl</kbd>, tap <kbd>V</kbd> to step back through what you have copied, release to paste.
