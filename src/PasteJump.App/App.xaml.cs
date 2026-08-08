@@ -457,12 +457,21 @@ public partial class App : Application
     /// </summary>
     private void ApplyTrayIcon()
     {
-        // Greyed while disabled, which is Windows' own convention for an inactive icon and the only signal
-        // visible without hovering for the tooltip. Worth having precisely because Disable is not persisted:
-        // the state has to be obvious at a glance or it is easy to forget the app is switched off.
-        var name = _keyboardHook is { IsInstalled: false }
-            ? "pastejump-disabled.ico"
-            : "pastejump.ico";
+        // Three states, and each earns a distinct icon because the tooltip is the only other signal and it
+        // needs a hover. Greyed-while-disabled is Windows' own convention for an inactive icon, and matters
+        // most because Disable is not persisted - the state has to be obvious or it is easy to forget the app
+        // is switched off. Amber-while-paused exists because "Pause" and "Disable" were reported as feeling
+        // like the same command: their only visible difference is whether Ctrl+V still works, which is
+        // invisible until you try it.
+        //
+        // Disabled is tested first: disabling also stops capture, so both conditions hold at once, and the
+        // stronger state is the one worth showing.
+        var name = _keyboardHook switch
+        {
+            { IsInstalled: false } => "pastejump-disabled.ico",
+            _ when !_settings.MonitorClipboard => "pastejump-paused.ico",
+            _ => "pastejump.ico",
+        };
 
         // Through AppPaths, so this resolves off Environment.ProcessPath like every other path in the
         // app. AppContext.BaseDirectory would look correct and then break under a single-file publish,
@@ -694,6 +703,11 @@ public partial class App : Application
             _settings.PasteModeOptions);
 
         _recognizer = new PasteGestureRecognizer(_controller);
+
+        // "Watch the clipboard" is editable here as well as from the tray, and it is what the paused icon
+        // reflects - so both routes into it have to refresh the tray or the icon disagrees with the setting.
+        _trayIcon.SetTooltip(BuildTrayTooltip());
+        ApplyTrayIcon();
     }
 
     /// <summary>
@@ -818,6 +832,10 @@ public partial class App : Application
         _settingsStore.Save(_settings);
 
         _trayIcon.SetTooltip(BuildTrayTooltip());
+
+        // Without this the only sign of being paused was the tooltip, which is why Pause and Disable were
+        // reported as indistinguishable - Disable greyed the icon and Pause changed nothing on screen.
+        ApplyTrayIcon();
     }
 
     /// <summary>

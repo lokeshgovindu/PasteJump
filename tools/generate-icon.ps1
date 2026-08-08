@@ -20,6 +20,14 @@
 #     icon is desaturation, and a semi-transparent tray icon reads as a rendering fault against some
 #     taskbar colours rather than as a state.
 
+#   * -Paused is amber AND swaps the two cards for two pause bars, which is belt and braces on purpose.
+#     A badge or a corner dot - the obvious way to mark a state - is what does not work here: at 16 px,
+#     the size the tray actually asks for, a badge is about five pixels across and its detail
+#     anti-aliases into a smudge, leaving paused indistinguishable from disabled. Hue is the one signal
+#     that survives at that size, so it carries the state; the glyph change is there so it also survives
+#     for anyone who cannot separate amber from blue, and in a greyscale rendering. Same reasoning as the
+#     note above about the original chevrons fusing into one mass.
+
 #   * -PngPath writes a single large PNG as well as the .ico. Needed because a multi-frame .ico is the
 #     wrong source for anything that renders the mark at a size Windows did not ask for: WPF's icon
 #     decoder picks a frame for you, and without a requested decode size it can pick a small one and
@@ -32,11 +40,16 @@ param(
     [string] $PreviewPath,
     [string] $PngPath,
     [int] $PngSize = 256,
-    [switch] $Disabled
+    [switch] $Disabled,
+    [switch] $Paused
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
+
+if ($Disabled -and $Paused) {
+    throw 'Pass -Disabled or -Paused, not both: they are two different tray states and each needs its own file.'
+}
 
 # Tile gradient. The disabled pair is the enabled pair converted to its luminance, so the mark keeps its
 # shape and tonal structure and only loses its colour.
@@ -44,6 +57,13 @@ if ($Disabled) {
     $tileTop = [System.Drawing.Color]::FromArgb(255, 142, 142, 146)
     $tileBottom = [System.Drawing.Color]::FromArgb(255, 79, 79, 84)
     $cardColour = [System.Drawing.Color]::FromArgb(255, 236, 236, 238)
+}
+elseif ($Paused) {
+    # Amber, and lighter than the blue rather than darker: this has to separate from #1D4ED8 at 16 px on a
+    # near-black taskbar, where two similarly dark tiles would read as the same icon.
+    $tileTop = [System.Drawing.Color]::FromArgb(255, 251, 191, 36)
+    $tileBottom = [System.Drawing.Color]::FromArgb(255, 217, 119, 6)
+    $cardColour = [System.Drawing.Color]::FromArgb(255, 255, 255, 255)
 }
 else {
     $tileTop = [System.Drawing.Color]::FromArgb(255, 91, 147, 248)
@@ -108,6 +128,37 @@ function New-PasteJumpBitmap {
             [single]([Math]::Max(1.0, $s * 0.018)))
         $g.DrawPath($rimPen, $tile)
         $rimPen.Dispose()
+    }
+
+    # --- glyph: two pause bars, for the paused tray state ---------------------
+    # Sized so the gap between the bars stays at least one whole pixel at 16 px, the same floor the cards
+    # below are built to. 0.10 * 16 = 1.6 px of gap and 0.13 * 16 = 2.1 px of bar.
+    if ($script:Paused) {
+        $barW = [single]($s * 0.13)
+        $barH = [single]($s * 0.42)
+        $barGap = [single]([Math]::Max(1.0, $s * 0.10))
+        $barR = [single]($s * 0.03)
+
+        $barsW = [single](2 * $barW + $barGap)
+        $barX = [single](($s - $barsW) / 2)
+        $barY = [single](($s - $barH) / 2)
+
+        $barBrush = New-Object System.Drawing.SolidBrush($script:cardColour)
+
+        foreach ($i in 0, 1) {
+            $bar = New-RoundedPath `
+                -X ($barX + $i * ($barW + $barGap)) -Y $barY `
+                -W $barW -H $barH -Radius $barR
+            $g.FillPath($barBrush, $bar)
+            $bar.Dispose()
+        }
+
+        $barBrush.Dispose()
+        $gradient.Dispose()
+        $tile.Dispose()
+        $g.Dispose()
+
+        return $bmp
     }
 
     # --- glyph: two offset cards ---------------------------------------------

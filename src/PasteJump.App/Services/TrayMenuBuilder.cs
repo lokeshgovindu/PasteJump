@@ -36,7 +36,12 @@ internal static class TrayMenuBuilder
         menu.Items.Add(new Separator());
         menu.Items.Add(MenuItemFor("Clipboard _history…", onHistory));
         menu.Items.Add(new Separator());
-        menu.Items.Add(MenuItemFor(isPaused ? "_Resume monitoring" : "_Pause monitoring", onPauseToggle));
+        // The parenthetical is the whole point of the wording. "Pause monitoring" next to "Disable PasteJump"
+        // was reported as two names for one command, because the two differ in exactly one respect - whether
+        // Ctrl+V still works - and nothing in either label said so.
+        menu.Items.Add(MenuItemFor(
+            isPaused ? "_Resume capture" : "_Pause capture (keep pasting)",
+            onPauseToggle));
         menu.Items.Add(MenuItemFor("_Settings…", onSettings));
         menu.Items.Add(MenuItemFor("Paste-mode _keys…", onHelp));
         menu.Items.Add(new Separator());
@@ -45,7 +50,10 @@ internal static class TrayMenuBuilder
         // but keeps the gesture, so Ctrl+V still opens the overlay on the clips already held. Disable also
         // releases the keyboard hook, handing Ctrl+V back to Windows untouched - which is what you want in
         // order to use another clipboard manager, or to rule PasteJump out when something else misbehaves.
-        menu.Items.Add(MenuItemFor(isDisabled ? "_Enable PasteJump" : "_Disable PasteJump", onDisableToggle));
+        // Both labels name their effect on Ctrl+V, because that is the only difference between them.
+        menu.Items.Add(MenuItemFor(
+            isDisabled ? "_Enable PasteJump" : "_Disable PasteJump (Ctrl+V passes through)",
+            onDisableToggle));
 
         // Restart sits immediately above Exit. Both are the same kind of end-of-session action, and grouping
         // them leaves Exit at the very bottom where muscle memory expects it - appending Restart last would
