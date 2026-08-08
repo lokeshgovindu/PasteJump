@@ -331,6 +331,12 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   `Shared.xaml`'s `AppIcon`, and `Content` for the loose file the tray's `LoadImage` needs. Dropping any
   one silently blanks that surface. `ApplicationIcon` was in fact missing until it was noticed while the
   tray was rewired — masked because the tray overwrote the icon a moment after start-up.
+- **Never bind an `Image` to the `.ico`.** A multi-frame icon is the wrong source for a chosen render size:
+  WPF's icon decoder picks the frame itself, and with no requested decode size it can pick a small one and
+  scale it *up*. That is what made the About window's logo look soft — a 32px frame enlarged to 48. Use
+  `AppIconLarge`, a single-frame `Assets/pastejump-256.png` from the same generator (`-PngPath`), rendered
+  down. `AppIcon` remains right for `Window.Icon`, where Windows asks for a small frame and gets one.
+  The PNG is also the file to reach for outside the app — a README, a release page.
 - The pair of monochrome tray glyphs is **gone**, and with it the Visual Studio Image Library licence
   question that used to sit here. The tray shows the coloured application icon, which reads against a
   light or a dark taskbar alike — which is all the two variants ever bought.
@@ -354,8 +360,13 @@ Icons are regenerated with Windows PowerShell 5.1, which has System.Drawing. `$P
 reliable in a parameter default under `-File`, so pass the paths explicitly:
 
 ```
-powershell -File tools/generate-icon.ps1 -OutputPath src/PasteJump.App/Assets/pastejump.ico
+powershell -File tools/generate-icon.ps1 -OutputPath src/PasteJump.App/Assets/pastejump.ico -PngPath src/PasteJump.App/Assets/pastejump-256.png
+powershell -File tools/generate-icon.ps1 -OutputPath src/PasteJump.App/Assets/pastejump-disabled.ico -Disabled
 ```
+
+Three files, one script: the coloured icon, its greyed twin for the disabled tray state, and the large PNG
+the UI displays. Regenerate all three together or they drift apart. `-PreviewPath` writes a contact sheet of
+the small sizes against both taskbar colours, which is the only honest way to judge a 16px frame.
 
 Kill a running instance before building: it locks the output DLLs, and its `Global\` single-instance
 mutex silently prevents a newly built copy from starting.

@@ -68,6 +68,12 @@
     <Content Include="Assets\pastejump.ico" CopyToOutputDirectory="PreserveNewest" />
 
     <!--
+      Large single-frame mark for anything that displays the logo at a chosen size, as opposed to handing it
+      to Windows as a window icon. Resource only: it is reached by pack:// URI, never as a file.
+    -->
+    <Resource Include="Assets\pastejump-256.png" />
+
+    <!--
       Greyed variant for the tray while PasteJump is disabled. Content only: no window shows it, so it needs
       no pack:// URI. Unlike the pair of monochrome glyphs this project used to carry, the two are not a
       light/dark theme split - they are two application states, and picking between them is not something a

@@ -25,13 +25,13 @@
 
         <StackPanel Orientation="Horizontal">
             <!--
-                The same pastejump.ico the tray, the taskbar and every title bar use. Rendered at 48
-                from an icon file that carries a 48 frame, so this is a straight blit rather than an
-                upscale of the 16.
+                AppIconLarge, not AppIcon: the latter is the multi-frame .ico, and WPF's icon decoder chose a
+                small frame and scaled it up, which is what made this look soft. This is a single 256px PNG
+                rendered down to 64 - always the cleaner direction. See the note in Themes/Shared.xaml.
             -->
-            <Image Source="{DynamicResource AppIcon}"
-                   Width="48"
-                   Height="48"
+            <Image Source="{DynamicResource AppIconLarge}"
+                   Width="64"
+                   Height="64"
                    VerticalAlignment="Top"
                    RenderOptions.BitmapScalingMode="HighQuality" />
 

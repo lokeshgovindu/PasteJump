@@ -20,10 +20,18 @@
 #     icon is desaturation, and a semi-transparent tray icon reads as a rendering fault against some
 #     taskbar colours rather than as a state.
 
+#   * -PngPath writes a single large PNG as well as the .ico. Needed because a multi-frame .ico is the
+#     wrong source for anything that renders the mark at a size Windows did not ask for: WPF's icon
+#     decoder picks a frame for you, and without a requested decode size it can pick a small one and
+#     scale it up. A one-frame PNG removes the choice. It is also the file to reach for outside the app -
+#     a README, a release page, a store listing.
+
 [CmdletBinding()]
 param(
     [string] $OutputPath = (Join-Path $PSScriptRoot '..\src\PasteJump.App\Assets\pastejump.ico'),
     [string] $PreviewPath,
+    [string] $PngPath,
+    [int] $PngSize = 256,
     [switch] $Disabled
 )
 
@@ -210,6 +218,19 @@ finally {
 }
 
 Write-Output "Wrote $OutputPath ($((Get-Item $OutputPath).Length) bytes, $($frames.Count) frames)"
+
+# Large single-frame PNG. Drawn at the requested size rather than upscaled from an icon frame, so it is
+# genuinely that resolution.
+if ($PngPath) {
+    $pngDir = Split-Path -Parent $PngPath
+    if ($pngDir -and -not (Test-Path $pngDir)) { New-Item -ItemType Directory -Path $pngDir -Force | Out-Null }
+
+    $big = New-PasteJumpBitmap -Size $PngSize
+    $big.Save($PngPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $big.Dispose()
+
+    Write-Output "Wrote $PngPath ($((Get-Item $PngPath).Length) bytes, ${PngSize}x${PngSize})"
+}
 
 # Optional contact sheet, for checking the small sizes against both taskbar colours rather than
 # judging the 256 px frame and hoping.
