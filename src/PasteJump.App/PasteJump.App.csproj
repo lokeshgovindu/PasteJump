@@ -19,8 +19,10 @@
     at tens of megabytes: unlike a .NET Framework app, which can be a few MB because Windows already carries
     its runtime, this has to bring the whole of .NET and WPF with it.
 
-    EnableCompressionInSingleFile roughly halves the result - measured 143 MB down to 65 MB - at the cost of
-    decompressing assemblies on each start. Worth it for an app launched once per logon and then resident.
+    EnableCompressionInSingleFile roughly halves the result, 143 MB down to 65 MB, and is faster as well as
+    smaller - it is not the trade it looks like. Instrumented start-up, process launch to tray icon: 2,873 ms
+    first run and ~1,150 ms warm compressed, against 3,416 ms and ~1,690 ms uncompressed. Reading 143 MB costs
+    more than decompressing 65 MB.
 
     IncludeNativeLibrariesForSelfExtract is required, because WPF's native libraries cannot be loaded from
     inside the bundle. Note what it does NOT need to be joined by:

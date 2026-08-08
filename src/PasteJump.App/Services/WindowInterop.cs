@@ -85,6 +85,40 @@ internal static class WindowInterop
     }
 
     /// <summary>
+    /// Asks DWM to round a window's corners, and to draw its border in a given colour.
+    /// <para>
+    /// This is what makes it possible to drop <c>AllowsTransparency</c>. WPF renders a layered window's text
+    /// with greyscale antialiasing rather than ClearType, so any window using transparency to get rounded
+    /// corners pays for them in text quality - which on 11-12px notification text is the difference between
+    /// crisp and smudged. Letting DWM round an opaque window restores ClearType and hands the corners and the
+    /// drop shadow to the compositor, which draws both better than we can.
+    /// </para>
+    /// <para>
+    /// Windows 11 only. On Windows 10 the call fails and the window is a plain rectangle, which is exactly what
+    /// Windows 10's own notifications look like, so the failure is ignored rather than worked around.
+    /// </para>
+    /// </summary>
+    public static void ApplyRoundedCorners(IntPtr handle, System.Windows.Media.Color borderColor)
+    {
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2.
+        var preference = 2;
+        _ = DwmSetWindowAttribute(handle, 33, ref preference, sizeof(int));
+
+        // DWMWA_BORDER_COLOR = 34, as 0x00BBGGRR. Without it the border follows the accent colour, which has
+        // nothing to do with this app's palette.
+        var colorRef = borderColor.R | (borderColor.G << 8) | (borderColor.B << 16);
+        _ = DwmSetWindowAttribute(handle, 34, ref colorRef, sizeof(int));
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    /// <summary>
     /// Rounds a device-independent coordinate so it lands on a whole device pixel.
     /// <para>
     /// Needed because window positions here are computed as <c>physicalPixels / scale</c>, which at any

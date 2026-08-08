@@ -244,11 +244,14 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   exact glyph advances for faithful scaling and renders 11–12px UI text visibly soft. The overlay and the
   toast are nothing but small text, so both set it. This is the actual cause when someone reports the toast
   looking blurry — it bites at every DPI, including 100%.
-- **`AllowsTransparency="True"` costs you ClearType.** WPF drops subpixel antialiasing to greyscale on a
-  layered window, so the overlay and toast can never be quite as crisp as an opaque window. Requesting
-  `TextRenderingMode="ClearType"` is harmless but only helps where the compositor allows it. Escaping this
-  properly means giving up `AllowsTransparency` and getting rounded corners from
-  `DWMWA_WINDOW_CORNER_PREFERENCE` plus the system shadow instead — not done, but that is the route.
+- **`AllowsTransparency="True"` costs you ClearType, and that is the bigger half of "blurry text".** WPF drops
+  subpixel antialiasing to greyscale on a layered window, so asking for `TextRenderingMode="ClearType"` there
+  achieves precisely nothing. `ToastWindow` has therefore **given up transparency**: it is opaque, and its
+  rounded corners and drop shadow come from DWM via `WindowInterop.ApplyRoundedCorners`
+  (`DWMWA_WINDOW_CORNER_PREFERENCE`, `DWMWA_BORDER_COLOR`). Do not reintroduce `AllowsTransparency` to a text
+  window to get a corner radius back — that is the trade that made the text soft. Windows 11 only; on 10 the
+  calls fail and the window is a plain rectangle, which is what Windows 10's own notifications look like.
+  `OverlayWindow` still uses transparency and could follow the same route.
 - **Window positions must be snapped to whole device pixels.** Positions here are `physicalPixels / scale`;
   at any fractional scale that lands on half a device pixel and WPF renders the entire window soft.
   `UseLayoutRounding` does not help — it rounds layout *within* a window, not the window's own origin. See
@@ -320,11 +323,15 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 - **Publish is a single self-contained `PasteJump.exe`, ~65 MB, with nothing beside it.**
   `PublishSingleFile` plus `IncludeNativeLibrariesForSelfExtract` (WPF's native libraries cannot load from
   inside the bundle) plus `EnableCompressionInSingleFile`.
-- **Compression is a measured trade, not an obvious win.** 143 MB down to 65 MB, at the cost of ~250 ms of CPU
-  decompressing on *every* start: measured 891 ms CPU uncompressed against 1141 ms compressed. Once the exe is
-  in the OS file cache the uncompressed build actually starts faster in wall-clock (1.3 s against 2.2 s), but a
-  logon-resident app launches just after boot when nothing is cached, and there reading 65 MB beats reading
-  143 MB. Keep compression; do not "improve" it on the strength of a warm-cache timing.
+- **Compression wins outright — it is not a trade.** Instrumented time from process start to the tray icon,
+  same data, same machine: compressed 2,873 ms first run and ~1,150 ms warm, against uncompressed 3,416 ms and
+  ~1,690 ms. Reading 143 MB costs more than decompressing 65 MB, cold *and* warm. An earlier note here claimed
+  the opposite from a harness that timed CPU going quiet; that harness also could not tell a fast start from a
+  process exiting on the single-instance mutex, and its numbers should not be trusted over these.
+- **Single-file costs about 850 ms per launch, all of it before `Compose` runs.** Pre-`Compose` is 1,030–1,064 ms
+  warm for the published build against 171–185 ms for the folder build — bundle extraction, assembly
+  decompression, then CLR and WPF init. `Compose` itself is 103–217 ms either way, so app-side start-up work is
+  not the lever; the deployment shape is.
 - **`IncludeAllContentForSelfExtract` must stay OFF.** It was once set here on the mistaken belief that
   without it the `Assets\*.ico` files would sit loose beside the exe. They do not: content is bundled *and*
   extracted either way. What the flag adds is extracting every **managed assembly** too, which .NET loads

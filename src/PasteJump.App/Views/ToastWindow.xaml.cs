@@ -37,6 +37,12 @@ public partial class ToastWindow : Window
         // window incapable of taking focus or intercepting a click. A toast that appears mid-copy and
         // steals foreground would be worse than no toast at all.
         WindowInterop.MakeNonActivating(handle);
+
+        // Rounded corners and the drop shadow now come from DWM rather than from AllowsTransparency, which
+        // would cost ClearType on every glyph in the window. Border colour taken from the palette so it
+        // follows the theme instead of the system accent.
+        WindowInterop.ApplyRoundedCorners(handle, ThemeBorderColor());
+
         _stylesApplied = true;
     }
 
@@ -86,6 +92,15 @@ public partial class ToastWindow : Window
         _dismissTimer.Interval = duration;
         _dismissTimer.Start();
     }
+
+    /// <summary>
+    /// The palette's border colour, for the DWM border. Falls back to a mid grey if the resource is missing,
+    /// which only happens in a host that composed the resource set by hand and forgot one.
+    /// </summary>
+    private System.Windows.Media.Color ThemeBorderColor()
+        => TryFindResource("BorderBrush") is System.Windows.Media.SolidColorBrush brush
+            ? brush.Color
+            : System.Windows.Media.Color.FromRgb(0x80, 0x80, 0x80);
 
     /// <summary>Hides immediately, without the fade. For shutdown and for entering paste mode.</summary>
     public void HideNow()

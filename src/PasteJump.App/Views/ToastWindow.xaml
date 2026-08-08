@@ -4,8 +4,7 @@
         Title="PasteJump Notification"
         WindowStyle="None"
         ResizeMode="NoResize"
-        AllowsTransparency="True"
-        Background="Transparent"
+        Background="{DynamicResource SurfaceRaisedBrush}"
         ShowInTaskbar="False"
         ShowActivated="False"
         Focusable="False"
@@ -16,14 +15,16 @@
         TextOptions.TextRenderingMode="ClearType">
 
     <!--
-        TextFormattingMode=Display is why this text is legible. WPF's default is Ideal, which preserves
-        exact glyph advances for faithful scaling and is visibly soft at the 11-12px this window uses;
-        Display snaps advances to whole pixels instead. Small UI text wants Display, always.
+        Two things make this text legible, and it took both.
 
-        ClearType is requested rather than assumed. WPF disables subpixel antialiasing on a window with
-        AllowsTransparency and falls back to greyscale, so this only bites where the compositor allows it -
-        but combined with Display and the device-pixel snapping in the code-behind it is the difference
-        between crisp and smeared.
+        TextFormattingMode=Display: WPF's default is Ideal, which preserves exact glyph advances for faithful
+        scaling and is visibly soft at the 11-12px this window uses. Display snaps advances to whole pixels.
+
+        And NO AllowsTransparency. That was the larger half and the less obvious one: WPF renders a layered
+        window's text with greyscale antialiasing instead of ClearType, so asking for ClearType on a
+        transparent window achieves nothing at all. The window is now opaque, and the rounded corners and drop
+        shadow come from DWM instead - see WindowInterop.ApplyRoundedCorners. Do not reintroduce
+        AllowsTransparency here to get a rounded corner back; that is the trade that made the text soft.
     -->
 
     <!--
@@ -34,19 +35,13 @@
         code-behind. That is not optional: a notification that steals focus at the exact moment the
         user is copying would send their next keystroke here instead of into their document.
     -->
+    <!-- No CornerRadius and no DropShadowEffect: DWM provides both for the window itself now. A rounded Border
+         inside a square opaque window would just show the window's own background in the corners. -->
     <Border Background="{DynamicResource SurfaceRaisedBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
-            CornerRadius="6"
             Padding="12,9"
             MaxWidth="420">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="14"
-                              ShadowDepth="2"
-                              Opacity="0.40"
-                              Color="{DynamicResource ShadowColor}" />
-        </Border.Effect>
-
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
