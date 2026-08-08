@@ -62,18 +62,39 @@
                     Sizing is fixed rather than Auto: an Auto column would resize as rows virtualise in and
                     out, making the grid shift under the pointer while scrolling.
                 -->
-                <DataGridTemplateColumn Header="" Width="30" CanUserSort="False" IsReadOnly="True">
+                <DataGridTemplateColumn Header="" Width="42" CanUserSort="False" IsReadOnly="True">
+                    <!--
+                        The width alone was never the whole problem, and raising it without this style would
+                        not have fixed it either: the themed DataGridCell carries Padding="10,0", so of the
+                        30px this column used to have, 20 went to padding and the 16px image was handed 10 -
+                        which Stretch=Uniform then obediently shrank it into. Hence a near-invisible icon in a
+                        column that looked wide enough.
+
+                        BasedOn is mandatory, as everywhere else in this project: an explicit CellStyle
+                        replaces the themed one outright rather than merging, so without it this cell would
+                        lose its ControlTemplate and its selection colours.
+                    -->
+                    <DataGridTemplateColumn.CellStyle>
+                        <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                            <Setter Property="Padding" Value="4,0" />
+                        </Style>
+                    </DataGridTemplateColumn.CellStyle>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <!--
                                 Uniform, NOT None. CreateBitmapSourceFromHIcon hands back the icon at whatever
                                 size the executable actually provides, commonly 32x32 - and Stretch=None does
-                                not scale it down to the 16x16 box, it CROPS it, so every icon rendered as its
-                                own top-left quarter. Uniform fits whatever arrives.
+                                not scale it down to the box, it CROPS it, so every icon rendered as its own
+                                top-left quarter. Uniform fits whatever arrives.
+
+                                24 rather than 16: these are program icons being identified by eye, and the
+                                source is usually a 32px frame, so it is downscaled either way - the smaller
+                                box threw away detail for no reason. 42 of column minus 8 of padding leaves
+                                34, comfortably more than this needs.
                             -->
                             <Image Source="{Binding Icon}"
-                                   Width="16"
-                                   Height="16"
+                                   Width="24"
+                                   Height="24"
                                    Stretch="Uniform"
                                    HorizontalAlignment="Center"
                                    RenderOptions.BitmapScalingMode="HighQuality" />
