@@ -312,10 +312,17 @@ public sealed class ImagePathTests : IDisposable
             ? Directory.GetFiles(blobDirectory, "*", SearchOption.AllDirectories)
             : [];
 
-        // Asserted by payload size rather than by total file count, because history writes its own
+        // Asserted by content address rather than by total file count, because history writes its own
         // preview blob per image as well - so the total is legitimately four here, and pinning that
         // number would be asserting an implementation detail rather than deduplication.
-        var copiesOfTheRepeatedImage = blobFiles.Count(f => new FileInfo(f).Length == dib.Length);
+        //
+        // Matched on the hash, not on the file's length. Blobs are deflated on disk, so a file's size no
+        // longer equals the payload's; the hash is over the uncompressed bytes precisely so that content
+        // addressing keeps meaning what it says.
+        var expectedName = BlobStore.ComputeHash(dib);
+
+        var copiesOfTheRepeatedImage = blobFiles.Count(f =>
+            string.Equals(Path.GetFileName(f), expectedName, StringComparison.Ordinal));
 
         Assert.Equal(1, copiesOfTheRepeatedImage);
     }

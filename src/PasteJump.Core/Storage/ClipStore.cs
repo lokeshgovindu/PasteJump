@@ -598,6 +598,15 @@ public sealed class ClipStore : IDisposable
         return _blobs.CollectGarbage(live);
     }
 
+    /// <summary>
+    /// Compresses blobs written by a version that stored them raw. Returns how many were converted.
+    /// <para>
+    /// Safe to call on every start: it is idempotent, bounded, and reaches zero work once the store has been
+    /// converted. Nothing depends on it having run, because a raw blob still reads correctly.
+    /// </para>
+    /// </summary>
+    public int CompactBlobs() => _blobs.CompactLegacyBlobs();
+
     public void Checkpoint()
     {
         lock (_gate)

@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 315 passing (`dotnet test`) |
+| Tests | 333 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | ~134 MB self-contained `win-x64` |
 
@@ -63,7 +63,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      315 tests.
+tests/PasteJump.Core.Tests      333 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -169,6 +169,20 @@ that immediately caught two real bugs. Expect to do the same again.
 - **One logical copy can raise two clipboard notifications with *different* sequence numbers.**
   Anything using OLE does `OleSetClipboard` + `OleFlushClipboard`. `ClipStore.Add` reports
   insert-vs-promote so history does not double-log; the sequence number alone cannot collapse these.
+- **The clipboard hands out images uncompressed, and hands them out more than once.** A PNG that is 146 KB
+  on disk arrives as a ~15 MB `CF_DIB` — raw pixels, no encoding — and Windows publishes the same pixels
+  again as `CF_DIBV5` and usually a third time as `System.Drawing.Bitmap`. The three differ only by header
+  size (+84 for `BITMAPV5HEADER`, +14 for `BITMAPFILEHEADER`), so content addressing cannot dedupe them.
+  This surfaced as a user asking why history said 15.2 MB for a 146 KB file; the number was truthful.
+  `BlobStore` therefore deflates at `CompressionLevel.Optimal` — measured 44x on a real store, 33 MB down
+  to 0.75 MB. **The duplicate formats are deliberately kept**: dropping them saves a further third at best
+  against a real risk, since `System.Drawing.Bitmap` is a registered format Windows will *not* synthesise
+  back, so an app asking only for it would paste nothing. Storing what the source published stays the rule.
+- **A blob's hash is over its *uncompressed* bytes,** and its on-disk length is therefore not its payload
+  length. Anything asserting on file size to identify a payload is wrong — one test did exactly that. Blobs
+  written before compression carry no `PJB1` marker and are read verbatim, so no migration is required;
+  `CompactBlobs` converts them opportunistically at startup within a byte budget, so a large store cannot
+  turn one launch into a stall.
 - **Clipboard acquisition must stay bounded.** Backoff ramp (~620 ms) plus two deferred re-reads.
   Never an unbounded spin — that was the original's `MakeClipboardAvailable` and it turns another
   app's misbehaviour into our hang.
@@ -260,7 +274,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 315 tests
+dotnet test                                         # 333 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

@@ -195,6 +195,10 @@ reverse-engineerable but not worth it for data that turns over in days.
 
 ## Known limitations
 
+- **An image clip's reported size looks enormous next to the original file.** It is not a bug and not
+  wasted disk. The clipboard carries images as uncompressed bitmaps, so a 146 KB PNG becomes ~15 MB of raw
+  pixels, and Windows publishes the same pixels under two or three format names at once. The size column
+  reports what the clipboard actually handed over. On disk it is deflated — around 44× smaller in practice.
 - **A capture can still be lost under heavy clipboard contention.** The clipboard is a machine-wide
   lock. PasteJump retries with backoff (~620 ms inline) and then twice more on a delay, but if another
   process holds the clipboard longer than that, the copy is dropped and

@@ -120,6 +120,10 @@ public partial class App : Application
         _store.PruneHistoryOlderThan(_settings.HistoryRetentionDays);
         _store.EvictBeyond(_settings.MaxClips);
 
+        // After eviction, so blobs that are about to be discarded are not compressed first. Bounded
+        // internally, and a no-op once the store has been converted.
+        _store.CompactBlobs();
+
         var foreground = new ForegroundWindowInfo();
         _clipboard = new Win32ClipboardAccess(foreground);
         _selfWrites = new SelfWriteGuard();
