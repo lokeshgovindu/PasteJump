@@ -8,7 +8,6 @@
         MinHeight="320"
         ShowInTaskbar="False"
         Background="{DynamicResource SurfaceBrush}"
-        Icon="{DynamicResource AppIcon}"
         WindowStartupLocation="CenterOwner"
         TextOptions.TextFormattingMode="Display">
 

@@ -7,7 +7,6 @@
         MinWidth="680"
         MinHeight="400"
         Background="{DynamicResource SurfaceBrush}"
-        Icon="{DynamicResource AppIcon}"
         WindowStartupLocation="CenterScreen">
 
     <Window.Resources>

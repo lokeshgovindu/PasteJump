@@ -6,7 +6,6 @@
         SizeToContent="Height"
         ResizeMode="NoResize"
         Background="{DynamicResource SurfaceBrush}"
-        Icon="{DynamicResource AppIcon}"
         WindowStartupLocation="CenterScreen">
 
     <StackPanel Margin="12">

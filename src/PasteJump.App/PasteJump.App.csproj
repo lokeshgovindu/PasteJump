@@ -56,22 +56,25 @@
   </ItemGroup>
 
   <!--
-    pastejump.ico is shipped three ways on purpose, and each one is reachable only by its own
-    mechanism - which is why this looks redundant and is not.
+    pastejump.ico is shipped two ways on purpose, and each one is reachable only by its own mechanism -
+    which is why this looks redundant and is not.
 
-    ApplicationIcon    puts it in the PE header. That is what Explorer, the taskbar and Alt+Tab read.
-                       NOT reachable through a pack:// URI, so XAML cannot bind to this copy.
-    Resource           makes it addressable as pack://application:,,,/PasteJump;component/... which is
-                       what Themes/Shared.xaml's AppIcon key - and therefore every window's title-bar
-                       icon - resolves against.
+    ApplicationIcon    puts it in the PE header, all nine frames. That is what Explorer, the taskbar,
+                       Alt+Tab and Task Manager read - and, because no window sets Window.Icon, what
+                       every window falls back to as well. Windows picks the frame per surface and per
+                       DPI, which is the one approach that cannot pick wrong. NOT reachable through a
+                       pack:// URI, so XAML cannot bind to this copy.
     Content            copies it loose beside the executable, which is what the notification area
                        needs: TrayIcon calls LoadImage(LR_LOADFROMFILE) so it can ask for the icon at
                        the shell's current small-icon metric. Extracting the PE copy instead would
                        hand back a fixed 16x16 that the shell then upscales, and at 150% scaling -
                        where it wants 24 - that is visibly blurry.
+
+    There was a third, a Resource item for the pack:// URI behind Shared.xaml's AppIcon key. It is gone
+    with that key: binding Window.Icon to a BitmapImage forces one frame to serve every size, and every
+    choice of frame was wrong somewhere. See the note at the top of Themes/Shared.xaml.
   -->
   <ItemGroup>
-    <Resource Include="Assets\pastejump.ico" />
     <Content Include="Assets\pastejump.ico" CopyToOutputDirectory="PreserveNewest" />
 
     <!--

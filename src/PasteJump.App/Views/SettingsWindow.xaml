@@ -7,7 +7,6 @@
         MinWidth="680"
         MinHeight="460"
         Background="{DynamicResource SurfaceBrush}"
-        Icon="{DynamicResource AppIcon}"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display"
         FontSize="13">

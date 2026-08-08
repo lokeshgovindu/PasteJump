@@ -11,39 +11,22 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!--
-        The application mark: title-bar and Alt+Tab icon for every window, and the image in the About
-        window. Theme-independent, and so is the notification-area icon, which is now this same file -
-        a coloured tile reads against a light or a dark background alike, which is what retired the pair
-        of monochrome tray glyphs this used to be contrasted with.
+        There is deliberately no AppIcon resource here, and no window sets Window.Icon.
 
-        Note the tray cannot use this entry: it needs a filesystem path for LoadImage, and a pack:// URI
-        is not one. See the Content item in PasteJump.App.csproj.
+        A BitmapImage decodes exactly ONE frame of an .ico, so binding Window.Icon to one hands Windows a
+        single bitmap to answer every size with - and no single choice is right. Decoding without a size
+        picked the smallest, 16, and the taskbar drew it visibly undersized. Forcing 256 fixed the size and
+        made it blurry, because reducing 8:1 destroys a 1px rim and a one-pixel gap. Forcing 32 is exact at
+        100% scaling and wrong again at 150%.
+
+        With no Window.Icon, Windows falls back to the executable's icon from the PE header - all nine frames,
+        via ApplicationIcon in the csproj - and picks the right one per surface and per DPI itself. That is
+        what Explorer has been doing correctly all along, and it is the only option that needs no guess about
+        which size will be asked for.
+
+        Consequence worth knowing: windows hosted by another executable show that executable's icon, so the UI
+        smoke harness shows its own. Not a defect - it is the same fallback working as intended.
     -->
-    <!--
-        DecodePixelWidth is not optional, and leaving it off was a real bug: a BitmapImage decodes exactly one
-        frame of an .ico, and with no requested size WPF's icon decoder picks the SMALLEST - measured, 16 of the
-        nine frames present. Window.Icon then has nothing but that 16px bitmap to answer every request with, so
-        the taskbar button, Alt+Tab and Task Manager - which ask for 32 or more - all rendered a 16px image,
-        visibly smaller than every neighbouring icon rather than merely soft.
-
-        32 rather than 256, and that correction was itself reported: asking for the largest frame fixed the size
-        and made the taskbar icon blurry instead, because ~8:1 is a brutal reduction for a mark with a 1px rim
-        and a one-pixel gap between its cards. "Downscaling beats upscaling" holds for photographs; for a
-        pixel-tuned icon the hand-authored frame at the requested size beats any resampling of a bigger one,
-        which is the entire reason multi-frame icons exist.
-
-        32 is what the taskbar and Alt+Tab ask for - SM_CXICON - at 100% scaling, so at that scale the frame is
-        used as authored with no resampling at all, and the 16px title bar is a 2:1 reduction within the same
-        family. The honest limitation: at 150% the taskbar wants 48 and will upscale from 32, so this is tuned
-        for the common case rather than universally right. The better fix is to drop Window.Icon entirely and
-        let Windows choose from all nine frames in the PE header, which is what Explorer already does - not
-        taken here only because no screenshot can verify a taskbar button, and a wrong guess means windows with
-        no icon at all rather than a soft one.
-    -->
-    <BitmapImage x:Key="AppIcon"
-                 UriSource="pack://application:,,,/PasteJump;component/Assets/pastejump.ico"
-                 DecodePixelWidth="32"
-                 DecodePixelHeight="32" />
 
     <!--
         The mark for anything that *displays* it rather than using it as a window icon.

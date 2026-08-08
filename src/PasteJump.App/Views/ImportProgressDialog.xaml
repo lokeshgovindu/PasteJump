@@ -8,7 +8,6 @@
         ShowInTaskbar="False"
         WindowStyle="SingleBorderWindow"
         Background="{DynamicResource SurfaceBrush}"
-        Icon="{DynamicResource AppIcon}"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display">
 
