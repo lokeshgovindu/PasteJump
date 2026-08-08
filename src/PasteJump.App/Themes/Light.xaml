@@ -56,6 +56,16 @@
         <GradientStop Offset="1" Color="#FFBAD8F7" />
     </LinearGradientBrush>
 
+    <!--
+        Band behind a settings row whose value differs from its default.
+
+        Deliberately weaker than SelectionBrush. Hover and selection both set the row background by
+        TargetName, which beats the TemplateBinding this arrives through, so they win when they apply - and
+        that is the right order: what you are pointing at matters more in the moment than what is modified.
+        Strong enough to scan a column of rows for, weak enough not to compete.
+    -->
+    <SolidColorBrush x:Key="ModifiedRowBrush" Color="#FFFFF6E0" />
+
     <SolidColorBrush x:Key="SelectionBorderBrush" Color="#FF7DA8D4" />
     <SolidColorBrush x:Key="SelectionTextBrush" Color="#FF0B1C38" />
     <SolidColorBrush x:Key="HoverBorderBrush" Color="#FFDCE8F5" />

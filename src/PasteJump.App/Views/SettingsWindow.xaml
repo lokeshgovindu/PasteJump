@@ -351,6 +351,17 @@
                               VirtualizingPanel.IsVirtualizing="True"
                               VirtualizingPanel.VirtualizationMode="Recycling">
                         <DataGrid.Columns>
+                            <!-- Marker column. A glyph rather than colour alone, so "changed" is still
+                                 legible to someone who cannot pick the accent hue out of the row. -->
+                            <DataGridTemplateColumn Header="" Width="22" CanUserSort="False" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Style="{StaticResource ModifiedMarkerText}"
+                                                   ToolTip="Changed from the default" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
                             <DataGridTextColumn Header="Name"
                                                 Binding="{Binding Name}"
                                                 Width="1.4*"
@@ -362,7 +373,7 @@
                             <DataGridTextColumn Header="Value"
                                                 Binding="{Binding Value}"
                                                 Width="1.2*"
-                                                ElementStyle="{StaticResource CellText}" />
+                                                ElementStyle="{StaticResource ModifiedValueText}" />
                             <DataGridTextColumn Header="Default"
                                                 Binding="{Binding Default}"
                                                 Width="1.2*"
@@ -374,10 +385,13 @@
                                 <Setter Property="ToolTip"
                                         Value="{Binding Name, StringFormat='{}{0} — see data\\PasteJump.json'}" />
                                 <Style.Triggers>
-                                    <!-- Anything changed from its default is worth spotting at a glance;
-                                         it is the first thing to check when behaviour is surprising. -->
+                                    <!-- Anything changed from its default is worth spotting at a glance; it
+                                         is the first thing to check when behaviour is surprising. Weight
+                                         alone was far too subtle, so the row is banded and its value is
+                                         accented too - see ModifiedValueText and ModifiedMarkerText. -->
                                     <DataTrigger Binding="{Binding IsModified}" Value="True">
                                         <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Background" Value="{DynamicResource ModifiedRowBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

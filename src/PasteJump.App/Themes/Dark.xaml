@@ -47,6 +47,10 @@
         <GradientStop Offset="1" Color="#FF2C4B7C" />
     </LinearGradientBrush>
 
+    <!-- See the note in Light.xaml. A warm dark band rather than a light one: on a dark surface, lightening
+         a row reads as a highlight competing with selection, while a warm tint reads as a marked state. -->
+    <SolidColorBrush x:Key="ModifiedRowBrush" Color="#FF3A3320" />
+
     <SolidColorBrush x:Key="SelectionBorderBrush" Color="#FF6191CE" />
     <SolidColorBrush x:Key="SelectionTextBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="HoverBorderBrush" Color="#FF43434F" />

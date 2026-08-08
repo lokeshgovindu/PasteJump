@@ -719,6 +719,49 @@
         </Style.Triggers>
     </Style>
 
+    <!--
+        The value of a setting that differs from its default.
+
+        Three cues, not one, and the redundancy is the point. The row also carries a background tint, but a
+        tint alone is easy to miss when scanning and disappears entirely under selection; weight alone -
+        which is all this used to have - proved far too subtle to spot at a glance. Colour is not doing the
+        work on its own either, because the row carries a marker glyph as well, so the state survives being
+        read by someone who cannot distinguish the accent hue.
+
+        Selection wins, as everywhere else: accent-coloured text on a saturated selection fill is unreadable.
+    -->
+    <Style x:Key="ModifiedValueText" TargetType="TextBlock" BasedOn="{StaticResource CellText}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsModified}" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}"
+                         Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- The marker itself. Hidden rather than blank so the column keeps its width and the rows stay aligned. -->
+    <Style x:Key="ModifiedMarkerText" TargetType="TextBlock">
+        <Setter Property="Text" Value="●" />
+        <Setter Property="FontSize" Value="9" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Visibility" Value="Hidden" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsModified}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}"
+                         Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="MutedCellText" TargetType="TextBlock" BasedOn="{StaticResource NumericCellText}">
         <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
         <Style.Triggers>
