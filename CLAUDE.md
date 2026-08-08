@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 348 passing (`dotnet test`) |
+| Tests | 355 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -63,7 +63,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      348 tests.
+tests/PasteJump.Core.Tests      355 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -187,11 +187,18 @@ that immediately caught two real bugs. Expect to do the same again.
   This surfaced as a user asking why history said 15.2 MB for a 146 KB file; the number was truthful.
   Two independent fixes, and both were needed:
   - `BlobStore` deflates at `CompressionLevel.Optimal` — measured 44x on a real store, 33 MB to 0.75 MB.
-  - `RedundantImageFormats.Prune` drops the duplicate encodings at **capture**, keeping `CF_DIBV5` over
-    `CF_DIB` (Windows synthesises either from the other, and only the V5 header describes alpha) and
-    dropping `System.Drawing.Bitmap` when a DIB survives. Roughly a third of the bytes survive, and it is
-    the only fix that moves the number the history window *reports* — compression alone changes the disk,
-    not `TotalBytes`.
+  - `RedundantImageFormats.Prune` drops the duplicate encodings at **capture**, keeping `CF_DIB` over
+    `CF_DIBV5` and dropping `System.Drawing.Bitmap` when a DIB survives. Roughly a third of the bytes
+    survive, and it is the only fix that moves the number the history window *reports* — compression alone
+    changes the disk, not `TotalBytes`.
+- **Keep `CF_DIB`, not `CF_DIBV5`, when both are offered.** Windows synthesises either from the other so
+  nothing is lost, but they are not equally well *read*: WPF's BMP decoder is far better exercised against
+  `BITMAPINFOHEADER` than `BITMAPV5HEADER`, and preferring V5 was reported as history previews rendering with
+  their right-hand portion wrong. The link is `CaptureService.RecordHistory`, which picks its blob with
+  `FirstOrDefault(FormatId is 8 or 17)` — so whichever DIB survives pruning *is* the preview. Clipjump keeps
+  the plain `CF_DIB` too. The V5 header genuinely describes more (alpha, colour space), so this is a real
+  trade; it is the right way round because an image that renders correctly beats one that documents itself
+  better, and `TryMakeOpaqueIfFullyTransparent` already handles the alpha case that actually bites.
 
   I initially rejected the pruning as too risky and was wrong: `Clipjump`'s own clip files were the evidence
   that settled it. Parsing `cache/clips/1007.avc` shows a single `CF_DIB` and no bitmap duplicate, so a
@@ -336,7 +343,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 348 tests
+dotnet test                                         # 355 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

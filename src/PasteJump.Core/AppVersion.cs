@@ -28,17 +28,9 @@ public static class AppVersion
     /// </summary>
     public static string Copyright => CachedCopyright.Value;
 
-    /// <summary>Short form for display, dropping a trailing zero revision: <c>2026.1.0</c>.</summary>
-    public static string Display
-    {
-        get
-        {
-            var value = Current;
-            return value.EndsWith(".0", StringComparison.Ordinal) && value.Count(static c => c == '.') == 3
-                ? value[..^2]
-                : value;
-        }
-    }
+    // There is deliberately no shortened Display form. It existed only to trim a trailing ".0" for the tray
+    // tooltip, and the tooltip now shows the full four-part version - it is the quickest place to read the
+    // build number from without opening a window, so it should match what a bug report needs verbatim.
 
     private static string Resolve()
     {

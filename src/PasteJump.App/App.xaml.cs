@@ -839,7 +839,9 @@ public partial class App : Application
     /// </summary>
     private string BuildTrayTooltip()
     {
-        var text = $"PasteJump {AppVersion.Display}";
+        // Full four-part version, not the shortened form. This is the fastest place to read the build number
+        // from without opening a window, so it should match what a bug report needs verbatim.
+        var text = $"PasteJump {AppVersion.Current}";
 
         // Disabled outranks paused, because it is the stronger statement: a disabled PasteJump is not
         // watching the clipboard either, so reporting "paused" would understate what is switched off.

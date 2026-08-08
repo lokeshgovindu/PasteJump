@@ -43,10 +43,18 @@ public static class RedundantImageFormats
     /// <summary>
     /// Returns the payloads worth storing, dropping duplicate encodings of an image that is already present.
     /// <para>
-    /// <c>CF_DIBV5</c> is preferred over <c>CF_DIB</c> when both are present. Windows synthesises either from
-    /// the other, and the V5 header is the one able to describe alpha and colour space - so this keeps
-    /// strictly more information than Clipjump, which keeps the plain <c>CF_DIB</c>, while saving the same
-    /// bytes.
+    /// <c>CF_DIB</c> is preferred over <c>CF_DIBV5</c> when both are present, and the order matters more than
+    /// it looks. Windows synthesises either from the other, so nothing is lost that a consumer cannot get
+    /// back - but the two are not equally well handled on the way in. WPF's BMP decoder is far better
+    /// exercised against <c>BITMAPINFOHEADER</c> than <c>BITMAPV5HEADER</c>, and keeping V5 instead was
+    /// reported as image previews rendering with their right-hand portion wrong. Clipjump keeps the plain
+    /// <c>CF_DIB</c> too, which is a decade of shipped evidence for the same choice.
+    /// </para>
+    /// <para>
+    /// The V5 header does describe alpha and colour space, which <c>CF_DIB</c> cannot - so this is a real
+    /// trade rather than a free win. It is the right way round because a 32bpp <c>CF_DIB</c> still carries the
+    /// alpha bytes, <see cref="Imaging.DibConverter.TryMakeOpaqueIfFullyTransparent"/> already handles the
+    /// case that actually bites, and an image that renders correctly beats one that describes itself better.
     /// </para>
     /// <para>
     /// Nothing is dropped unless a DIB survives. Without that guard, a clip carrying only
@@ -75,7 +83,7 @@ public static class RedundantImageFormats
 
         foreach (var payload in payloads)
         {
-            if (hasDibV5 && payload.FormatId == CfDib)
+            if (hasDib && payload.FormatId == CfDibV5)
             {
                 continue;
             }

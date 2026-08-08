@@ -35,10 +35,24 @@ public sealed class RedundantImageFormatTests
     {
         var kept = RedundantImageFormats.Prune(ThreeCopiesOfOneImage());
 
-        // CF_DIBV5 survives, being the only one whose header can describe alpha and colour space. Windows
-        // synthesises CF_DIB and CF_BITMAP back from it, so nothing is actually lost.
+        // CF_DIB survives, not CF_DIBV5. Windows synthesises either from the other so nothing is lost, but
+        // WPF's BMP decoder is far better exercised against BITMAPINFOHEADER - keeping V5 instead was reported
+        // as previews rendering with their right-hand portion wrong. Clipjump keeps the plain CF_DIB too.
         var only = Assert.Single(kept);
-        Assert.Equal(RedundantImageFormats.CfDibV5, only.FormatId);
+        Assert.Equal(RedundantImageFormats.CfDib, only.FormatId);
+    }
+
+    [Fact]
+    public void The_kept_dib_is_the_one_history_will_render()
+    {
+        // RecordHistory picks its blob with FirstOrDefault(FormatId is 8 or 17), so whichever DIB survives
+        // pruning is the one that becomes the preview. This test is the link between the two: change the
+        // preference here and the preview changes with it.
+        var kept = RedundantImageFormats.Prune(ThreeCopiesOfOneImage());
+
+        var forHistory = kept.First(static p => p.FormatId is RedundantImageFormats.CfDib or RedundantImageFormats.CfDibV5);
+
+        Assert.Equal(RedundantImageFormats.CfDib, forHistory.FormatId);
     }
 
     [Fact]
@@ -65,6 +79,22 @@ public sealed class RedundantImageFormatTests
         var only = Assert.Single(RedundantImageFormats.Prune(payloads));
 
         Assert.Equal(RedundantImageFormats.CfDib, only.FormatId);
+    }
+
+    [Fact]
+    public void A_v5_only_clip_keeps_its_v5()
+    {
+        // Preferring CF_DIB must not mean requiring it. Some sources publish only the V5 form, and dropping it
+        // for want of a plain DIB would leave the clip with no image at all.
+        List<ClipPayload> payloads =
+        [
+            new(RedundantImageFormats.CfDibV5, null, new byte[40_124]),
+            new(0xC100, "System.Drawing.Bitmap", new byte[40_054]),
+        ];
+
+        var only = Assert.Single(RedundantImageFormats.Prune(payloads));
+
+        Assert.Equal(RedundantImageFormats.CfDibV5, only.FormatId);
     }
 
     [Fact]
@@ -97,8 +127,8 @@ public sealed class RedundantImageFormatTests
         Assert.Equal(3, kept.Count);
         Assert.Contains(kept, p => p.FormatId == CfUnicodeText);
         Assert.Contains(kept, p => p.FormatId == CfHtml);
-        Assert.Contains(kept, p => p.FormatId == RedundantImageFormats.CfDibV5);
-        Assert.DoesNotContain(kept, p => p.FormatId == RedundantImageFormats.CfDib);
+        Assert.Contains(kept, p => p.FormatId == RedundantImageFormats.CfDib);
+        Assert.DoesNotContain(kept, p => p.FormatId == RedundantImageFormats.CfDibV5);
     }
 
     [Fact]
@@ -148,6 +178,7 @@ public sealed class RedundantImageFormatTests
 
         var snapshot = new ClipboardSnapshot(pruned, null, ClipKind.Image, "devenv.exe");
 
-        Assert.Equal(124 + 400_000, snapshot.TotalBytes);
+        // The surviving CF_DIB, so a 40-byte BITMAPINFOHEADER plus the pixels - not the 124-byte V5 form.
+        Assert.Equal(40 + 400_000, snapshot.TotalBytes);
     }
 }
