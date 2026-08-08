@@ -1,3 +1,4 @@
+using System.Text;
 using PasteJump.Core.Abstractions;
 using PasteJump.Core.Imaging;
 using PasteJump.Core.Model;
@@ -244,6 +245,14 @@ public sealed class CaptureService
             {
                 blob = DibConverter.TryCreateBitmapFile(dib.Data);
             }
+        }
+        else if (snapshot.Text is { } full && full.Length > ClipStore.PreviewMaxChars)
+        {
+            // The preview column is capped, so for anything longer the archive used to keep only the first
+            // ClipStore.PreviewMaxChars characters - and History's Copy handed that back as if it were the whole
+            // clip, silently. Storing the real text costs little: blobs are content-addressed and deflated, and
+            // only entries that actually exceed the cap take this path.
+            blob = Encoding.UTF8.GetBytes(full);
         }
 
         var preview = snapshot.Text

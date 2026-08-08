@@ -181,6 +181,16 @@ The product lives here. Specify it before writing UI.
 
 1. Ctrl release always terminates the session, even if a keystroke was swallowed.
 2. `Cancel` / `Delete` / `DeleteAll` restore the pre-existing clipboard contents.
+   > **Amended during implementation.** `DeleteAll` no longer deletes on release: it
+   > reports `DeleteAllRequested` and hands the deletion to
+   > `IPasteModeHost.RequestDeleteAllConfirmation`, which performs it only if the user
+   > agrees. The clipboard restore still happens immediately either way, so this
+   > invariant holds unchanged. The reason is that user testing found a real history
+   > wiped this way — 41 clips, evidenced by a `clip` table holding 14 rows against a
+   > `sqlite_sequence` of 55 — and three taps of `X` followed by a natural Ctrl release
+   > is a plausible accident with no undo. The prompt cannot be answered inside
+   > `ModifierReleased`, which runs in the keyboard hook where anything modal blocks all
+   > keyboard input machine-wide; deferral is therefore forced, not stylistic.
 3. A paste **intentionally leaves the pasted clip on the clipboard**, so a
    following native Ctrl+V repeats it.
    > **Corrected during implementation.** This originally read "commit never leaves

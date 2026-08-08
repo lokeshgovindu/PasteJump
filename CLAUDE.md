@@ -145,6 +145,24 @@ that immediately caught two real bugs. Expect to do the same again.
   user clicks OK, and the pointer records `migrateFrom` per half explicitly — inferring "there is a
   database over there, adopt it" would swallow an unrelated history the first time someone unzips a fresh
   portable copy on a machine that already has one. The source is never deleted.
+- **The only irreversible thing the gesture can do is `DeleteAll`, and it is confirmed — asynchronously,
+  because it has to be.** Three taps of `X` reaches DELETE ALL, and releasing Ctrl commits whatever mode you
+  are in, so a plausible accident wiped a real 41-clip history during testing. The prompt **cannot** be shown
+  from `Commit`: that runs in the keyboard hook, and anything modal there spins its own message loop on the UI
+  thread, blocking all keyboard input machine-wide and blowing `LowLevelHooksTimeout`. So `Commit` returns
+  `PasteCommitKind.DeleteAllRequested` — *requested*, nothing deleted — and passes the deletion itself to
+  `IPasteModeHost.RequestDeleteAllConfirmation`, whose implementation must `BeginInvoke` and return at once.
+  Handing over the `Action` rather than a boolean answer keeps "unpinned only" in `IClipCatalog` instead of
+  restated by whoever draws the dialog. Note the diagnostic that found this: `clip` had 14 rows against a
+  `sqlite_sequence` of 55, and history was intact — `PruneHistoryOlderThan` never touches `clip`, and
+  `EvictBeyond` was capped at 1000, so a bulk `DELETE FROM clip WHERE pinned = 0` was the only candidate left.
+- **History archives the full text separately, because `preview` is capped at `PreviewMaxChars` (4096).**
+  `RecordHistory` writes a blob for text longer than that, and the History window's Copy prefers it. Without
+  the blob, Copy handed back the first 4096 characters *silently* — and for an entry no longer in the stack
+  that is the only copy left, so it was quiet data loss rather than a cosmetic limit. Short text stores no
+  blob: the preview already is the payload, and a blob per row would just duplicate it. Rows captured before
+  this say so in the status line rather than pretending to be complete. Note `history_fts` still indexes only
+  the preview, so search does not reach text beyond the cap.
 - **Never send the paste keystroke unless the clipboard write succeeded.** `TryWrite` genuinely fails,
   and a Ctrl+V after a failed write pastes whatever was there before — silently, and looking exactly
   like the app choosing the wrong clip. `ClipboardPaster` owns this ordering; it lives in `Core`

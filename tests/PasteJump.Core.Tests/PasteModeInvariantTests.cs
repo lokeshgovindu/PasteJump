@@ -70,10 +70,87 @@ public class PasteModeInvariantTests
 
     // Invariant 2 -----------------------------------------------------------
 
+    /// <summary>
+    /// DELETE ALL asks first and deletes nothing on its own. The prompt cannot be answered inside
+    /// <c>ModifierReleased</c> - that runs in the keyboard hook, where anything modal blocks the whole machine's
+    /// keyboard - so the controller must hand the deletion over and let it happen later, or not at all.
+    /// </summary>
+    [Fact]
+    public void DeleteAll_AsksBeforeDeletingAnything()
+    {
+        var (controller, catalog, host) = Build(clipCount: 3);
+
+        controller.Begin();
+
+        for (var i = 0; i < 3; i++)
+        {
+            controller.Handle(PasteAction.CycleCommitMode);
+        }
+
+        var kind = controller.ModifierReleased();
+
+        Assert.Equal(PasteCommitKind.DeleteAllRequested, kind);
+        Assert.Equal(3, host.DeleteAllConfirmationCount);
+
+        // The part that matters: nothing has gone yet.
+        Assert.Equal(0, catalog.DeleteAllCallCount);
+        Assert.Equal(3, catalog.Snapshot().Count);
+    }
+
+    [Fact]
+    public void DeleteAll_DeletesOnceTheRequestIsConfirmed()
+    {
+        var (controller, catalog, host) = Build(clipCount: 3);
+
+        controller.Begin();
+
+        for (var i = 0; i < 3; i++)
+        {
+            controller.Handle(PasteAction.CycleCommitMode);
+        }
+
+        controller.ModifierReleased();
+        host.DeleteAllConfirmAction!();
+
+        Assert.Equal(1, catalog.DeleteAllCallCount);
+        Assert.Empty(catalog.Snapshot());
+    }
+
+    /// <summary>
+    /// The count offered to the user excludes pinned clips, because those survive the deletion. Promising to
+    /// remove more than will actually go would make the prompt a lie.
+    /// </summary>
+    [Fact]
+    public void DeleteAll_CountsOnlyUnpinnedClips()
+    {
+        var catalog = new FakeClipCatalog();
+        catalog.Add("one");
+        catalog.Add("two");
+        catalog.AddPinned("kept");
+
+        var host = new RecordingPasteModeHost();
+        var controller = new PasteModeController(
+            catalog,
+            host,
+            new FormatterRegistry(),
+            new PasteModeOptions { PreserveClipPosition = false });
+
+        controller.Begin();
+
+        for (var i = 0; i < 3; i++)
+        {
+            controller.Handle(PasteAction.CycleCommitMode);
+        }
+
+        controller.ModifierReleased();
+
+        Assert.Equal(2, host.DeleteAllConfirmationCount);
+    }
+
     [Theory]
     [InlineData(1, PasteCommitKind.Cancelled)]
     [InlineData(2, PasteCommitKind.Deleted)]
-    [InlineData(3, PasteCommitKind.DeletedAll)]
+    [InlineData(3, PasteCommitKind.DeleteAllRequested)]
     public void DestructiveCommitModes_RestoreThePreviousClipboard(int cyclePresses, PasteCommitKind expected)
     {
         var (controller, _, host) = Build();
@@ -179,11 +256,12 @@ public class PasteModeInvariantTests
 
         controller.Begin();
 
-        // Delete-all mode, commit, then a fresh session with nothing left.
+        // Delete-all mode, commit, confirm, then a fresh session with nothing left.
         controller.Handle(PasteAction.CycleCommitMode);
         controller.Handle(PasteAction.CycleCommitMode);
         controller.Handle(PasteAction.CycleCommitMode);
         controller.ModifierReleased();
+        host.DeleteAllConfirmAction!();
 
         Assert.Empty(catalog.Snapshot());
 

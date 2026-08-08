@@ -103,5 +103,21 @@ internal sealed class RecordingPasteModeHost : IPasteModeHost
         Calls.Add("help");
     }
 
+    /// <summary>Clips at stake in the last confirmation request, or null if none was made.</summary>
+    public int? DeleteAllConfirmationCount { get; private set; }
+
+    /// <summary>
+    /// The deletion handed over with the last request, left uninvoked. Tests call this to stand in for the user
+    /// agreeing - which is the only thing that may actually delete anything.
+    /// </summary>
+    public Action? DeleteAllConfirmAction { get; private set; }
+
+    public void RequestDeleteAllConfirmation(int unpinnedCount, Action confirmed)
+    {
+        DeleteAllConfirmationCount = unpinnedCount;
+        DeleteAllConfirmAction = confirmed;
+        Calls.Add($"confirm-delete-all:{unpinnedCount}");
+    }
+
     public void ShowTransientMessage(string message) => Calls.Add($"message:{message}");
 }

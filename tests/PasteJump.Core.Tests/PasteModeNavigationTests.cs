@@ -194,6 +194,9 @@ public class PasteModeNavigationTests
         controller.Handle(PasteAction.CycleCommitMode);
         controller.ModifierReleased();
 
+        // DELETE ALL is confirmed rather than performed on release, so stand in for the user agreeing.
+        host.DeleteAllConfirmAction!();
+
         var remaining = catalog.Snapshot();
         Assert.Single(remaining);
         Assert.Equal(pinnedId, remaining[0].Id);

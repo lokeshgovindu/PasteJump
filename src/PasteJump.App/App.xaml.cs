@@ -149,6 +149,7 @@ public partial class App : Application
         _pasteHost.ExportRequested += OnExportRequested;
         _pasteHost.HelpRequested += ShowShortcutHelp;
         _pasteHost.TransientMessage += OnTransientMessage;
+        _pasteHost.DeleteAllConfirmationRequested += OnDeleteAllConfirmationRequested;
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
 
@@ -491,6 +492,36 @@ public partial class App : Application
     private void OnTransientMessage(string message)
         // Longer than a copy notification: these report a failure the user may need to act on.
         => Toast().Notify(message, null, TimeSpan.FromMilliseconds(Math.Max(2500, _settings.CopyNotificationMs)));
+
+    /// <summary>
+    /// Confirms the paste-mode DELETE ALL before it happens. Runs on the Dispatcher, well after the keyboard hook
+    /// has returned - the controller hands this over as a request precisely so nothing modal can run in the hook.
+    /// </summary>
+    private void OnDeleteAllConfirmationRequested(int unpinnedCount, Action confirmed)
+    {
+        if (unpinnedCount == 0)
+        {
+            // Nothing to lose, so nothing to ask. A prompt here would be pure noise.
+            return;
+        }
+
+        // The toast is hidden on entering paste mode and the overlay is already down by now, so there is nothing
+        // for this to appear behind.
+        var accepted = MessageDialog.Show(
+            "Pinned clips are kept. This cannot be undone - the clips are removed from the stack, though history "
+                + "keeps its own record.",
+            headline: $"Delete all {unpinnedCount} unpinned clip{(unpinnedCount == 1 ? string.Empty : "s")}?",
+            kind: DialogKind.Warning,
+            buttons: DialogButtons.OkCancel) == DialogResultKind.Accepted;
+
+        if (!accepted)
+        {
+            return;
+        }
+
+        confirmed();
+        OnTransientMessage($"Deleted {unpinnedCount} clip{(unpinnedCount == 1 ? string.Empty : "s")}.");
+    }
 
     private ToastWindow Toast()
     {

@@ -327,10 +327,21 @@ public sealed class PasteModeController
             }
 
             case PasteCommitMode.DeleteAll:
-                _catalog.DeleteAllUnpinned();
+            {
+                // Asked, not done. Three taps of X and a natural Ctrl release is a plausible accident, and this
+                // is the only irreversible thing the gesture can do - so it now needs an answer. The prompt
+                // cannot happen here: this runs in the keyboard hook, where anything modal blocks all keyboard
+                // input machine-wide. See IPasteModeHost.RequestDeleteAllConfirmation.
+                var unpinned = _catalog.Snapshot().Count(static c => !c.Pinned);
+
+                _host.RequestDeleteAllConfirmation(unpinned, _catalog.DeleteAllUnpinned);
+
+                // Invariant 2 still holds, and holds immediately: the clipboard goes back whether or not the
+                // deletion is ever confirmed.
                 _host.RestoreExistingClipboard();
                 EndSession();
-                return PasteCommitKind.DeletedAll;
+                return PasteCommitKind.DeleteAllRequested;
+            }
 
             default:
                 EndSession();

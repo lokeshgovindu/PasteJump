@@ -58,6 +58,51 @@ public sealed class CaptureServiceTests : IDisposable
         capture.OnClipboardChanged();
     }
 
+    /// <summary>
+    /// Text longer than the preview column can hold is archived in full as a blob.
+    /// <para>
+    /// Without this the history archive kept only the first <see cref="ClipStore.PreviewMaxChars"/> characters,
+    /// and the History window's Copy handed that back as though it were the whole clip - silently, and for an
+    /// entry no longer in the stack that was the only copy left.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void RecordsFullTextForEntriesTooLongForThePreview()
+    {
+        var long_ = new string('a', ClipStore.PreviewMaxChars + 500);
+        _clipboard.EnqueueRead(FakeClipboardAccess.TextSnapshot(long_, "devenv.exe"));
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        var entry = Assert.Single(_store.SearchHistory(null));
+
+        Assert.Equal(ClipStore.PreviewMaxChars, entry.Preview.Length);
+        Assert.NotNull(entry.BlobHash);
+
+        var archived = _store.Blobs.TryRead(entry.BlobHash!);
+
+        Assert.NotNull(archived);
+        Assert.Equal(long_, System.Text.Encoding.UTF8.GetString(archived!));
+    }
+
+    /// <summary>
+    /// And nothing is archived when the preview already holds the whole thing - the preview is the payload for
+    /// short text, so a blob would be a duplicate copy of it in every history row.
+    /// </summary>
+    [Fact]
+    public void DoesNotArchiveTextThatFitsInThePreview()
+    {
+        _clipboard.EnqueueRead(FakeClipboardAccess.TextSnapshot("short enough", "devenv.exe"));
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        Assert.Null(Assert.Single(_store.SearchHistory(null)).BlobHash);
+    }
+
     [Fact]
     public void CapturesAClipAndRecordsHistory()
     {

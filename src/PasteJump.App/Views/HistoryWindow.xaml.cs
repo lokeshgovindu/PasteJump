@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -422,7 +423,21 @@ public partial class HistoryWindow : Window
             return;
         }
 
-        var payloads = TryBuildImagePayloads(row) ?? Win32ClipboardAccess.TextOnlyPayloads(row.Preview);
+        var payloads = TryBuildImagePayloads(row);
+        var truncated = false;
+
+        if (payloads is null)
+        {
+            // Prefer the archived full text over the preview column, which is capped at
+            // ClipStore.PreviewMaxChars. Copying the preview was handing back a silently shortened clip for
+            // anything longer - and for an entry no longer in the stack, this is the only way to get it back.
+            var full = TryReadArchivedText(row);
+
+            // Entries captured before full text was archived have nothing else to offer, so say so rather than
+            // producing a quietly incomplete copy.
+            truncated = full is null && row.Preview.Length >= ClipStore.PreviewMaxChars;
+            payloads = Win32ClipboardAccess.TextOnlyPayloads(full ?? row.Preview);
+        }
 
         var kind = payloads[0].FormatId == CfDib ? ClipKind.Image : ClipKind.Text;
         var snapshot = new ClipboardSnapshot(payloads, kind == ClipKind.Text ? row.Preview : null, kind, null);
@@ -432,8 +447,29 @@ public partial class HistoryWindow : Window
         _selfWrites.NoteWrite(snapshot.ContentHash);
 
         StatusText.Text = _clipboard.TryWrite(payloads)
-            ? kind == ClipKind.Image ? "Image copied to clipboard." : "Copied to clipboard."
+            ? kind == ClipKind.Image
+                ? "Image copied to clipboard."
+                : truncated
+                    ? $"Copied - but this entry predates full-text archiving, so only the first "
+                        + $"{ClipStore.PreviewMaxChars:N0} characters were kept."
+                    : "Copied to clipboard."
             : "Could not open the clipboard - another application may be holding it.";
+    }
+
+    /// <summary>
+    /// The archived full text for an entry too long for the preview column, or null when the row predates
+    /// full-text archiving, is not text, or its blob has been collected.
+    /// </summary>
+    private string? TryReadArchivedText(HistoryRow row)
+    {
+        if (row.Kind != ClipKind.Text || row.BlobHash is not { Length: > 0 })
+        {
+            return null;
+        }
+
+        var bytes = _store.Blobs.TryRead(row.BlobHash);
+
+        return bytes is null ? null : Encoding.UTF8.GetString(bytes);
     }
 
     /// <summary>

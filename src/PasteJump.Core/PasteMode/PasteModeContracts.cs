@@ -42,7 +42,19 @@ public enum PasteCommitKind
     Pasted,
     Cancelled,
     Deleted,
-    DeletedAll,
+
+    /// <summary>
+    /// <c>DeleteAll</c> was committed and the host has been <em>asked</em> to confirm it. Nothing has been
+    /// deleted yet.
+    /// <para>
+    /// Deliberately not "DeletedAll". The confirmation cannot be answered inside
+    /// <see cref="PasteModeController.ModifierReleased"/>, which runs in the keyboard hook, so the deletion
+    /// happens later - or not at all. A caller treating this as "done" would report a deletion that the user
+    /// may still refuse.
+    /// </para>
+    /// </summary>
+    DeleteAllRequested,
+
     PushedToClipboard,
 
     /// <summary>
@@ -157,6 +169,22 @@ public interface IPasteModeHost
     void RequestExport(Clip clip);
 
     void ShowShortcutHelp();
+
+    /// <summary>
+    /// Ask the user to confirm clearing the stack, and invoke <paramref name="confirmed"/> only if they agree.
+    /// <para>
+    /// A request rather than a question with a return value, because the only caller runs inside the keyboard
+    /// hook. Anything modal there owns the UI thread with its own message loop, which blocks all keyboard input
+    /// machine-wide and blows <c>LowLevelHooksTimeout</c> - so the implementation must defer the prompt and
+    /// return immediately.
+    /// </para>
+    /// <para>
+    /// <paramref name="confirmed"/> carries the deletion itself so the rule about which clips go - unpinned
+    /// only - stays in <see cref="IClipCatalog"/> rather than being restated by whoever draws the dialog.
+    /// </para>
+    /// </summary>
+    /// <param name="unpinnedCount">How many clips would be removed, for the prompt.</param>
+    void RequestDeleteAllConfirmation(int unpinnedCount, Action confirmed);
 
     void ShowTransientMessage(string message);
 }
