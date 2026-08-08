@@ -46,7 +46,7 @@ public partial class AboutWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Could not open the link.\n\n{ex.Message}", "PasteJump");
+            MessageDialog.Warn(ex.Message, headline: "Could not open the link", owner: this);
         }
 
         e.Handled = true;
@@ -76,7 +76,7 @@ public partial class AboutWindow : Window
         {
             // The clipboard is a machine-wide lock and another process can be holding it. Nothing here
             // is worth a modal dialog over - the details are on screen anyway.
-            MessageBox.Show(this, "The clipboard is busy. Nothing was copied.", "PasteJump");
+            MessageDialog.Warn("The clipboard is busy. Nothing was copied.", owner: this);
         }
     }
 }

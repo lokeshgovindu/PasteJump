@@ -65,8 +65,15 @@ public static class RivalClipboardManagers
     }
 
     /// <summary>
-    /// The explanation shown when a rival is running and PasteJump is still sending Ctrl+V. Built here
-    /// rather than in the UI so the wording is covered by a test and cannot drift from the detection.
+    /// The hint shown when a rival is detected. Built here rather than in the UI so the wording is covered by
+    /// a test and cannot drift from the detection.
+    /// <para>
+    /// Deliberately conditional - "if pasting stops working" rather than "pasting does nothing". Detection is
+    /// by process name, and that cannot tell whether the other manager's paste hotkey is actually enabled:
+    /// Clipjump has its own disable toggle and stays running while switched off, so asserting that pasting is
+    /// broken is wrong exactly as often as someone has it running but disabled. An earlier version of this
+    /// text made that assertion and was reported as a false alarm.
+    /// </para>
     /// </summary>
     public static string DescribeConflict(IReadOnlyList<string> rivals)
     {
@@ -82,12 +89,7 @@ public static class RivalClipboardManagers
         var verb = rivals.Count > 1 ? "are" : "is";
 
         return
-            $"{names} {verb} running.\n\n" +
-            "It also uses Ctrl+V, and because Windows shows injected keystrokes to every keyboard hook, " +
-            "it intercepts the Ctrl+V PasteJump sends before the application you are pasting into can " +
-            "see it. Copying still works; pasting does nothing.\n\n" +
-            "Switch PasteJump to paste with Shift+Insert instead? It is the legacy paste chord and " +
-            "works in almost every application, but the other manager does not claim it.\n\n" +
-            "You can change this at any time under Settings, Paste mode.";
+            $"{names} {verb} also running. If pasting stops working, that is why - two managers cannot " +
+            "share Ctrl+V. Settings, Paste mode has the fix.";
     }
 }

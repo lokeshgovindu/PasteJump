@@ -101,6 +101,16 @@ public partial class SettingsWindow : Window
     /// </summary>
     public event Action<DataLocation, DataLocation>? DataLocationChangeRequested;
 
+    /// <summary>
+    /// Raised when the user asks to import Clipjump's history.
+    /// <para>
+    /// Handled by the host rather than here because the importer needs the clip store, which this dialog has
+    /// no business holding. Fires immediately rather than on OK: it is an action, not a setting, and nothing
+    /// about it is pending until the dialog is accepted.
+    /// </para>
+    /// </summary>
+    public event Action? LegacyImportRequested;
+
     private void Load()
     {
         MonitorClipboardCheck.IsChecked = _baseline.MonitorClipboard;
@@ -295,6 +305,8 @@ public partial class SettingsWindow : Window
     }
 
     private void OnCancelClicked(object sender, RoutedEventArgs e) => Close();
+
+    private void OnImportClicked(object sender, RoutedEventArgs e) => LegacyImportRequested?.Invoke();
 
     /// <summary>
     /// Rebuilds the Advanced list from the settings currently entered in the dialog, so it reflects

@@ -102,6 +102,23 @@
                                  Grid.Column="1"
                                  ToolTip="0 keeps everything for ever. Old entries are pruned at start-up." />
                     </Grid>
+
+                    <TextBlock Margin="0,18,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Text="Import from Clipjump" />
+
+                    <TextBlock Margin="0,4,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               FontSize="11"
+                               Text="Copies Clipjump's history into PasteJump. Only history is imported — clip stacks are left alone, and nothing in the Clipjump folder is modified. Safe to run more than once; entries already imported are skipped." />
+
+                    <Button x:Name="ImportButton"
+                            Click="OnImportClicked"
+                            Content="_Import Clipjump history…"
+                            HorizontalAlignment="Left"
+                            Margin="0,10,0,0"
+                            MinWidth="200"
+                            ToolTip="Finds an existing Clipjump installation and imports its history." />
                 </StackPanel>
             </TabItem>
 

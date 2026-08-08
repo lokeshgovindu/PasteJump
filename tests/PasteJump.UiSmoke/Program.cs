@@ -85,6 +85,18 @@ internal static class Program
                 Check("SettingsWindow", () => new SettingsWindow(settings, formatters, DataLocation.UserProfile), CycleTabs);
                 Check("ShortcutHelpWindow", () => new ShortcutHelpWindow());
                 Check("AboutWindow", () => new AboutWindow());
+
+                // MessageDialog is normally shown modally, which would block this harness for ever - so it is
+                // constructed through a test hook and shown non-modally instead. Worth including: it is the
+                // one window whose content is built entirely in code, so a broken template here would not
+                // show up until the app had something to tell the user.
+                Check("MessageDialog", () => MessageDialog.CreateForSmokeTest(
+                    @"An existing Clipjump installation was found at:" + "\n\n"
+                    + @"D:\Lokesh\DoNotMove\Clipjump_x64" + "\n\n"
+                    + "Only history is imported. Clip stacks are left alone, and nothing in the Clipjump "
+                    + "folder is modified.\n\nYou can also do this later from Settings, History.",
+                    "Import Clipjump's history?",
+                    DialogKind.Question));
                 Check("TagEditorWindow", () => new TagEditorWindow(["alpha", "beta"]));
 
                 Check("ToastWindow", () =>

@@ -147,15 +147,26 @@ public sealed class PasteKeystrokeTests
     }
 
     [Fact]
-    public void The_conflict_message_names_the_manager_and_the_way_out()
+    public void The_conflict_message_names_the_manager_and_points_at_the_fix()
     {
         var message = RivalClipboardManagers.DescribeConflict(["Clipjump"]);
 
-        Assert.Contains("Clipjump is running", message, StringComparison.Ordinal);
-        Assert.Contains("Shift+Insert", message, StringComparison.Ordinal);
+        Assert.Contains("Clipjump is also running", message, StringComparison.Ordinal);
+        Assert.Contains("Settings, Paste mode", message, StringComparison.Ordinal);
+    }
 
-        // The asymmetry is the confusing part and the thing a user reports, so it must be said outright.
-        Assert.Contains("Copying still works", message, StringComparison.Ordinal);
+    [Fact]
+    public void The_conflict_message_is_conditional_rather_than_an_accusation()
+    {
+        // Detection is by process name, which cannot tell whether the other manager's paste hotkey is
+        // enabled - Clipjump has its own disable toggle and keeps running while switched off. An earlier
+        // version stated outright that pasting was broken and was reported as a false alarm, so the wording
+        // must stay hypothetical.
+        var message = RivalClipboardManagers.DescribeConflict(["Clipjump"]);
+
+        Assert.Contains("If pasting stops working", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("pasting does nothing", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Copying still works", message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -163,6 +174,6 @@ public sealed class PasteKeystrokeTests
     {
         var message = RivalClipboardManagers.DescribeConflict(["Clipjump", "Ditto"]);
 
-        Assert.Contains("Clipjump and Ditto are running", message, StringComparison.Ordinal);
+        Assert.Contains("Clipjump and Ditto are also running", message, StringComparison.Ordinal);
     }
 }

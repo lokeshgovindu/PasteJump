@@ -81,11 +81,12 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                $"PasteJump could not start.\n\n{ex.Message}",
-                "PasteJump",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            // Safe even this early: App.xaml merges the palette declaratively at slot 0, so the themed
+            // dialog has its brushes before Compose has run.
+            MessageDialog.Show(
+                ex.Message,
+                headline: "PasteJump could not start",
+                kind: DialogKind.Error);
 
             Shutdown();
         }
@@ -207,26 +208,35 @@ public partial class App : Application
         ApplyTrayIcon();
         _trayIcon.Show();
 
-        MaybeOfferLegacyImport();
-        MaybeOfferShiftInsert();
+        // Both deferred to idle rather than run inline. A modal dialog here would own the UI thread with its
+        // own Win32 message loop, which does not drain the Dispatcher - so every side effect PasteJumpPasteHost
+        // queues would sit unprocessed and the gesture would appear dead for as long as the prompt was up. On
+        // a first run against an existing Clipjump install that prompt is guaranteed, so this was the ordinary
+        // first-launch experience rather than an edge case.
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+            new Action(() =>
+            {
+                MaybeOfferLegacyImport();
+                HintAboutRivalManagers();
+            }));
     }
 
     /// <summary>
-    /// Offers Shift+Insert when another clipboard manager is running and we are still sending Ctrl+V.
+    /// Mentions a detected rival clipboard manager as a passing toast, and does nothing else.
     /// <para>
-    /// A prompt rather than a silent switch. Shift+Insert is not universally identical to Ctrl+V - a few
-    /// applications bind it to something else, and terminals historically used it for the X-style primary
-    /// selection - so changing the paste chord behind the user's back would trade one confusing failure
-    /// for another.
+    /// This used to be a modal dialog offering to switch the paste chord, and it was wrong to be one. Rivals
+    /// are detected by process name, which cannot tell whether the other manager's paste hotkey is actually
+    /// enabled - Clipjump has its own disable toggle and keeps running while switched off - so the dialog
+    /// interrogated the user about a conflict that frequently did not exist. Reported as exactly that.
     /// </para>
     /// <para>
-    /// Asked at every start-up while the conflict persists, not once and then remembered. The app is
-    /// genuinely unable to paste in this state, and a one-time notice dismissed months ago is no help to
-    /// someone who has just installed the other manager. Accepting the offer settles it permanently,
-    /// since the condition includes the chord still being Ctrl+V.
+    /// A toast is the right weight for a guess: it informs without blocking, it cannot be answered wrongly,
+    /// and it costs nothing when the guess is bad. The two actual remedies live in Settings, Paste mode,
+    /// which is where someone who has a problem will go looking.
     /// </para>
     /// </summary>
-    private void MaybeOfferShiftInsert()
+    private void HintAboutRivalManagers()
     {
         if (!_settings.WarnAboutClipboardManagerConflict
             || _settings.PasteKeystroke != PasteKeystroke.CtrlV)
@@ -241,20 +251,11 @@ public partial class App : Application
             return;
         }
 
-        var answer = MessageBox.Show(
+        // Longer than a copy notification: this is a sentence to read, not an acknowledgement to glance at.
+        Toast().Notify(
+            "Another clipboard manager",
             RivalClipboardManagers.DescribeConflict(rivals),
-            "PasteJump - another clipboard manager is running",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (answer != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        _settings.PasteKeystroke = PasteKeystroke.ShiftInsert;
-        _settingsStore.Save(_settings);
-        _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
+            TimeSpan.FromSeconds(8));
     }
 
     /// <summary>
@@ -316,13 +317,9 @@ public partial class App : Application
 
         if (problems.Count > 0)
         {
-            MessageBox.Show(
-                "PasteJump could not finish moving its data.\n\n" +
-                string.Join("\n\n", problems) +
-                "\n\nNothing was removed from the old location.",
-                "PasteJump",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            MessageDialog.Warn(
+                string.Join("\n\n", problems) + "\n\nNothing was removed from the old location.",
+                headline: "Could not finish moving the data");
         }
 
         void Report(DataMigrationReport report, string what, string from)
@@ -357,12 +354,10 @@ public partial class App : Application
             ? $"PasteJump cannot write to:\n\n{_paths.ClipsDirectory}\n\nClips will not be saved."
             : $"PasteJump cannot write to:\n\n{_paths.SettingsDirectory}\n\nSettings changes will not be kept.";
 
-        MessageBox.Show(
+        MessageDialog.Warn(
             message + "\n\nOpen Settings and store that data in your user profile instead, or move " +
             "PasteJump to a folder you can write to.",
-            "PasteJump",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+            headline: "Cannot write to the data folder");
     }
 
     /// <summary>
@@ -574,6 +569,7 @@ public partial class App : Application
                 _settings, _formatters, _paths.ClipsLocation, _paths.SettingsLocation));
             _settingsWindow.SettingsApplied += OnSettingsApplied;
             _settingsWindow.DataLocationChangeRequested += OnDataLocationChangeRequested;
+            _settingsWindow.LegacyImportRequested += OnLegacyImportRequested;
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Show();
         }
@@ -614,13 +610,10 @@ public partial class App : Application
             return;
         }
 
-        MessageBox.Show(
-            $"Windows would not give PasteJump the hotkey {spec}.\n\n" +
-            "Another program has already claimed it. Choose a different combination under Settings, " +
-            "Paste mode.",
-            "PasteJump",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        MessageDialog.Warn(
+            $"Windows would not give PasteJump the hotkey {spec}. Another program has already claimed it.\n\n" +
+            "Choose a different combination under Settings, Paste mode.",
+            headline: "Hotkey unavailable");
     }
 
     private void ShowShortcutHelp()
@@ -698,16 +691,18 @@ public partial class App : Application
             moves.Add($"Settings  →  {Path.Combine(AppPaths.RootFor(settings), "data")}");
         }
 
-        var answer = MessageBox.Show(
+        var accepted = MessageDialog.Show(
             "PasteJump will restart and copy to the new location:\n\n" +
             string.Join("\n", moves) +
             "\n\nThe existing copy is left where it is. Delete it yourself once you are happy the move " +
             "worked.",
-            "PasteJump - move data",
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Question);
+            headline: "Move PasteJump's data?",
+            title: "PasteJump - move data",
+            kind: DialogKind.Question,
+            buttons: DialogButtons.OkCancel,
+            owner: _settingsWindow) == DialogResultKind.Accepted;
 
-        if (answer != MessageBoxResult.OK)
+        if (!accepted)
         {
             return;
         }
@@ -726,12 +721,11 @@ public partial class App : Application
 
         if (!pointer.TryWrite(AppPaths.ApplicationDirectory))
         {
-            MessageBox.Show(
-                "PasteJump could not save the new data location. The folder holding PasteJump.exe is " +
-                "not writable, so the choice would not survive a restart.\n\nNothing was changed.",
-                "PasteJump",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            MessageDialog.Warn(
+                "The folder holding PasteJump.exe is not writable, so the choice would not survive a " +
+                "restart.\n\nNothing was changed.",
+                headline: "Could not save the new data location",
+                owner: _settingsWindow);
 
             return;
         }
@@ -760,12 +754,9 @@ public partial class App : Application
 
         if (string.IsNullOrEmpty(exePath))
         {
-            MessageBox.Show(
+            MessageDialog.Show(
                 "PasteJump could not work out its own path to restart. Close and reopen it to finish " +
-                "moving the data.",
-                "PasteJump",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                "moving the data.");
 
             return;
         }
@@ -899,7 +890,7 @@ public partial class App : Application
 
             if (bitmap is null)
             {
-                MessageBox.Show("This clip has nothing that can be edited.", "PasteJump");
+                MessageDialog.Show("This clip has nothing that can be edited.");
                 return;
             }
 
@@ -907,7 +898,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not open the editor.\n\n{ex.Message}", "PasteJump");
+            MessageDialog.Warn(ex.Message, headline: "Could not open the editor");
         }
 
         static byte[] Encode(string text) => System.Text.Encoding.UTF8.GetBytes(text);
@@ -953,7 +944,7 @@ public partial class App : Application
 
                 if (bitmap is null)
                 {
-                    MessageBox.Show("This image could not be exported.", "PasteJump");
+                    MessageDialog.Warn("This image could not be exported.");
                     return;
                 }
 
@@ -966,10 +957,18 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Export failed.\n\n{ex.Message}", "PasteJump");
+            MessageDialog.Warn(ex.Message, headline: "Export failed");
         }
     }
 
+    /// <summary>
+    /// Offers the Clipjump import once, on the first run that finds an installation.
+    /// <para>
+    /// Answered either way, it never asks again - the import is also reachable on demand from Settings,
+    /// History, so declining it here is not a decision the user is locked out of reversing. That is what makes
+    /// a single, skippable prompt acceptable rather than something that has to nag.
+    /// </para>
+    /// </summary>
     private void MaybeOfferLegacyImport()
     {
         if (_settings.LegacyImportCompleted)
@@ -979,40 +978,85 @@ public partial class App : Application
 
         var candidate = Import.LegacyClipjumpLocator.FindLikelyInstallation();
 
+        // Remembered either way, including when nothing was found, so this costs one locator sweep per
+        // installation rather than one per launch.
+        _settings.LegacyImportCompleted = true;
+        _settingsStore.Save(_settings);
+
         if (candidate is null)
         {
-            // Nothing found, so do not ask again on every launch.
-            _settings.LegacyImportCompleted = true;
-            _settingsStore.Save(_settings);
             return;
         }
 
-        var answer = MessageBox.Show(
+        var accepted = MessageDialog.Confirm(
             $"An existing Clipjump installation was found at:\n\n{candidate}\n\n" +
-            "Import its clipboard history into PasteJump?\n\n" +
             "Only history is imported. Clip stacks are left alone, and nothing in the " +
-            "Clipjump folder is modified.",
-            "PasteJump - import history",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
+            "Clipjump folder is modified.\n\n" +
+            "You can also do this later from Settings, History.",
+            headline: "Import Clipjump's history?",
+            title: "PasteJump - import history");
 
-        if (answer == MessageBoxResult.Yes)
+        if (accepted)
+        {
+            RunLegacyImport(candidate, owner: null);
+        }
+    }
+
+    /// <summary>
+    /// Imports on demand, from the button in Settings. Locates the installation itself, and says so plainly
+    /// when there is nothing to import rather than silently doing nothing.
+    /// </summary>
+    private void OnLegacyImportRequested()
+    {
+        var candidate = Import.LegacyClipjumpLocator.FindLikelyInstallation();
+
+        if (candidate is null)
+        {
+            MessageDialog.Show(
+                "No Clipjump installation was found. PasteJump looks in the usual places for a Clipjump " +
+                "folder containing a history database.",
+                headline: "Nothing to import",
+                owner: _settingsWindow);
+
+            return;
+        }
+
+        var accepted = MessageDialog.Confirm(
+            $"Import Clipjump's history from:\n\n{candidate}\n\n" +
+            "Only history is imported. Clip stacks are left alone, and nothing in the Clipjump folder is " +
+            "modified. Entries already imported are skipped, so running this twice is harmless.",
+            headline: "Import Clipjump's history?",
+            title: "PasteJump - import history",
+            owner: _settingsWindow);
+
+        if (accepted)
+        {
+            RunLegacyImport(candidate, _settingsWindow);
+        }
+    }
+
+    private void RunLegacyImport(string candidate, Window? owner)
+    {
+        try
         {
             var report = Import.LegacyClipjumpImporter.ImportHistory(candidate, _store);
 
-            MessageBox.Show(
-                $"Imported {report.Imported} entries.\n" +
-                $"Skipped {report.Skipped}.\n" +
-                (report.Errors.Count > 0 ? $"\nProblems:\n{string.Join('\n', report.Errors.Take(5))}" : string.Empty),
-                "PasteJump - import complete",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            MessageDialog.Show(
+                $"Imported {report.Imported} entries.\nSkipped {report.Skipped}." +
+                (report.Errors.Count > 0 ? $"\n\nProblems:\n{string.Join('\n', report.Errors.Take(5))}" : string.Empty),
+                headline: "Import complete",
+                title: "PasteJump - import history",
+                owner: owner);
 
             _historyWindow?.QueueRefresh();
         }
-
-        _settings.LegacyImportCompleted = true;
-        _settingsStore.Save(_settings);
+        catch (Exception ex)
+        {
+            // Reading someone else's database can fail in ways we do not control - a schema we do not
+            // recognise, a file held open by a running Clipjump. Reported rather than allowed to reach the
+            // dispatcher's unhandled handler and take the app down.
+            MessageDialog.Warn(ex.Message, headline: "Import failed", owner: owner);
+        }
     }
 
     private void ExitApplication() => Shutdown();

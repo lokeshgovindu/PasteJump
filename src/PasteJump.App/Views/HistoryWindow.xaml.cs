@@ -463,13 +463,14 @@ public partial class HistoryWindow : Window
 
     private void OnClearClicked(object sender, RoutedEventArgs e)
     {
-        var answer = MessageBox.Show(
-            $"Delete all {_store.HistoryCount} history entries?\n\nThis cannot be undone.",
-            "PasteJump",
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
+        var accepted = MessageDialog.Show(
+            "This cannot be undone.",
+            headline: $"Delete all {_store.HistoryCount} history entries?",
+            kind: DialogKind.Warning,
+            buttons: DialogButtons.OkCancel,
+            owner: this) == DialogResultKind.Accepted;
 
-        if (answer != MessageBoxResult.OK)
+        if (!accepted)
         {
             return;
         }

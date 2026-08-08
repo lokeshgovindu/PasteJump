@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 343 passing (`dotnet test`) |
+| Tests | 348 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -63,7 +63,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      343 tests.
+tests/PasteJump.Core.Tests      348 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -236,6 +236,20 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   at any fractional scale that lands on half a device pixel and WPF renders the entire window soft.
   `UseLayoutRounding` does not help — it rounds layout *within* a window, not the window's own origin. See
   `WindowInterop.SnapToDevicePixel`. Invisible at 100%, which is why it can sit unnoticed.
+- **`MessageBox` can never follow the theme, so the app's own prompts do not use it.** Win32 draws it, and
+  in dark mode it was the one light-on-light surface in the product. `MessageDialog` replaces it everywhere
+  PasteJump speaks for itself; the ComCtl32 manifest below still matters for the dialogs Windows genuinely
+  owns, such as `SaveFileDialog`.
+- **Nothing modal may run inside `Compose`.** A `MessageBox` or a `ShowDialog` there owns the UI thread with
+  its own Win32 message loop, which does *not* drain the Dispatcher — so every side effect
+  `PasteJumpPasteHost` queues sits unprocessed and the gesture looks dead for as long as the prompt is up.
+  The first-run Clipjump import hit this on every fresh install against an existing Clipjump, so it was the
+  ordinary first-launch experience. Start-up prompts are queued at `DispatcherPriority.ApplicationIdle`.
+- **Rival-manager detection is a guess, and the wording has to admit it.** `RivalClipboardManagers` matches
+  process names, which cannot tell whether the other manager's paste hotkey is *enabled* — Clipjump has its
+  own disable toggle and keeps running while switched off. An earlier version asserted "pasting does nothing"
+  in a modal dialog and was reported as a false alarm; it is now a non-blocking toast phrased conditionally.
+  Do not promote it back to a dialog without a way to detect actual interference.
 - **`app.manifest` must declare `Microsoft.Windows.Common-Controls` v6.** Without it the process has no
   ComCtl32 v6 activation context and *every dialog Windows draws for us* — `MessageBox` above all —
   renders in the pre-XP classic style: flat square grey buttons, classic caption, `MS Shell Dlg` instead
@@ -322,7 +336,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 343 tests
+dotnet test                                         # 348 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
