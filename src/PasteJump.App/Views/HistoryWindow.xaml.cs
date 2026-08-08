@@ -233,9 +233,19 @@ public partial class HistoryWindow : Window
             });
         }
 
+        var total = _store.HistoryCount;
+
         StatusText.Text = string.IsNullOrWhiteSpace(SearchBox.Text)
-            ? $"{_rows.Count} of {_store.HistoryCount} entries"
-            : $"{_rows.Count} matches of {_store.HistoryCount} entries";
+            ? $"{_rows.Count} of {total} entries"
+            : $"{_rows.Count} matches of {total} entries";
+
+        // Said outright when the query hit its cap, rather than leaving the two numbers to be compared. A
+        // window silently showing a fraction of the store is indistinguishable from an import that failed -
+        // which is exactly how an 11,000-entry import was first reported.
+        if (_rows.Count < total && string.IsNullOrWhiteSpace(SearchBox.Text))
+        {
+            StatusText.Text += $" — showing the newest {_rows.Count}; search to reach the rest";
+        }
 
         UpdateSearchCue();
 

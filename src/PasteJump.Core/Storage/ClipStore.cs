@@ -459,11 +459,21 @@ public sealed class ClipStore : IDisposable
         }
     }
 
+    /// <summary>Default cap on a history query. See <see cref="SearchHistory"/> for why it is this high.</summary>
+    public const int DefaultHistoryLimit = 50_000;
+
     /// <summary>
     /// Searches history. An empty term returns the most recent entries; otherwise this is an
     /// FTS5 prefix-AND match, which is what the original's "partial" checkbox meant.
+    /// <para>
+    /// The cap used to be 500, which was low enough to be a bug rather than a safeguard: importing a Clipjump
+    /// history of 11,000 entries produced a window that could only ever show the newest 500 of them, and the
+    /// status line reporting "500 of 11,108" was easy to read as a failed import. 50,000 is a backstop against
+    /// a pathological store rather than a display decision - the grid virtualises rows, so the cost of a large
+    /// result is the row objects alone.
+    /// </para>
     /// </summary>
-    public IReadOnlyList<HistoryEntry> SearchHistory(string? term, int limit = 500)
+    public IReadOnlyList<HistoryEntry> SearchHistory(string? term, int limit = DefaultHistoryLimit)
     {
         var fts = BuildFtsQuery(term);
 

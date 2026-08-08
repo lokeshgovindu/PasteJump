@@ -18,6 +18,17 @@ public sealed class ImportReport
     /// </summary>
     public bool Cancelled { get; set; }
 
+    /// <summary>
+    /// Timestamp of the oldest entry actually imported, or null when nothing was.
+    /// <para>
+    /// Reported because it is the only way the caller can notice a conflict the user would otherwise discover
+    /// as silent data loss: history retention prunes anything older than its cutoff, and it runs at start-up.
+    /// Importing three years of Clipjump history under a 180-day retention setting therefore deletes most of
+    /// what was just imported, at the next launch, without a word.
+    /// </para>
+    /// </summary>
+    public DateTimeOffset? OldestImported { get; set; }
+
     public List<string> Errors { get; } = [];
 }
 
@@ -198,6 +209,11 @@ public static class LegacyClipjumpImporter
                 }
 
                 report.Imported++;
+
+                if (report.OldestImported is null || captured < report.OldestImported)
+                {
+                    report.OldestImported = captured;
+                }
             }
             catch (Exception ex)
             {

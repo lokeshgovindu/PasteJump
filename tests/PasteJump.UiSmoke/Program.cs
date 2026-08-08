@@ -101,6 +101,10 @@ internal static class Program
                 // rendered - that is the state with the extra status line and the disabled Import button.
                 Check("ImportDialog", () => new ImportDialog(@"D:\Lokesh\DoNotMove\Clipjump_x64"));
 
+                // Enumerates the machine's real windowed processes, which is fine for a harness - it only
+                // reads. Constructed through a test hook because Choose is modal.
+                Check("RunningAppPicker", RunningAppPicker.CreateForSmokeTest);
+
                 // Constructed through a test hook rather than Run, which is modal and drives a worker to
                 // completion - neither of which a smoke harness can wait on.
                 Check("ImportProgressDialog", () => ImportProgressDialog.CreateForSmokeTest(1_240, 3_400));

@@ -1,0 +1,92 @@
+<Window x:Class="PasteJump.App.Views.RunningAppPicker"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PasteJump - choose programs"
+        Width="560"
+        Height="480"
+        MinWidth="420"
+        MinHeight="320"
+        ShowInTaskbar="False"
+        Background="{DynamicResource SurfaceBrush}"
+        Icon="{DynamicResource AppIcon}"
+        WindowStartupLocation="CenterOwner"
+        TextOptions.TextFormattingMode="Display">
+
+    <!--
+        Exists because nobody knows executable names off the top of their head. Asking someone to type
+        "1password.exe" to exclude 1Password is asking them to guess, and a wrong guess fails silently - the
+        entry simply never matches. Picking from what is running removes the guess.
+
+        Only programs with a visible window are listed. The full process table is mostly services and
+        background hosts, none of which can ever be the foreground window, so including them would bury the
+        dozen entries that matter.
+    -->
+
+    <Window.Resources>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="14,5" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="MinWidth" Value="88" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Margin="0,0,0,10"
+                   Foreground="{DynamicResource MutedTextBrush}"
+                   FontSize="11"
+                   Text="Programs with a window open. Select one or more — only the file name is added, so the exclusion applies whenever that program runs, not just to this instance." />
+
+        <DataGrid x:Name="AppsGrid"
+                  Grid.Row="1"
+                  SelectionMode="Extended"
+                  MouseDoubleClick="OnRowDoubleClick"
+                  EnableRowVirtualization="True"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Program"
+                                    Binding="{Binding FileName}"
+                                    Width="1.1*"
+                                    ElementStyle="{StaticResource CellText}" />
+                <DataGridTextColumn Header="Window"
+                                    Binding="{Binding WindowTitle}"
+                                    Width="1.9*"
+                                    ElementStyle="{StaticResource MutedValueText}" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="CountText"
+                       Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       FontSize="11" />
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="AddButton"
+                        Click="OnAddClicked"
+                        Content="_Add"
+                        IsDefault="True" />
+                <Button Content="_Cancel"
+                        Click="OnCancelClicked"
+                        IsCancel="True" />
+            </StackPanel>
+        </Grid>
+
+    </Grid>
+</Window>

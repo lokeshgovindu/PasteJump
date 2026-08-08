@@ -1075,6 +1075,55 @@ public partial class App : Application
             headline: "Import complete",
             title: "PasteJump - import history",
             owner: owner);
+
+        OfferToKeepImportedHistory(report, owner);
+    }
+
+    /// <summary>
+    /// Warns when history retention is about to delete part of what was just imported, and offers to switch
+    /// retention off.
+    /// <para>
+    /// Necessary because the two settings express contradictory intentions and the app cannot guess which
+    /// wins. Retention means "do not keep history older than N days"; importing three years of Clipjump
+    /// history means "keep this". Left alone, retention wins silently at the next start-up - the import
+    /// reports success, and thousands of entries are gone by the next launch with nothing said. This was
+    /// reported as an import that appeared not to have worked.
+    /// </para>
+    /// </summary>
+    private void OfferToKeepImportedHistory(Import.ImportReport report, Window? owner)
+    {
+        if (_settings.HistoryRetentionDays <= 0 || report.OldestImported is not { } oldest)
+        {
+            return;
+        }
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-_settings.HistoryRetentionDays);
+
+        if (oldest >= cutoff)
+        {
+            return;
+        }
+
+        var keep = MessageDialog.Confirm(
+            $"Some of what was just imported is older than the {_settings.HistoryRetentionDays} days of " +
+            $"history you have chosen to keep — the oldest entry is from {oldest.ToLocalTime():d}.\n\n" +
+            "Those entries will be deleted the next time PasteJump starts.\n\n" +
+            "Keep all history instead? This sets \"days of history to keep\" to 0, which keeps everything " +
+            "for ever. You can change it back on the History tab.",
+            headline: "Keep the older entries?",
+            title: "PasteJump - import history",
+            owner: owner);
+
+        if (!keep)
+        {
+            return;
+        }
+
+        _settings.HistoryRetentionDays = 0;
+        _settingsStore.Save(_settings);
+
+        // The open settings dialog is holding the previous value and would write it back on OK, undoing this.
+        _settingsWindow?.ReloadRetention(_settings.HistoryRetentionDays);
     }
 
     private void ExitApplication() => Shutdown();

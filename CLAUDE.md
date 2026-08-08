@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 355 passing (`dotnet test`) |
+| Tests | 380 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -63,7 +63,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      355 tests.
+tests/PasteJump.Core.Tests      380 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -204,6 +204,16 @@ that immediately caught two real bugs. Expect to do the same again.
   that settled it. Parsing `cache/clips/1007.avc` shows a single `CF_DIB` and no bitmap duplicate, so a
   decade of shipped use says nothing real depends on the copies. Note this filters at capture, deliberately
   departing from "store faithfully, filter on the way out" — the cost being avoided *is* the storage.
+- **History retention and the Clipjump import express contradictory intentions.** Retention means "do not
+  keep history older than N days" and runs at every start-up; importing a Clipjump history means "keep this",
+  and a real one spans years — 11,115 entries over three years in the case that surfaced this, of which a
+  180-day retention deletes 30%. Left alone retention wins *silently*, so the import reports success and
+  thousands of entries are gone by the next launch. `ImportReport.OldestImported` exists so the app can spot
+  the conflict and offer to switch retention off; do not remove it without replacing the warning.
+- **`SearchHistory`'s cap is a backstop, not a page size.** It was 500, which is low enough to be a bug: an
+  imported history of 11,000 entries produced a window showing only the newest 500, which reads as an import
+  that failed. It is now 50,000, and the history window says outright when it is showing a subset rather than
+  leaving two numbers to be compared.
 - **Clipjump's history size column is its JPEG thumbnail, not its clip.** For one screenshot,
   `thumbs/1007.jpg` was 85 KB while `clips/1007.avc` was 443 KB. Anyone comparing our reported size against
   Clipjump's is comparing a lossy preview against a clipboard payload; do not "fix" our number to match.
@@ -272,6 +282,10 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   then be re-stated as `MultiTrigger`s — otherwise a filled default button reverts to neutral grey the
   moment the pointer touches it.
 
+- **Every control needs a themed template *before* it is first used.** A `ListBox` was added to the new
+  Excluded apps tab and rendered as a glaring white panel in dark mode, because `Controls.xaml` had no
+  `ListBox` style and WPF fell back to its built-in chrome. Nothing warns you: it compiles, builds clean, and
+  looks fine in light mode. Check `Controls.xaml` has a style for a control type before putting one on a page.
 - **Palette references must be `DynamicResource`.** `ThemeManager` swaps the palette dictionary at
   `Application.Resources.MergedDictionaries[0]`; a `StaticResource` binds once and never follows.
 - **A window-level implicit style *replaces* the app-level one** rather than merging, so every one needs
@@ -349,7 +363,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 355 tests
+dotnet test                                         # 380 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

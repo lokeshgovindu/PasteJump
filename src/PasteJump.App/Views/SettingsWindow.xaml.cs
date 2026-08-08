@@ -1,6 +1,8 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using PasteJump.App.Services;
 using PasteJump.Core;
 using PasteJump.Core.Formatting;
@@ -70,6 +72,16 @@ public partial class SettingsWindow : Window
     private DataLocation _baselineClipsLocation;
     private DataLocation _baselineSettingsLocation;
 
+    /// <summary>
+    /// The excluded-application list as the user is editing it.
+    /// <para>
+    /// An <see cref="ObservableCollection{T}"/> bound to the ListBox, so adding and removing shows up without
+    /// rebuilding <c>ItemsSource</c> - which would lose the selection every time and make Remove feel broken
+    /// on a multiple selection.
+    /// </para>
+    /// </summary>
+    private readonly ObservableCollection<string> _excluded = [];
+
     public SettingsWindow(
         PasteJumpSettings settings,
         FormatterRegistry formatters,
@@ -119,7 +131,14 @@ public partial class SettingsWindow : Window
         LimitMaxClipsCheck.IsChecked = _baseline.LimitMaxClips;
         MaxClipsBox.Text = _baseline.MaxClips.ToString(CultureInfo.CurrentCulture);
         RefreshMaxClipsEnabled();
-        IgnoredProcessesBox.Text = string.Join(Environment.NewLine, _baseline.IgnoredProcesses);
+
+        foreach (var name in ExcludedApps.NormaliseAll(_baseline.IgnoredProcesses))
+        {
+            _excluded.Add(name);
+        }
+
+        ExcludedList.ItemsSource = _excluded;
+        RefreshExcludedStatus();
 
         RecordHistoryCheck.IsChecked = _baseline.RecordHistory;
         RetentionDaysBox.Text = _baseline.HistoryRetentionDays.ToString(CultureInfo.CurrentCulture);
@@ -310,6 +329,140 @@ public partial class SettingsWindow : Window
 
     private void OnImportClicked(object sender, RoutedEventArgs e) => LegacyImportRequested?.Invoke();
 
+    /// <summary>
+    /// Puts a retention value changed behind the dialog's back into the box, and into the baseline.
+    /// <para>
+    /// Needed because the import can offer to switch retention off while this dialog is open. Without this the
+    /// box still holds the old number and writes it straight back on OK, quietly undoing the choice the user
+    /// just made in the import prompt.
+    /// </para>
+    /// </summary>
+    public void ReloadRetention(int days)
+    {
+        RetentionDaysBox.Text = days.ToString(CultureInfo.CurrentCulture);
+        _baseline.HistoryRetentionDays = days;
+        RefreshAdvanced();
+    }
+
+    // ------------------------------------------------------------------ excluded apps
+
+    private void OnExcludedSelectionChanged(object sender, SelectionChangedEventArgs e)
+        => RemoveExcludedButton.IsEnabled = ExcludedList.SelectedItems.Count > 0;
+
+    private void OnAddExcludedClicked(object sender, RoutedEventArgs e) => AddTypedExclusion();
+
+    /// <summary>Enter in the entry box adds, which is what anyone typing a name will try first.</summary>
+    private void OnExcludedEntryKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        AddTypedExclusion();
+
+        // Handled, or Enter also fires the dialog's default button and closes the window on the user
+        // mid-edit - which is a genuinely infuriating way to lose a list you were part-way through building.
+        e.Handled = true;
+    }
+
+    private void AddTypedExclusion()
+    {
+        var normalised = ExcludedApps.Normalise(ExcludedEntryBox.Text);
+
+        if (normalised is null)
+        {
+            RefreshExcludedStatus("Type a program's file name, for example keepass.exe.");
+            return;
+        }
+
+        if (!TryAddExclusion(normalised))
+        {
+            RefreshExcludedStatus($"{normalised} is already excluded.");
+            return;
+        }
+
+        ExcludedEntryBox.Clear();
+        ExcludedEntryBox.Focus();
+        RefreshExcludedStatus($"Added {normalised}.");
+    }
+
+    private void OnAddFromRunningClicked(object sender, RoutedEventArgs e)
+    {
+        var chosen = RunningAppPicker.Choose(this, _excluded);
+
+        if (chosen.Count == 0)
+        {
+            return;
+        }
+
+        var added = chosen.Count(TryAddExclusion);
+
+        RefreshExcludedStatus(added == 1 ? $"Added {chosen[0]}." : $"Added {added} programs.");
+    }
+
+    private void OnBrowseExcludedClicked(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose a program to exclude",
+            Filter = "Programs|*.exe|All files|*.*",
+            CheckFileExists = true,
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        // Only the file name is kept. Capture resolves the foreground window to a process and gets a file
+        // name, never a path, so storing the full path would produce an entry that can never match.
+        var normalised = ExcludedApps.Normalise(dialog.FileName);
+
+        if (normalised is null)
+        {
+            return;
+        }
+
+        RefreshExcludedStatus(TryAddExclusion(normalised)
+            ? $"Added {normalised}."
+            : $"{normalised} is already excluded.");
+    }
+
+    private void OnRemoveExcludedClicked(object sender, RoutedEventArgs e)
+    {
+        // Copied before removing: SelectedItems mutates as items leave the collection, so iterating it
+        // directly removes every other entry.
+        var doomed = ExcludedList.SelectedItems.OfType<string>().ToList();
+
+        foreach (var name in doomed)
+        {
+            _excluded.Remove(name);
+        }
+
+        RefreshExcludedStatus(doomed.Count == 1 ? $"Removed {doomed[0]}." : $"Removed {doomed.Count} programs.");
+        RefreshAdvanced();
+    }
+
+    private bool TryAddExclusion(string normalised)
+    {
+        if (ExcludedApps.Contains(_excluded, normalised))
+        {
+            return false;
+        }
+
+        _excluded.Add(normalised);
+        RefreshAdvanced();
+        return true;
+    }
+
+    private void RefreshExcludedStatus(string? message = null)
+    {
+        ExcludedStatusText.Text = message ?? (_excluded.Count == 0
+            ? "Nothing is excluded. Everything you copy is recorded."
+            : $"{_excluded.Count} program{(_excluded.Count == 1 ? string.Empty : "s")} excluded.");
+    }
+
     private void OnLimitMaxClipsChanged(object sender, RoutedEventArgs e) => RefreshMaxClipsEnabled();
 
     /// <summary>
@@ -425,9 +578,9 @@ public partial class SettingsWindow : Window
         settings.LimitMaxClips = LimitMaxClipsCheck.IsChecked == true;
         settings.MaxClips = maxClips;
 
-        settings.IgnoredProcesses = IgnoredProcessesBox.Text
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
+        // Already normalised on the way into the list, but run again on the way out so a value hand-edited
+        // into PasteJump.json and then loaded here cannot be written back in a shape capture never matches.
+        settings.IgnoredProcesses = ExcludedApps.NormaliseAll(_excluded);
 
         settings.RecordHistory = RecordHistoryCheck.IsChecked == true;
         settings.HistoryRetentionDays = retention;

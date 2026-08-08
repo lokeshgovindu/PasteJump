@@ -420,6 +420,47 @@ public sealed class LegacyImportTests : IDisposable
         Assert.Empty(report.Errors);
     }
 
+    // ---------------------------------------------------------------- retention conflict
+
+    [Fact]
+    public void The_report_names_the_oldest_entry_it_imported()
+    {
+        // The only signal the caller has that retention is about to delete part of what was just imported.
+        // Retention prunes anything older than its cutoff and runs at start-up, so importing three years of
+        // Clipjump history under a 180-day setting silently loses most of it by the next launch. That was
+        // reported as an import that appeared not to have worked.
+        CreateLegacyDatabase(connection =>
+        {
+            InsertLegacyRow(connection, "recent", 0, null, "2026-08-01 09:00:00", 10);
+            InsertLegacyRow(connection, "ancient", 0, null, "2023-08-20 09:46:44", 10);
+            InsertLegacyRow(connection, "middle", 0, null, "2025-01-15 12:00:00", 10);
+        });
+
+        var report = RunImport(_legacyFolder);
+
+        Assert.Equal(3, report.Imported);
+
+        // Local time in, UTC out - the legacy timestamps carry no zone and came from AutoHotkey's A_Now, which
+        // is local, so the date is what matters here rather than the exact instant.
+        Assert.Equal(
+            new DateTime(2023, 8, 20).Date,
+            report.OldestImported!.Value.ToLocalTime().Date);
+    }
+
+    [Fact]
+    public void Nothing_imported_means_no_oldest_entry()
+    {
+        // Null rather than DateTimeOffset.MinValue, so the caller cannot mistake "nothing imported" for
+        // "imported something impossibly old" and prompt about a retention conflict that does not exist.
+        CreateLegacyDatabase(connection =>
+            InsertLegacyRow(connection, string.Empty, 0, null, "2026-08-01 09:00:00", 0));
+
+        var report = RunImport(_legacyFolder);
+
+        Assert.Equal(0, report.Imported);
+        Assert.Null(report.OldestImported);
+    }
+
     // ---------------------------------------------------------------- locating an installation
 
     [Fact]
