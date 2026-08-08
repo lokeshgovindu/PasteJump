@@ -59,6 +59,79 @@ public sealed class CaptureServiceTests : IDisposable
     }
 
     /// <summary>
+    /// A clipboard holding only OLE's <c>DataObject</c> marker is not a clip. Reported as
+    /// <c>[binary]</c>, 8 bytes, from the Snipping Tool and every other OLE source, because
+    /// <c>OleSetClipboard</c> announces the data object before <c>OleFlushClipboard</c> renders anything.
+    /// </summary>
+    [Fact]
+    public void DoesNotStoreAClipboardHoldingOnlyOleBookkeeping()
+    {
+        _clipboard.EnqueueRead(BookkeepingSnapshot());
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        Assert.Equal(0, _store.Count);
+        Assert.Equal(0, _store.HistoryCount);
+        Assert.Equal(1, capture.BookkeepingOnlySkipCount);
+    }
+
+    /// <summary>
+    /// And the copy is not lost: the read is retried, which is what picks up the real formats once the
+    /// source has flushed them.
+    /// </summary>
+    [Fact]
+    public void RetriesAfterABookkeepingOnlyRead()
+    {
+        _clipboard.EnqueueRead(BookkeepingSnapshot());
+        _clipboard.EnqueueRead(FakeClipboardAccess.TextSnapshot("the real payload", "devenv.exe"));
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        // The scheduler is manual, so the deferred re-read only happens when the test lets it.
+        _scheduler.RunPending();
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal("the real payload", _store.GetOrdered()[0].Preview);
+    }
+
+    /// <summary>
+    /// A descriptor alongside real content must not suppress the capture - only a clipboard that is
+    /// <em>nothing but</em> bookkeeping is skipped.
+    /// </summary>
+    [Fact]
+    public void StoresAClipThatCarriesBookkeepingAlongsideContent()
+    {
+        var payloads = new[]
+        {
+            new ClipPayload(49161, "DataObject", new byte[8]),
+            new ClipPayload(13, null, System.Text.Encoding.Unicode.GetBytes("real text")),
+        };
+
+        _clipboard.EnqueueRead(new ClipboardSnapshot(payloads, "real text", ClipKind.Text, "devenv.exe"));
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(0, capture.BookkeepingOnlySkipCount);
+    }
+
+    /// <summary>The eight-byte marker set observed in a real store, for the tests above.</summary>
+    private static ClipboardSnapshot BookkeepingSnapshot() => new(
+        [
+            new ClipPayload(49161, "DataObject", new byte[8]),
+            new ClipPayload(49171, "Ole Private Data", new byte[216]),
+        ],
+        null,
+        ClipKind.Other,
+        "devenv.exe");
+
+    /// <summary>
     /// Text longer than the preview column can hold is archived in full as a blob.
     /// <para>
     /// Without this the history archive kept only the first <see cref="ClipStore.PreviewMaxChars"/> characters,

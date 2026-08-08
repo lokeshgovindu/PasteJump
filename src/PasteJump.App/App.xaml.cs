@@ -122,6 +122,12 @@ public partial class App : Application
         // Retention runs at startup rather than on a timer: this is a logon-resident app, so
         // startup happens at least daily, and a timer would be a wakeup for no user benefit.
         _store.PruneHistoryOlderThan(_settings.HistoryRetentionDays);
+
+        // Before eviction, so junk clips do not occupy slots that push real ones out. A no-op on a store
+        // captured after BookkeepingFormats started filtering them; on an older one it clears the 8-byte OLE
+        // markers that were being promoted to the front of the stack on every screenshot.
+        _store.PurgeContentlessClips();
+
         _store.EvictBeyond(_settings.EffectiveMaxClips);
 
         // After eviction, so blobs that are about to be discarded are not compressed first. Bounded

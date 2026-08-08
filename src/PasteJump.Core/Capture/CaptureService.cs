@@ -75,6 +75,13 @@ public sealed class CaptureService
     /// <summary>Read attempts that could not open the clipboard, including retries.</summary>
     public int ReadFailureCount { get; private set; }
 
+    /// <summary>
+    /// Reads that found only OLE bookkeeping and were retried instead of stored. Routinely non-zero on a
+    /// machine that copies from OLE applications; it is the normal cost of catching a copy mid-publish, not
+    /// a fault. See <see cref="BookkeepingFormats"/>.
+    /// </summary>
+    public int BookkeepingOnlySkipCount { get; private set; }
+
     /// <summary>Captures abandoned after every retry was exhausted. Should stay at zero.</summary>
     public int DroppedCaptureCount { get; private set; }
 
@@ -142,9 +149,22 @@ public sealed class CaptureService
 
         var snapshot = _clipboard.TryRead();
 
-        if (snapshot is null || snapshot.IsEmpty)
+        // An OLE source announces its data object before rendering any of it, so a read that lands between
+        // the two sees only bookkeeping. Treated exactly like a failed read - retried on a delay rather than
+        // stored - because that is what it is: the copy is real, the content is simply not there yet.
+        var contentless = snapshot is { IsEmpty: false }
+            && BookkeepingFormats.CarriesNoUserContent(snapshot.Payloads);
+
+        if (snapshot is null || snapshot.IsEmpty || contentless)
         {
-            ReadFailureCount++;
+            if (contentless)
+            {
+                BookkeepingOnlySkipCount++;
+            }
+            else
+            {
+                ReadFailureCount++;
+            }
 
             // The clipboard is a machine-wide lock, so a read can genuinely lose the race against
             // whichever process is still holding it. Inline backoff alone was measured dropping

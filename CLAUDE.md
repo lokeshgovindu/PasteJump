@@ -201,6 +201,17 @@ that immediately caught two real bugs. Expect to do the same again.
 - **The overlay must never take focus.** `WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW`
   applied in code, not just the XAML flags. Focus theft sends the user's paste into our overlay.
   Search input therefore arrives through the hook, not a focused text box.
+- **A clipboard holding only OLE bookkeeping is not a clip.** `OleSetClipboard` announces the data object
+  before `OleFlushClipboard` renders anything, so a read landing between the two sees `DataObject` — eight
+  bytes of OLE state and none of what was copied. Stored, that became a `[binary]` 8-byte clip from the
+  Snipping Tool and every other OLE source. The damaging part was not the junk entry: every such copy
+  publishes the *same* eight bytes, so they all hash alike and each one **promoted** one ancient blob to the
+  front of the stack — making the newest clip after a screenshot an 8-byte binary, while the real image sat
+  correctly captured one place below. That is why it was reported as "the screenshot was saved as binary".
+  `BookkeepingFormats.CarriesNoUserContent` gates it and the read is retried, exactly like a failed read.
+  Match those formats by **name**, never by id — `RegisterClipboardFormat` ids last only the session. Keep
+  the list short: a false entry silently discards a real copy, which is why `Embed Source` and `Link Source`
+  are deliberately absent. `ClipStore.PurgeContentlessClips` clears ones captured before the gate existed.
 - **One logical copy can raise two clipboard notifications with *different* sequence numbers.**
   Anything using OLE does `OleSetClipboard` + `OleFlushClipboard`. `ClipStore.Add` reports
   insert-vs-promote so history does not double-log; the sequence number alone cannot collapse these.
@@ -406,7 +417,14 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   WPF's icon decoder picks the frame itself, and with no requested decode size it can pick a small one and
   scale it *up*. That is what made the About window's logo look soft — a 32px frame enlarged to 48. Use
   `AppIconLarge`, a single-frame `Assets/pastejump-256.png` from the same generator (`-PngPath`), rendered
-  down. `AppIcon` remains right for `Window.Icon`, where Windows asks for a small frame and gets one.
+  down. **`AppIcon` therefore carries `DecodePixelWidth="256"`, and that is load-bearing.** An earlier note
+  here claimed `AppIcon` was fine for `Window.Icon` because "Windows asks for a small frame and gets one" —
+  wrong, and it shipped as a visible bug. A `BitmapImage` decodes exactly *one* frame, and with no requested
+  size WPF picks the **smallest**: measured, 16 out of the nine frames present. `Window.Icon` then answers
+  every request with that 16px bitmap, so the taskbar button, Alt+Tab and Task Manager rendered an icon
+  visibly *smaller* than their neighbours rather than merely soft. Explorer and a pinned taskbar entry were
+  unaffected throughout, because they read the PE header via `ApplicationIcon` — which is exactly why this
+  survived review. Verify a change here by decoding the file and printing `PixelWidth`, not by eye.
   The PNG is also the file to reach for outside the app — a README, a release page.
 - The pair of monochrome tray glyphs is **gone**, and with it the Visual Studio Image Library licence
   question that used to sit here. The tray shows the coloured application icon, which reads against a

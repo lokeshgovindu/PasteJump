@@ -318,6 +318,59 @@ public sealed class ClipStore : IDisposable
     }
 
     /// <summary>
+    /// Deletes clips whose every format is OLE bookkeeping, and returns how many went.
+    /// <para>
+    /// The corollary of <see cref="Model.BookkeepingFormats"/>: that stops new ones being stored, but a store
+    /// built before it holds however many were already captured - 134 in the store that surfaced this - and
+    /// they are not inert. Because they all carry the identical eight bytes they hash alike, so every OLE copy
+    /// promoted one of them to the front of the stack, meaning the newest clip after taking a screenshot was
+    /// an ancient 8-byte blob. Deleting them is what actually clears the reported symptom.
+    /// </para>
+    /// <para>
+    /// Pinned clips are left alone regardless. Nothing about pinning implies the content is useful, and
+    /// silently deleting something the user deliberately kept is worse than leaving one odd entry.
+    /// </para>
+    /// </summary>
+    public int PurgeContentlessClips()
+    {
+        lock (_gate)
+        {
+            using var cmd = _connection.CreateCommand();
+
+            // Names come from BookkeepingFormats so the rule is defined once, and are parameterised rather
+            // than interpolated - they are internal constants today, but building SQL by concatenation is a
+            // habit that eventually meets a value that is not.
+            var names = Model.BookkeepingFormats.RegisteredNames;
+            var placeholders = string.Join(", ", names.Select((_, i) => $"$n{i}"));
+
+            for (var i = 0; i < names.Count; i++)
+            {
+                cmd.Parameters.AddWithValue($"$n{i}", names[i].ToLowerInvariant());
+            }
+
+            cmd.Parameters.AddWithValue("$locale", Model.BookkeepingFormats.CfLocale);
+
+            // "No format that is not bookkeeping" rather than "every format is bookkeeping", because the
+            // latter is not expressible over rows without a grouping. A clip with no formats at all cannot
+            // occur - Add always writes at least one - so the double negative has no empty-set trap here.
+            cmd.CommandText = $"""
+                DELETE FROM clip
+                WHERE pinned = 0
+                  AND NOT EXISTS (
+                      SELECT 1 FROM clip_format f
+                      WHERE f.clip_id = clip.id
+                        AND NOT (
+                            (f.format_name IS NOT NULL AND LOWER(f.format_name) IN ({placeholders}))
+                            OR (f.format_name IS NULL AND f.format_id = $locale)
+                        )
+                  );
+                """;
+
+            return cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
     /// Trims the stack to <paramref name="maxClips"/>, oldest unpinned first. Returns how many went.
     /// </summary>
     public int EvictBeyond(int maxClips)
