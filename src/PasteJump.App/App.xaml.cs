@@ -119,6 +119,9 @@ public partial class App : Application
 
         _store = new ClipStore(_paths);
 
+        // Before the first capture, and before retention runs - it is what new previews are truncated to.
+        _store.PreviewMaxChars = _settings.PreviewMaxChars;
+
         // Retention runs at startup rather than on a timer: this is a logon-resident app, so
         // startup happens at least daily, and a timer would be a wakeup for no user benefit.
         _store.PruneHistoryOlderThan(_settings.HistoryRetentionDays);
@@ -158,6 +161,8 @@ public partial class App : Application
         _pasteHost.DeleteAllConfirmationRequested += OnDeleteAllConfirmationRequested;
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
+        _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
+        _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
 
         _controller = new PasteModeController(
             new ClipStoreCatalog(_store),
@@ -417,7 +422,7 @@ public partial class App : Application
         // case where the toast is off or on a monitor you are not looking at.
         if (_settings.BeepOnCopy)
         {
-            CopyBeep.Play(_settings.BeepFrequencyHz);
+            CopyBeep.Play(_settings.BeepFrequencyHz, _settings.BeepDurationMs);
         }
 
         // A new copy makes the next Ctrl+V open on the newest clip. Without this the remembered
@@ -631,7 +636,13 @@ public partial class App : Application
         if (_historyWindow is null)
         {
             _historyWindow = Themed(new HistoryWindow(
-                _store, _clipboard, _selfWrites, _formatters, _settings.GridDensity));
+                _store,
+                _clipboard,
+                _selfWrites,
+                _formatters,
+                _settings.GridDensity,
+                _settings.HistoryLoadLimit,
+                _settings.HistoryPreviewMaxWidth));
             _historyWindow.DensityChanged += OnHistoryDensityChanged;
             _historyWindow.Closed += (_, _) => _historyWindow = null;
             _historyWindow.Show();
@@ -741,6 +752,8 @@ public partial class App : Application
         _theme.Apply(_settings.Theme);
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
+        _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
+        _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
 
         _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
         ApplyHistoryHotkey(announceFailure: true);
@@ -750,6 +763,11 @@ public partial class App : Application
 
         // An open history window follows the new density rather than needing to be reopened.
         _historyWindow?.ApplyDensity(_settings.GridDensity);
+        _historyWindow?.ApplyLimits(_settings.HistoryLoadLimit, _settings.HistoryPreviewMaxWidth);
+
+        // Set on the store rather than passed per call, because it decides what gets written and every write
+        // path would otherwise have to remember to thread it through.
+        _store.PreviewMaxChars = _settings.PreviewMaxChars;
 
         StartupShortcut.Apply(_settings.RunAtLogon);
 

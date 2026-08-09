@@ -6,7 +6,7 @@ namespace PasteJump.Interop;
 public static class CopyBeep
 {
     /// <summary>Matches the original's <c>BeepAt</c> default duration.</summary>
-    private const int DurationMs = 150;
+    public const int DefaultDurationMs = 150;
 
     /// <summary>
     /// Sounds a tone without blocking the caller.
@@ -18,17 +18,21 @@ public static class CopyBeep
     /// <c>LowLevelHooksTimeout</c> that makes Windows silently discard the hook.
     /// </para>
     /// </summary>
-    public static void Play(int frequencyHz)
+    public static void Play(int frequencyHz, int durationMs = DefaultDurationMs)
     {
         // Clamped to the range the Win32 Beep API accepts. Outside it the call simply fails, which would
         // turn a mistyped setting into a silently dead feature.
         var frequency = Math.Clamp(frequencyHz, 37, 32_767);
 
+        // Same reasoning, plus a floor: Beep accepts zero and simply makes no sound, which is indistinguishable
+        // from the feature being broken.
+        var duration = Math.Clamp(durationMs, 20, 2_000);
+
         _ = Task.Run(() =>
         {
             try
             {
-                Console.Beep(frequency, DurationMs);
+                Console.Beep(frequency, duration);
             }
             catch (Exception)
             {

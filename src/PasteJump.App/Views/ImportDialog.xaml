@@ -28,7 +28,7 @@
 
     <StackPanel Margin="20,18,20,16">
 
-        <TextBlock Text="Import Clipjump's history?"
+        <TextBlock Text="Import from Clipjump?"
                    Foreground="{DynamicResource TextBrush}"
                    FontSize="14"
                    FontWeight="SemiBold" />
@@ -37,7 +37,7 @@
                    Foreground="{DynamicResource TextBrush}"
                    FontSize="12.5"
                    LineHeight="18"
-                   Text="Only history is imported. Clip stacks are left alone, and nothing in the Clipjump folder is modified. Entries already imported are skipped, so running this twice is harmless." />
+                   Text="Both the history archive and the clip stack are imported, so imported clips can be pasted with the gesture and not merely searched. Nothing in the Clipjump folder is modified. Entries already imported are skipped, so running this twice is harmless." />
 
         <TextBlock Margin="0,16,0,4"
                    Foreground="{DynamicResource MutedTextBrush}"

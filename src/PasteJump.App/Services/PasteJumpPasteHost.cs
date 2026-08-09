@@ -25,6 +25,40 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     private readonly Func<OverlayWindow> _overlayFactory;
 
     private OverlayWindow? _overlay;
+
+    private int _previewMaxWidth = 520;
+    private int _previewMaxHeight = 220;
+
+    private int? _overlayX;
+    private int? _overlayY;
+
+    /// <summary>
+    /// Pins the overlay to a fixed screen position, or restores "follow the caret" when either is null.
+    /// <para>
+    /// Physical pixels, matching what <see cref="ForegroundWindowInfo.GetPreferredOverlayAnchor"/> returns -
+    /// the overlay converts to device-independent units using the DPI of the monitor the anchor lands on, so a
+    /// value taken from one display still lands correctly on a mixed-DPI desktop.
+    /// </para>
+    /// </summary>
+    public void SetOverlayAnchor(int? x, int? y)
+    {
+        _overlayX = x;
+        _overlayY = y;
+    }
+
+    /// <summary>
+    /// Sets the overlay's image-preview ceiling, applying it now if the overlay already exists and remembering
+    /// it for when it is next created. Also the width thumbnails are decoded at, so a larger preview is a
+    /// larger decode rather than a 520px one stretched.
+    /// </summary>
+    public void SetPreviewSize(int maxWidth, int maxHeight)
+    {
+        _previewMaxWidth = maxWidth;
+        _previewMaxHeight = maxHeight;
+
+        FileThumbnailCache.SetMaxWidth(maxWidth);
+        _overlay?.ApplyPreviewSize(maxWidth, maxHeight);
+    }
     private IReadOnlyList<ClipPayload>? _savedClipboard;
 
     public PasteJumpPasteHost(
@@ -123,9 +157,21 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
     public void ShowOverlay(PasteOverlayModel model)
     {
-        _overlay ??= _overlayFactory();
+        if (_overlay is null)
+        {
+            _overlay = _overlayFactory();
 
-        var (anchorX, anchorY) = ForegroundWindowInfo.GetPreferredOverlayAnchor();
+            // Applied on creation as well as on change, because the overlay is created lazily on the first
+            // gesture - which is usually long after the settings were loaded.
+            _overlay.ApplyPreviewSize(_previewMaxWidth, _previewMaxHeight);
+        }
+
+        // A configured position wins over the caret. Both halves have to be set for it to mean anything, which
+        // is why one alone is not honoured rather than being paired with a caret coordinate - a half-fixed
+        // overlay that moves in one axis only reads as a bug rather than as a setting.
+        var (anchorX, anchorY) = _overlayX is { } fixedX && _overlayY is { } fixedY
+            ? (fixedX, fixedY)
+            : ForegroundWindowInfo.GetPreferredOverlayAnchor();
 
         _overlay.SetImagePayload(model.Kind == ClipKind.Image ? TryLoadImageBytes(model) : null);
 

@@ -39,7 +39,10 @@
 
     <!-- No CornerRadius and no DropShadowEffect: DWM provides both for the window itself now. A rounded
          Border inside a square opaque window would only show the window's own background in the corners. -->
-    <Border Background="{DynamicResource SurfaceBrush}"
+    <!-- MaxWidth is set from the preview size in ApplyPreviewSize: a wider preview than the window allows would
+         simply be clipped, so the two cannot be configured independently. -->
+    <Border x:Name="RootBorder"
+            Background="{DynamicResource SurfaceBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
             Padding="0"

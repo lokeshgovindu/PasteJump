@@ -6,17 +6,23 @@ using System.Text.Json.Serialization;
 namespace PasteJump.Core.Settings;
 
 /// <summary>One setting, as shown on the Advanced page.</summary>
-/// <param name="Name">Property name, matching the key in <c>settings.json</c>.</param>
+/// <param name="Name">Display name. For a setting this is the property name, matching the key in the JSON file.</param>
 /// <param name="TypeName">Friendly type name, e.g. <c>Boolean</c> or <c>Integer</c>.</param>
 /// <param name="Value">Current value, formatted for display.</param>
 /// <param name="Default">The value a fresh install would have.</param>
 /// <param name="IsModified">Whether <paramref name="Value"/> differs from <paramref name="Default"/>.</param>
+/// <param name="Key">
+/// What this row identifies, for acting on it. The property name for a setting; for the two data locations,
+/// which are not settings, the name without the file suffix that <paramref name="Name"/> carries. Separate from
+/// <paramref name="Name"/> so a change to how rows are labelled cannot break Reset to Default.
+/// </param>
 public sealed record SettingRow(
     string Name,
     string TypeName,
     string Value,
     string Default,
-    bool IsModified);
+    bool IsModified,
+    string Key);
 
 /// <summary>
 /// Enumerates every setting with its current and default value.
@@ -75,7 +81,8 @@ public static class SettingsInspector
                 FriendlyTypeName(property.PropertyType),
                 current,
                 original,
-                !string.Equals(current, original, StringComparison.Ordinal)));
+                !string.Equals(current, original, StringComparison.Ordinal),
+                property.Name));
         }
 
         return [.. rows.OrderBy(static r => r.Name, StringComparer.Ordinal)];
@@ -91,7 +98,8 @@ public static class SettingsInspector
         string.Join(" | ", Enum.GetNames<DataLocation>()),
         value.ToString(),
         DataLocation.ApplicationFolder.ToString(),
-        value != DataLocation.ApplicationFolder);
+        value != DataLocation.ApplicationFolder,
+        name);
 
     private static string FriendlyTypeName(Type type)
     {

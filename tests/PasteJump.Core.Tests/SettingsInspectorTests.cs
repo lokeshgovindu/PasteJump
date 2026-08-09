@@ -21,6 +21,57 @@ public sealed class SettingsInspectorTests
         Assert.Contains(rows, r => r.Name == nameof(PasteJumpSettings.IgnoredProcesses));
     }
 
+    /// <summary>
+    /// Every row's key names a writable property on <see cref="PasteJumpSettings"/>, apart from the two data
+    /// locations that live in their own file.
+    /// <para>
+    /// This is what makes the Advanced page's Reset to Default safe. It resets a setting by looking its property
+    /// up by this key and writing the default into it, so a key that did not resolve would be a Reset button
+    /// that silently did nothing - and being reflection, nothing would fail to compile.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Every_row_key_resolves_to_a_writable_property()
+    {
+        var rows = SettingsInspector.Describe(new PasteJumpSettings());
+
+        foreach (var row in rows)
+        {
+            if (row.Key is "ClipsLocation" or "SettingsLocation")
+            {
+                // Not settings: they are in data-location.json, because one of them decides where the settings
+                // file itself is. The dialog resets these by moving their combo instead.
+                continue;
+            }
+
+            var property = typeof(PasteJumpSettings).GetProperty(row.Key);
+
+            Assert.NotNull(property);
+            Assert.NotNull(property!.SetMethod);
+        }
+    }
+
+    /// <summary>
+    /// And resetting one property through that key genuinely returns the row to its default, which is the
+    /// end-to-end shape of what the Reset button does.
+    /// </summary>
+    [Fact]
+    public void Writing_the_default_through_a_row_key_clears_the_modified_flag()
+    {
+        var settings = new PasteJumpSettings { OverlayPreviewMaxWidth = 900 };
+        var row = SettingsInspector.Describe(settings)
+            .Single(r => r.Name == nameof(PasteJumpSettings.OverlayPreviewMaxWidth));
+
+        Assert.True(row.IsModified);
+
+        var property = typeof(PasteJumpSettings).GetProperty(row.Key)!;
+        property.SetValue(settings, property.GetValue(new PasteJumpSettings()));
+
+        Assert.False(SettingsInspector.Describe(settings)
+            .Single(r => r.Name == nameof(PasteJumpSettings.OverlayPreviewMaxWidth))
+            .IsModified);
+    }
+
     [Fact]
     public void Computed_views_over_other_settings_are_excluded()
     {

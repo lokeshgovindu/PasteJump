@@ -83,6 +83,32 @@ public partial class OverlayWindow : Window
     /// <summary>Supplies decoded image bytes for an image clip, or null to clear.</summary>
     public void SetImagePayload(byte[]? imageBytes) => _pendingImageBytes = imageBytes;
 
+    /// <summary>
+    /// Sets the largest size an image preview may occupy. A maximum, not a size - the overlay never enlarges a
+    /// picture, so a smaller one still draws at its own dimensions.
+    /// <para>
+    /// The window's own width cap follows it. Leaving that at a constant would mean a preview configured wider
+    /// than the window was simply clipped, which would look like the setting not working rather than like two
+    /// limits disagreeing.
+    /// </para>
+    /// </summary>
+    public void ApplyPreviewSize(int maxWidth, int maxHeight)
+    {
+        PreviewImage.MaxWidth = maxWidth;
+        PreviewImage.MaxHeight = maxHeight;
+
+        // Never narrower than the original 560: the header carries the position, chips and formatter name, and
+        // squeezing those to suit a small preview would trade a readable overlay for a smaller picture.
+        RootBorder.MaxWidth = Math.Max(560, maxWidth + PreviewMargin);
+
+        // Text previews keep pace, so a taller overlay is taller for a long clip as well rather than only for a
+        // picture - otherwise the setting would look like it applied selectively.
+        PreviewText.MaxHeight = maxHeight;
+    }
+
+    /// <summary>Left and right padding around the preview inside the window, from the body Grid's margin.</summary>
+    private const int PreviewMargin = 20;
+
     private void RenderCommitMode(PasteCommitMode mode)
     {
         if (mode == PasteCommitMode.Paste)

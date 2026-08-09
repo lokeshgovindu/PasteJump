@@ -20,10 +20,27 @@ namespace PasteJump.App.Services;
 internal static class FileThumbnailCache
 {
     /// <summary>
-    /// Widest thumbnail worth decoding, matching the overlay's MaxWidth. JPEG decoders scale during decode
-    /// rather than after, so asking for less genuinely costs less.
+    /// Widest thumbnail worth decoding, tracking the overlay's configured preview width. JPEG decoders scale
+    /// during decode rather than after, so asking for less genuinely costs less - and asking for less than the
+    /// overlay will draw would stretch the result, which is the one outcome worth avoiding here.
     /// </summary>
-    private const int MaxWidth = 520;
+    private static int _maxWidth = 520;
+
+    /// <summary>
+    /// Follows the preview-size setting. Cached thumbnails are dropped, because they were decoded for the old
+    /// width and reusing them is precisely the stretching this exists to avoid.
+    /// </summary>
+    internal static void SetMaxWidth(int maxWidth)
+    {
+        if (maxWidth == _maxWidth)
+        {
+            return;
+        }
+
+        _maxWidth = maxWidth;
+        Entries.Clear();
+        Order.Clear();
+    }
 
     /// <summary>
     /// How many entries to keep. Small on purpose: the gesture walks a handful of recent clips, and holding
@@ -104,9 +121,9 @@ internal static class FileThumbnailCache
             bitmap.StreamSource = stream;
 
             // Downwards only. Enlarging a small image would be pointless and would misreport its size.
-            if (pixelWidth > MaxWidth)
+            if (pixelWidth > _maxWidth)
             {
-                bitmap.DecodePixelWidth = MaxWidth;
+                bitmap.DecodePixelWidth = _maxWidth;
             }
 
             bitmap.CacheOption = BitmapCacheOption.OnLoad;

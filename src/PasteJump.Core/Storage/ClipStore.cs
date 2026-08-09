@@ -16,8 +16,22 @@ namespace PasteJump.Core.Storage;
 /// </summary>
 public sealed class ClipStore : IDisposable
 {
-    /// <summary>Preview text is capped: the overlay shows a fraction of this and search works on prefixes.</summary>
-    public const int PreviewMaxChars = 4096;
+    /// <summary>
+    /// Default cap on preview text: the overlay shows a fraction of this and search works on prefixes. The live
+    /// value is <see cref="PreviewMaxChars"/>, which the app sets from settings.
+    /// </summary>
+    public const int DefaultPreviewMaxChars = 4096;
+
+    /// <summary>
+    /// Characters of text kept in the <c>preview</c> column, from
+    /// <see cref="Settings.PasteJumpSettings.PreviewMaxChars"/>.
+    /// <para>
+    /// Mutable rather than a constructor argument because the store is opened before settings are read - the
+    /// settings file's own location can depend on a pointer read even earlier - and because Apply in the settings
+    /// dialog has to be able to change it without reopening the database.
+    /// </para>
+    /// </summary>
+    public int PreviewMaxChars { get; set; } = DefaultPreviewMaxChars;
 
     private const double SortKeyStep = 1.0;
 
@@ -846,7 +860,7 @@ public sealed class ClipStore : IDisposable
         Tags = [],
     };
 
-    private static string BuildPreview(ClipboardSnapshot snapshot)
+    private string BuildPreview(ClipboardSnapshot snapshot)
     {
         if (!string.IsNullOrEmpty(snapshot.Text))
         {

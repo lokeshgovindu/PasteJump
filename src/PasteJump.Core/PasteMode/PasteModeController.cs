@@ -26,8 +26,12 @@ namespace PasteJump.Core.PasteMode;
 /// </summary>
 public sealed class PasteModeController
 {
-    /// <summary>How much clip text the overlay shows. The original used 200 characters.</summary>
-    public const int OverlayPreviewChars = 400;
+    /// <summary>
+    /// How much clip text the overlay shows when nothing else is configured. The original used 200 characters.
+    /// The live value is <see cref="PasteModeOptions.OverlayPreviewChars"/>; this is only its default, kept here
+    /// so the constant and the setting cannot disagree.
+    /// </summary>
+    public const int DefaultOverlayPreviewChars = 400;
 
     private readonly IClipCatalog _catalog;
     private readonly IPasteModeHost _host;
@@ -594,16 +598,18 @@ public sealed class PasteModeController
         });
     }
 
-    private static string BuildPreviewText(Clip? clip)
+    private string BuildPreviewText(Clip? clip)
     {
         if (clip is null)
         {
             return string.Empty;
         }
 
+        var limit = _options.OverlayPreviewChars;
         var preview = clip.Preview;
-        return preview.Length <= OverlayPreviewChars
+
+        return preview.Length <= limit
             ? preview
-            : preview[..OverlayPreviewChars] + "…";
+            : preview[..limit] + "…";
     }
 }

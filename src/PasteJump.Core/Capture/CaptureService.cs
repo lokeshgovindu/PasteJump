@@ -266,7 +266,7 @@ public sealed class CaptureService
                 blob = DibConverter.TryCreateBitmapFile(dib.Data);
             }
         }
-        else if (snapshot.Text is { } full && full.Length > ClipStore.PreviewMaxChars)
+        else if (snapshot.Text is { } full && full.Length > _store.PreviewMaxChars)
         {
             // The preview column is capped, so for anything longer the archive used to keep only the first
             // ClipStore.PreviewMaxChars characters - and History's Copy handed that back as if it were the whole

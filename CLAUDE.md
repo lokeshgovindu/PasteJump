@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 380 passing (`dotnet test`) |
+| Tests | 445 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -69,7 +69,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      380 tests.
+tests/PasteJump.Core.Tests      445 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -208,6 +208,24 @@ that immediately caught two real bugs. Expect to do the same again.
   that for free, so a new setting belongs on that class rather than in a field somewhere. The two data
   locations are the exception — they are in `data-location.json` — so `SettingsInspector.Describe` takes
   them as arguments and labels the rows with their file.
+- **A setting the settings dialog does not assign in `TryBuild` is silently wiped by opening the dialog.**
+  `TryBuild` constructs a *fresh* `PasteJumpSettings` and fills it from the controls, so anything it forgets
+  reverts to its default the moment the user presses OK — no error, no visible change until the feature it
+  governs stops working. `OverlayX`/`OverlayY` sat like that: declared, listed on Advanced, read by nothing,
+  and reset by every OK. They are now real (a fixed overlay position, honoured in `PasteJumpPasteHost`) and
+  assigned explicitly; `LegacyImportCompleted` is the other non-control case and is carried forward by hand.
+  When adding a setting, add it in three places or it is broken in a way nothing reports: `ShowValues`,
+  `TryBuild`, and a control on some tab.
+- **Advanced's Reset buttons work by reflection on `SettingRow.Key`, and `ShowValues` must write every
+  control.** Reset writes one default into the pending settings object and then reloads the whole dialog from
+  it, so a control `ShowValues` skips keeps its old value through a reset — which reads as Reset not working.
+  `SettingsInspectorTests.Every_row_key_resolves_to_a_writable_property` guards the key side;
+  `SettingsWindow.ExerciseResetsForSmokeTest` drives both reset paths from the UI smoke harness, which is the
+  only thing that would catch the wiring. Reset edits pending values only, so Cancel still abandons it — and
+  the confirmation on Reset All is skipped by the smoke hook because it is modal.
+- **`RunAtLogon` is the one control whose displayed value is not just the setting.** `Load` ORs it with
+  `StartupShortcut.Exists`, because the user may have deleted the shortcut by hand. `ShowValues` deliberately
+  does *not*, or a reset would leave the box ticked because the shortcut is still there.
 - **`Console.Beep` is synchronous.** It returns only when the tone has finished, so the copy beep goes
   through `CopyBeep.Play`, which hops to the thread pool. Called inline it would freeze the UI for 150 ms
   per copy, and the capture path is reachable from the hook, where that is halfway to `LowLevelHooksTimeout`.
@@ -486,7 +504,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 380 tests
+dotnet test                                         # 445 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

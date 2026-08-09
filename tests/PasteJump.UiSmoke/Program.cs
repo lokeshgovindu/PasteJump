@@ -61,7 +61,18 @@ internal static class Program
             Seed(store);
 
             var formatters = new FormatterRegistry();
-            var settings = new PasteJumpSettings();
+            // Deliberately not all defaults. The Advanced page's "changed from default" banding, its accented
+            // value and its per-row Reset button only appear on a modified row, so a pristine settings object
+            // would leave all three unrendered - and the reset hook below would never reach the reflection
+            // branch that writes a default back into a property.
+            var settings = new PasteJumpSettings
+            {
+                MaxClips = 500,
+                Theme = AppTheme.Dark,
+                OverlayPreviewMaxWidth = 800,
+                BeepOnCopy = true,
+                IgnoredProcesses = ["keepass.exe", "1password.exe"],
+            };
 
             foreach (var theme in new[] { "Light", "Dark" })
             {
@@ -97,7 +108,20 @@ internal static class Program
                 // Cycles every tab. TabControl only realises the SELECTED tab's content, so without
                 // this the other tabs' templates are never instantiated and a broken one goes unseen -
                 // which is exactly the class of failure this harness exists to catch.
-                Check("SettingsWindow", () => new SettingsWindow(settings, formatters, DataLocation.UserProfile), CycleTabs);
+                Check(
+                    "SettingsWindow",
+                    () => new SettingsWindow(settings, formatters, DataLocation.UserProfile),
+                    (window, name) =>
+                    {
+                        CycleTabs(window, name);
+
+                        // Then the Advanced page's Reset buttons, which write back into every other tab's
+                        // controls by reflection. Nothing is saved - the dialog is closed, never accepted -
+                        // but a key that no longer names a property, or a control missing from the reload,
+                        // throws here rather than in front of the user.
+                        ((SettingsWindow)window).ExerciseResetsForSmokeTest();
+                        Drain();
+                    });
                 Check("ShortcutHelpWindow", () => new ShortcutHelpWindow());
                 Check("AboutWindow", () => new AboutWindow());
 
@@ -108,9 +132,9 @@ internal static class Program
                 Check("MessageDialog", () => MessageDialog.CreateForSmokeTest(
                     @"An existing Clipjump installation was found at:" + "\n\n"
                     + @"D:\Lokesh\DoNotMove\Clipjump_x64" + "\n\n"
-                    + "Only history is imported. Clip stacks are left alone, and nothing in the Clipjump "
+                    + "Both the history archive and the clip stack are imported, and nothing in the Clipjump "
                     + "folder is modified.\n\nYou can also do this later from Settings, History.",
-                    "Import Clipjump's history?",
+                    "Import from Clipjump?",
                     DialogKind.Question));
                 // Seeded with a folder that does not exist, so the invalid branch of the validation is the one
                 // rendered - that is the state with the extra status line and the disabled Import button.

@@ -191,84 +191,37 @@ public partial class SettingsWindow : Window
     /// </summary>
     public event Action? LegacyImportRequested;
 
+    /// <summary>
+    /// Fills the combo boxes and then shows the values in force. Split from <see cref="ShowValues"/> because
+    /// the item lists are populated with <c>Items.Add</c> and would duplicate if this ran twice, while showing
+    /// values has to be repeatable - that is what Reset to Default relies on.
+    /// </summary>
     private void Load()
     {
-        MonitorClipboardCheck.IsChecked = _baseline.MonitorClipboard;
-        StoreImagesCheck.IsChecked = _baseline.StoreImages;
-        AllowDuplicatesCheck.IsChecked = _baseline.AllowDuplicateClips;
-        LimitMaxClipsCheck.IsChecked = _baseline.LimitMaxClips;
-        MaxClipsBox.Text = _baseline.MaxClips.ToString(CultureInfo.CurrentCulture);
-        RefreshMaxClipsEnabled();
-
-        foreach (var name in ExcludedApps.NormaliseAll(_baseline.IgnoredProcesses))
-        {
-            _excluded.Add(name);
-        }
-
-        ExcludedList.ItemsSource = _excluded;
-        RefreshExcludedStatus();
-
-        RecordHistoryCheck.IsChecked = _baseline.RecordHistory;
-        RetentionDaysBox.Text = _baseline.HistoryRetentionDays.ToString(CultureInfo.CurrentCulture);
-
-        PreservePositionCheck.IsChecked = _baseline.PreserveClipPosition;
-        OpenSearchCheck.IsChecked = _baseline.OpenSearchImmediately;
-        ResetFormatterCheck.IsChecked = _baseline.ResetFormatterOnEntry;
-
         foreach (var formatter in _formatters.All)
         {
             DefaultFormatterCombo.Items.Add(formatter.DisplayName);
         }
-
-        DefaultFormatterCombo.SelectedItem = _formatters.Resolve(_baseline.DefaultFormatterId).DisplayName;
 
         foreach (var choice in PasteKeystrokeChoices)
         {
             PasteKeystrokeCombo.Items.Add(choice.Label);
         }
 
-        PasteKeystrokeCombo.SelectedItem = PasteKeystrokeChoices
-            .First(c => c.Keystroke == _baseline.PasteKeystroke).Label;
-
-        WarnAboutConflictCheck.IsChecked = _baseline.WarnAboutClipboardManagerConflict;
-
         foreach (var key in TriggerKey.Available)
         {
             TriggerKeyCombo.Items.Add(key.ToString());
         }
-
-        TriggerKeyCombo.SelectedItem = TriggerKey.Normalise(_baseline.PasteModeTriggerKey).ToString();
-
-        HistoryHotkeyBox.Text = _baseline.HistoryHotkey;
 
         foreach (var choice in ThemeChoices)
         {
             ThemeCombo.Items.Add(choice.Label);
         }
 
-        ThemeCombo.SelectedItem = ThemeChoices.First(c => c.Theme == _baseline.Theme).Label;
-
         foreach (var choice in DensityChoices)
         {
             DensityCombo.Items.Add(choice.Label);
         }
-
-        DensityCombo.SelectedItem = DensityChoices.First(c => c.Density == _baseline.GridDensity).Label;
-
-        VersionText.Text = $"PasteJump {AppVersion.Current}";
-
-        ShowCopyNotificationCheck.IsChecked = _baseline.ShowCopyNotification;
-        CopyNotificationMsBox.Text = _baseline.CopyNotificationMs.ToString(CultureInfo.CurrentCulture);
-        PasteSettleDelayBox.Text = _baseline.PasteSettleDelayMs.ToString(CultureInfo.CurrentCulture);
-
-        BeepOnCopyCheck.IsChecked = _baseline.BeepOnCopy;
-        BeepFrequencyBox.Text = _baseline.BeepFrequencyHz.ToString(CultureInfo.CurrentCulture);
-
-        // Reflect the real state of the shortcut, not just what settings claim. The user may have
-        // deleted it from the Startup folder by hand since the last run.
-        RunAtLogonCheck.IsChecked = _baseline.RunAtLogon || StartupShortcut.Exists;
-        TextEditorBox.Text = _baseline.TextEditor;
-        ImageEditorBox.Text = _baseline.ImageEditor;
 
         foreach (var choice in DataLocationChoices)
         {
@@ -276,11 +229,96 @@ public partial class SettingsWindow : Window
             SettingsLocationCombo.Items.Add(choice.Label);
         }
 
+        ExcludedList.ItemsSource = _excluded;
+        VersionText.Text = $"PasteJump {AppVersion.Current}";
+
+        ShowValues(_baseline, _baselineClipsLocation, _baselineSettingsLocation);
+
+        // Reflect the real state of the shortcut, not just what settings claim. The user may have deleted it
+        // from the Startup folder by hand since the last run.
+        RunAtLogonCheck.IsChecked = _baseline.RunAtLogon || StartupShortcut.Exists;
+    }
+
+    /// <summary>
+    /// Puts a settings object into the controls. Called with the values in force when the dialog opens, and
+    /// again with defaults - whole or in part - by Reset to Default on the Advanced page.
+    /// <para>
+    /// Every control is written, including ones whose value is unchanged. Writing only the differences would
+    /// mean a reset silently leaving a control behind the first time someone added one and forgot, which is the
+    /// same drift the Advanced page avoids by reflecting over the settings class.
+    /// </para>
+    /// </summary>
+    private void ShowValues(PasteJumpSettings source, DataLocation clipsLocation, DataLocation settingsLocation)
+    {
+        MonitorClipboardCheck.IsChecked = source.MonitorClipboard;
+        StoreImagesCheck.IsChecked = source.StoreImages;
+        AllowDuplicatesCheck.IsChecked = source.AllowDuplicateClips;
+        LimitMaxClipsCheck.IsChecked = source.LimitMaxClips;
+        MaxClipsBox.Text = source.MaxClips.ToString(CultureInfo.CurrentCulture);
+        RefreshMaxClipsEnabled();
+
+        _excluded.Clear();
+
+        foreach (var name in ExcludedApps.NormaliseAll(source.IgnoredProcesses))
+        {
+            _excluded.Add(name);
+        }
+
+        RefreshExcludedStatus();
+
+        RecordHistoryCheck.IsChecked = source.RecordHistory;
+        RetentionDaysBox.Text = source.HistoryRetentionDays.ToString(CultureInfo.CurrentCulture);
+        PreviewMaxCharsBox.Text = source.PreviewMaxChars.ToString(CultureInfo.CurrentCulture);
+        HistoryLoadLimitBox.Text = source.HistoryLoadLimit.ToString(CultureInfo.CurrentCulture);
+        HistoryPreviewWidthBox.Text = source.HistoryPreviewMaxWidth.ToString(CultureInfo.CurrentCulture);
+
+        PreservePositionCheck.IsChecked = source.PreserveClipPosition;
+        OpenSearchCheck.IsChecked = source.OpenSearchImmediately;
+        ResetFormatterCheck.IsChecked = source.ResetFormatterOnEntry;
+
+        DefaultFormatterCombo.SelectedItem = _formatters.Resolve(source.DefaultFormatterId).DisplayName;
+
+        PasteKeystrokeCombo.SelectedItem = PasteKeystrokeChoices
+            .First(c => c.Keystroke == source.PasteKeystroke).Label;
+
+        WarnAboutConflictCheck.IsChecked = source.WarnAboutClipboardManagerConflict;
+
+        TriggerKeyCombo.SelectedItem = TriggerKey.Normalise(source.PasteModeTriggerKey).ToString();
+
+        HistoryHotkeyBox.Text = source.HistoryHotkey;
+
+        ThemeCombo.SelectedItem = ThemeChoices.First(c => c.Theme == source.Theme).Label;
+        DensityCombo.SelectedItem = DensityChoices.First(c => c.Density == source.GridDensity).Label;
+
+        ShowCopyNotificationCheck.IsChecked = source.ShowCopyNotification;
+        CopyNotificationMsBox.Text = source.CopyNotificationMs.ToString(CultureInfo.CurrentCulture);
+        PasteSettleDelayBox.Text = source.PasteSettleDelayMs.ToString(CultureInfo.CurrentCulture);
+
+        BeepOnCopyCheck.IsChecked = source.BeepOnCopy;
+        BeepFrequencyBox.Text = source.BeepFrequencyHz.ToString(CultureInfo.CurrentCulture);
+        BeepDurationBox.Text = source.BeepDurationMs.ToString(CultureInfo.CurrentCulture);
+
+        PreviewWidthBox.Text = source.OverlayPreviewMaxWidth.ToString(CultureInfo.CurrentCulture);
+        PreviewHeightBox.Text = source.OverlayPreviewMaxHeight.ToString(CultureInfo.CurrentCulture);
+        OverlayPreviewCharsBox.Text = source.OverlayPreviewChars.ToString(CultureInfo.CurrentCulture);
+
+        // Empty rather than "0" for "not set". Zero is a legal screen coordinate, so using it as the sentinel
+        // would make the top-left corner unreachable.
+        OverlayXBox.Text = source.OverlayX?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
+        OverlayYBox.Text = source.OverlayY?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
+
+        // Deliberately just the setting. Load reconciles it with the Startup folder afterwards, which is right
+        // for opening the dialog and wrong for a reset: resetting means "go back to not starting at logon", and
+        // a box that stayed ticked because the shortcut is still there would read as the reset being ignored.
+        RunAtLogonCheck.IsChecked = source.RunAtLogon;
+        TextEditorBox.Text = source.TextEditor;
+        ImageEditorBox.Text = source.ImageEditor;
+
         ClipsLocationCombo.SelectedItem = DataLocationChoices
-            .First(c => c.Location == _baselineClipsLocation).Label;
+            .First(c => c.Location == clipsLocation).Label;
 
         SettingsLocationCombo.SelectedItem = DataLocationChoices
-            .First(c => c.Location == _baselineSettingsLocation).Label;
+            .First(c => c.Location == settingsLocation).Label;
     }
 
     /// <summary>Clips location currently picked, which may differ from the one in force.</summary>
@@ -723,11 +761,15 @@ public partial class SettingsWindow : Window
 
         var modified = rows.Count(static r => r.IsModified);
 
-        AdvancedStatus.Text =
-            $"{rows.Count} setting{(rows.Count == 1 ? string.Empty : "s")}, {modified} changed from default. " +
-            $"Read-only here - edit on the other tabs, or in data\\{AppPaths.SettingsFileName} while " +
-            "PasteJump is closed. " +
-            $"Rows marked {DataLocationPointer.FileName} live in that file instead, beside PasteJump.exe.";
+        // The note wins the line when there is one, because it says something about what just happened; the
+        // inventory count is always derivable from the grid itself.
+        AdvancedStatus.Text = AdvancedStatusNote
+            ?? $"{rows.Count} setting{(rows.Count == 1 ? string.Empty : "s")}, {modified} changed from default. "
+                + $"Values are read-only here - edit them on the other tabs, or in data\\{AppPaths.SettingsFileName} "
+                + $"while PasteJump is closed. Rows marked {DataLocationPointer.FileName} live in that file.";
+
+        // One-shot: cleared as it is read, so the next filter keystroke or edit shows the inventory line again.
+        AdvancedStatusNote = null;
 
         AdvancedFilterCue.Visibility = string.IsNullOrEmpty(filter)
             ? Visibility.Visible
@@ -735,6 +777,158 @@ public partial class SettingsWindow : Window
     }
 
     private void OnAdvancedFilterChanged(object sender, TextChangedEventArgs e) => RefreshAdvanced();
+
+    /// <summary>
+    /// Puts one setting back to its default, leaving every other pending edit alone.
+    /// <para>
+    /// Reflection over the property named by the row rather than a switch over control names. A hand-written
+    /// map would be one more list to keep in step with <see cref="PasteJumpSettings"/>, and a setting missing
+    /// from it would have a Reset button that silently did nothing - the same drift the Advanced page exists to
+    /// avoid. Nothing is written here: this edits the pending values, so Cancel still abandons it.
+    /// </para>
+    /// </summary>
+    private void OnResetSettingClicked(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is SettingRow row)
+        {
+            ResetSetting(row);
+        }
+    }
+
+    private void ResetSetting(SettingRow row)
+    {
+        // The two data locations are not settings - they live in their own file - so they are reset by moving
+        // their combo rather than by touching a settings object.
+        if (string.Equals(row.Key, "ClipsLocation", StringComparison.Ordinal))
+        {
+            SelectLocation(ClipsLocationCombo, DataLocation.ApplicationFolder);
+            return;
+        }
+
+        if (string.Equals(row.Key, "SettingsLocation", StringComparison.Ordinal))
+        {
+            SelectLocation(SettingsLocationCombo, DataLocation.ApplicationFolder);
+            return;
+        }
+
+        // Resetting works on the pending values, so they have to be readable first. Refusing while a box holds
+        // a half-typed number is deliberate: the alternative is silently discarding the user's other edits.
+        if (!TryBuild(out var pending, out var error))
+        {
+            ValidationText.Text = $"{error} Fix that first, then reset {row.Name}.";
+            ValidationText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        var property = typeof(PasteJumpSettings).GetProperty(row.Key);
+
+        if (property?.SetMethod is null)
+        {
+            return;
+        }
+
+        property.SetValue(pending, property.GetValue(new PasteJumpSettings()));
+
+        // Normalise after the write, because settings are not all independent: clearing one half of the overlay
+        // position has to clear the other, and only Normalise knows that.
+        pending.Normalise();
+
+        ValidationText.Visibility = Visibility.Collapsed;
+        ShowValues(pending, SelectedClipsLocation, SelectedSettingsLocation);
+
+        AdvancedStatusNote = $"{row.Name} reset to {row.Default}. Nothing is saved until you press OK or Apply.";
+        RefreshAdvanced();
+    }
+
+    /// <summary>
+    /// Puts every setting back to its default, including the two data locations.
+    /// <para>
+    /// Confirmed even though it is reversible with Cancel: it discards a configuration that may have taken a
+    /// while to arrive at, and the excluded-apps list is the kind of thing nobody remembers re-entering.
+    /// </para>
+    /// </summary>
+    private void OnResetAllClicked(object sender, RoutedEventArgs e)
+    {
+        if (!MessageDialog.Confirm(
+                "Every setting goes back to the value a fresh install would have, including the excluded "
+                    + "applications list and both data locations.\n\nNothing is saved until you press OK or "
+                    + "Apply, so Cancel still abandons it. Your clips and history are not touched.",
+                headline: "Reset all settings to their defaults?",
+                title: "PasteJump - settings",
+                owner: this))
+        {
+            return;
+        }
+
+        ResetAll();
+    }
+
+    private void ResetAll()
+    {
+        ValidationText.Visibility = Visibility.Collapsed;
+
+        ShowValues(new PasteJumpSettings(), DataLocation.ApplicationFolder, DataLocation.ApplicationFolder);
+        RefreshLocationHints();
+
+        AdvancedStatusNote = "All settings reset. Nothing is saved until you press OK or Apply.";
+        RefreshAdvanced();
+    }
+
+    /// <summary>
+    /// Test hook: runs both reset paths against the rows actually on screen.
+    /// <para>
+    /// It goes through <see cref="ResetSetting"/> and <see cref="ResetAll"/> rather than reimplementing them,
+    /// which is the point - what can break here is the wiring between a grid row and a settings property, and
+    /// only exercising the real path can catch that. The confirmation is skipped because it is modal and would
+    /// block the harness for ever; nothing is written either way, since this dialog is never accepted.
+    /// </para>
+    /// </summary>
+    public void ExerciseResetsForSmokeTest()
+    {
+        if (AdvancedGrid.ItemsSource is IEnumerable<SettingRow> rows)
+        {
+            // A modified row, so the branch that actually writes something is the one taken.
+            foreach (var row in rows.Where(static r => r.IsModified))
+            {
+                ResetSetting(row);
+            }
+        }
+
+        ResetAll();
+    }
+
+    /// <summary>
+    /// One-shot line shown above the Advanced grid after a reset, cleared by the next refresh. A transient note
+    /// rather than a dialog: the grid itself already shows the new value, so this only has to say that nothing
+    /// has been written yet.
+    /// </summary>
+    private string? AdvancedStatusNote { get; set; }
+
+    private static void SelectLocation(ComboBox combo, DataLocation location) => combo.SelectedItem =
+        DataLocationChoices.First(c => c.Location == location).Label;
+
+    /// <summary>
+    /// Parses a screen coordinate that is allowed to be blank. Blank yields null and succeeds; anything that is
+    /// neither blank nor a coordinate fails, so a typo is reported rather than quietly meaning "not set".
+    /// </summary>
+    private static bool TryParseOptionalCoordinate(string? text, out int? value)
+    {
+        value = null;
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return true;
+        }
+
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var parsed)
+            || parsed is < -32_768 or > 32_767)
+        {
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
 
     private bool TryBuild(out PasteJumpSettings settings, out string error)
     {
@@ -773,6 +967,71 @@ public partial class SettingsWindow : Window
             || beepHz is < 37 or > 32_767)
         {
             error = "Beep pitch must be between 37 and 32767 hertz.";
+            return false;
+        }
+
+        // The bounds match PasteJumpSettings.Normalise. Rejected here rather than clamped there, because a
+        // number silently changing to 1400 after OK reads as the box not having taken the value.
+        if (!int.TryParse(PreviewWidthBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var previewWidth)
+            || previewWidth is < 120 or > 1400)
+        {
+            error = "Image preview width must be between 120 and 1400 pixels.";
+            return false;
+        }
+
+        if (!int.TryParse(PreviewHeightBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var previewHeight)
+            || previewHeight is < 80 or > 900)
+        {
+            error = "Image preview height must be between 80 and 900 pixels.";
+            return false;
+        }
+
+        if (!int.TryParse(OverlayPreviewCharsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var overlayChars)
+            || overlayChars is < 40 or > 4_000)
+        {
+            error = "Characters of text shown in the overlay must be between 40 and 4000.";
+            return false;
+        }
+
+        if (!int.TryParse(BeepDurationBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var beepMs)
+            || beepMs is < 20 or > 2_000)
+        {
+            error = "Beep length must be between 20 and 2000 milliseconds.";
+            return false;
+        }
+
+        if (!int.TryParse(PreviewMaxCharsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var previewChars)
+            || previewChars is < 256 or > 65_536)
+        {
+            error = "Characters kept per history entry must be between 256 and 65536.";
+            return false;
+        }
+
+        if (!int.TryParse(HistoryLoadLimitBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var historyLimit)
+            || historyLimit is < 100 or > 1_000_000)
+        {
+            error = "Rows the history window loads must be between 100 and 1000000.";
+            return false;
+        }
+
+        if (!int.TryParse(HistoryPreviewWidthBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var historyPreviewWidth)
+            || historyPreviewWidth is < 120 or > 4_096)
+        {
+            error = "History preview image width must be between 120 and 4096 pixels.";
+            return false;
+        }
+
+        // Negative coordinates are legal: a monitor placed left of or above the primary one has them.
+        if (!TryParseOptionalCoordinate(OverlayXBox.Text, out var overlayX)
+            || !TryParseOptionalCoordinate(OverlayYBox.Text, out var overlayY))
+        {
+            error = "The overlay position must be whole numbers between -32768 and 32767, or empty.";
+            return false;
+        }
+
+        if (overlayX is null != overlayY is null)
+        {
+            error = "Give the overlay position both an x and a y, or leave both empty to follow the caret.";
             return false;
         }
 
@@ -844,6 +1103,19 @@ public partial class SettingsWindow : Window
 
         settings.BeepOnCopy = BeepOnCopyCheck.IsChecked == true;
         settings.BeepFrequencyHz = beepHz;
+
+        settings.OverlayPreviewMaxWidth = previewWidth;
+        settings.OverlayPreviewMaxHeight = previewHeight;
+        settings.OverlayPreviewChars = overlayChars;
+        settings.BeepDurationMs = beepMs;
+        settings.PreviewMaxChars = previewChars;
+        settings.HistoryLoadLimit = historyLimit;
+        settings.HistoryPreviewMaxWidth = historyPreviewWidth;
+
+        // Carried through explicitly. Before these had controls they were simply never assigned here, so a
+        // position set by hand in PasteJump.json was silently discarded by opening this dialog and clicking OK.
+        settings.OverlayX = overlayX;
+        settings.OverlayY = overlayY;
 
         settings.RunAtLogon = RunAtLogonCheck.IsChecked == true;
         settings.TextEditor = TextEditorBox.Text;

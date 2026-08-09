@@ -70,6 +70,33 @@ public sealed class PasteJumpSettings
     /// <summary>Write captured clips to the long-term history archive as well as the stack.</summary>
     public bool RecordHistory { get; set; } = true;
 
+    /// <summary>
+    /// Characters of text kept in a clip's or history entry's <c>preview</c> column.
+    /// <para>
+    /// Not merely cosmetic, which is why it is exposed: <c>history_fts</c> indexes the preview, so this is also
+    /// how far into a long clip search can reach. Raising it makes long clips searchable at the cost of a larger
+    /// database; text beyond it is still archived whole as a blob, so nothing is lost either way. Changing it
+    /// affects captures from here on - rows already written keep the length they were written at.
+    /// </para>
+    /// </summary>
+    public int PreviewMaxChars { get; set; } = 4096;
+
+    /// <summary>
+    /// Most rows the history window will load at once.
+    /// <para>
+    /// A backstop against an enormous store making the window unresponsive, not a page size. It was once 500,
+    /// which was low enough to read as a bug: an imported Clipjump history of 11,000 entries showed only the
+    /// newest 500 and looked like an import that had failed.
+    /// </para>
+    /// </summary>
+    public int HistoryLoadLimit { get; set; } = 50_000;
+
+    /// <summary>
+    /// Widest an image is decoded for the history window's preview pane, in pixels. Larger is sharper on a
+    /// high-resolution screen and costs more per row selected; the image is never enlarged past its own size.
+    /// </summary>
+    public int HistoryPreviewMaxWidth { get; set; } = 640;
+
     // ------------------------------------------------------------ paste mode
 
     /// <summary>Reopen on the previously active clip. Original: <c>ini_PreserveClipPos</c>.</summary>
@@ -102,9 +129,17 @@ public sealed class PasteJumpSettings
     /// </summary>
     public string PasteModeTriggerKey { get; set; } = PasteMode.TriggerKey.Default.ToString();
 
-    /// <summary>Fixed overlay position. Null means "follow the caret, else the cursor".</summary>
+    /// <summary>
+    /// Fixed overlay position in physical pixels. Null means "follow the caret, else the cursor".
+    /// <para>
+    /// Both halves must be set for either to apply: half a position would move the overlay in one axis and
+    /// track the caret in the other, which reads as a bug rather than as a setting. <see cref="Normalise"/>
+    /// enforces that, so a hand-edited file cannot express it.
+    /// </para>
+    /// </summary>
     public int? OverlayX { get; set; }
 
+    /// <inheritdoc cref="OverlayX"/>
     public int? OverlayY { get; set; }
 
     /// <summary>
@@ -140,6 +175,30 @@ public sealed class PasteJumpSettings
     /// <summary>Row spacing in the history list. Cozy by default.</summary>
     public GridDensity GridDensity { get; set; } = GridDensity.Cozy;
 
+    /// <summary>
+    /// Largest size, in device-independent pixels, at which the paste overlay draws an image preview.
+    /// <para>
+    /// A <em>maximum</em>, not a size: the overlay never enlarges a picture, so anything smaller than this is
+    /// drawn at its own dimensions. Raising it makes a screenshot legible during the gesture at the cost of an
+    /// overlay that covers more of what you are pasting into, which is why it is a preference rather than a
+    /// constant.
+    /// </para>
+    /// </summary>
+    public int OverlayPreviewMaxWidth { get; set; } = 520;
+
+    /// <inheritdoc cref="OverlayPreviewMaxWidth"/>
+    public int OverlayPreviewMaxHeight { get; set; } = 220;
+
+    /// <summary>
+    /// Characters of a text clip shown in the paste overlay before it is elided.
+    /// <para>
+    /// Separate from <see cref="PreviewMaxChars"/>, which is about what gets <em>stored</em>. This one is about
+    /// how much of it is worth reading during a gesture that is over in a second - so it is deliberately far
+    /// smaller, and raising it trades a taller overlay for more context.
+    /// </para>
+    /// </summary>
+    public int OverlayPreviewChars { get; set; } = 400;
+
     /// <summary>Show a brief notification near the cursor after each copy, as Clipjump did.</summary>
     public bool ShowCopyNotification { get; set; } = true;
 
@@ -157,6 +216,16 @@ public sealed class PasteJumpSettings
 
     /// <summary>Pitch of that tone in hertz. Original: <c>beepFrequency</c>, also 1500.</summary>
     public int BeepFrequencyHz { get; set; } = 1500;
+
+    /// <summary>
+    /// Length of that tone in milliseconds. Matches the original's <c>BeepAt</c> default.
+    /// <para>
+    /// Kept short on purpose. The tone is synchronous inside <c>Console.Beep</c>, so it is played on the thread
+    /// pool - but it is still a sound on every single copy, and anything much longer than a click becomes the
+    /// thing you notice rather than a confirmation.
+    /// </para>
+    /// </summary>
+    public int BeepDurationMs { get; set; } = 150;
 
     // ------------------------------------------------------------ system
 
@@ -195,6 +264,7 @@ public sealed class PasteJumpSettings
         OpenSearchImmediately = OpenSearchImmediately,
         ResetFormatterOnEntry = ResetFormatterOnEntry,
         DefaultFormatterId = DefaultFormatterId,
+        OverlayPreviewChars = OverlayPreviewChars,
     };
 
     /// <summary>Clamps anything a hand-edited JSON file could have made nonsensical.</summary>
@@ -225,9 +295,31 @@ public sealed class PasteJumpSettings
         HistoryHotkey = HotkeySpec.ParseOrNone(HistoryHotkey).ToString();
 
         BeepFrequencyHz = Math.Clamp(BeepFrequencyHz, 37, 32_767);
+        BeepDurationMs = Math.Clamp(BeepDurationMs, 20, 2_000);
+
+        // Floor is high enough that search still has something to index; the ceiling is where a preview column
+        // stops being a preview. Text past it is archived whole regardless, so neither bound loses data.
+        PreviewMaxChars = Math.Clamp(PreviewMaxChars, 256, 65_536);
+
+        // Either both or neither. See OverlayX for why half a fixed position is not a state worth having.
+        if (OverlayX is null || OverlayY is null)
+        {
+            OverlayX = null;
+            OverlayY = null;
+        }
+
+        HistoryLoadLimit = Math.Clamp(HistoryLoadLimit, 100, 1_000_000);
+        HistoryPreviewMaxWidth = Math.Clamp(HistoryPreviewMaxWidth, 120, 4_096);
+        OverlayPreviewChars = Math.Clamp(OverlayPreviewChars, 40, 4_000);
 
         PasteSettleDelayMs = Math.Clamp(PasteSettleDelayMs, 0, 500);
         CopyNotificationMs = Math.Clamp(CopyNotificationMs, 250, 10_000);
+
+        // Floors are low enough to be useful for someone who wants the overlay out of the way, and the ceilings
+        // are what a 1080p screen can show without the overlay becoming the thing being looked at rather than
+        // the document underneath it.
+        OverlayPreviewMaxWidth = Math.Clamp(OverlayPreviewMaxWidth, 120, 1400);
+        OverlayPreviewMaxHeight = Math.Clamp(OverlayPreviewMaxHeight, 80, 900);
 
         if (!Enum.IsDefined(Theme))
         {

@@ -139,17 +139,27 @@ public partial class HistoryWindow : Window
     /// </summary>
     private bool _settingDensity;
 
+    /// <summary>Most rows to load at once, from settings. A backstop, not a page size.</summary>
+    private int _historyLoadLimit;
+
+    /// <summary>Widest an image file is decoded for the preview pane, from settings.</summary>
+    private int _thumbnailMaxWidth;
+
     public HistoryWindow(
         ClipStore store,
         IClipboardAccess clipboard,
         SelfWriteGuard selfWrites,
         FormatterRegistry formatters,
-        GridDensity density = GridDensity.Cozy)
+        GridDensity density = GridDensity.Cozy,
+        int historyLoadLimit = ClipStore.DefaultHistoryLimit,
+        int previewImageMaxWidth = DefaultThumbnailMaxWidth)
     {
         _store = store;
         _clipboard = clipboard;
         _selfWrites = selfWrites;
         _formatters = formatters;
+        _historyLoadLimit = historyLoadLimit;
+        _thumbnailMaxWidth = previewImageMaxWidth;
 
         InitializeComponent();
 
@@ -231,6 +241,25 @@ public partial class HistoryWindow : Window
                         GridDensityMetrics.CellPaddingY(density))),
             },
         };
+    }
+
+    /// <summary>
+    /// Applies the two numeric limits from settings. Separate from <see cref="ApplyDensity"/> only because
+    /// density has a control in this window and these do not; both exist so an open window follows Apply.
+    /// </summary>
+    public void ApplyLimits(int historyLoadLimit, int previewImageMaxWidth)
+    {
+        var reload = historyLoadLimit != _historyLoadLimit;
+
+        _historyLoadLimit = historyLoadLimit;
+        _thumbnailMaxWidth = previewImageMaxWidth;
+
+        // Only the row limit needs a reload; the thumbnail width is read on the next selection change, and
+        // re-decoding the current one would be work for a difference nobody asked to see right now.
+        if (reload && IsLoaded)
+        {
+            Refresh();
+        }
     }
 
     /// <summary>
@@ -336,7 +365,7 @@ public partial class HistoryWindow : Window
     {
         var number = 1;
 
-        foreach (var entry in _store.SearchHistory(SearchBox.Text))
+        foreach (var entry in _store.SearchHistory(SearchBox.Text, _historyLoadLimit))
         {
             _rows.Add(new HistoryRow
             {
@@ -577,7 +606,7 @@ public partial class HistoryWindow : Window
     /// one picture, and a copy of forty photographs should not read forty files to fill it.
     /// </para>
     /// </summary>
-    private static ImageFilePreview? TryLoadFirstImageFile(string? preview)
+    private ImageFilePreview? TryLoadFirstImageFile(string? preview)
     {
         foreach (var path in FileListPreview.TryReadPathsFromDescription(preview))
         {
@@ -617,9 +646,9 @@ public partial class HistoryWindow : Window
                 // Only ever downwards. Capping a large photograph avoids decoding forty megapixels to fill a
                 // pane a few hundred pixels wide; applying the same cap to a small image would enlarge it,
                 // which is both pointless and how the wrong resolution got reported.
-                if (pixelWidth > ThumbnailMaxWidth)
+                if (pixelWidth > _thumbnailMaxWidth)
                 {
-                    bitmap.DecodePixelWidth = ThumbnailMaxWidth;
+                    bitmap.DecodePixelWidth = _thumbnailMaxWidth;
                 }
 
                 // OnLoad, so the bitmap does not depend on the stream after this using block closes it.
@@ -648,7 +677,7 @@ public partial class HistoryWindow : Window
         int PixelHeight);
 
     /// <summary>Widest thumbnail worth decoding. The pane is a few hundred pixels; this leaves room to enlarge it.</summary>
-    private const int ThumbnailMaxWidth = 640;
+    internal const int DefaultThumbnailMaxWidth = 640;
 
     /// <summary>
     /// Extensions worth attempting. An allow-list rather than "try everything": the alternative is opening and
@@ -752,7 +781,7 @@ public partial class HistoryWindow : Window
 
             // Entries captured before full text was archived have nothing else to offer, so say so rather than
             // producing a quietly incomplete copy.
-            truncated = full is null && row.Preview.Length >= ClipStore.PreviewMaxChars;
+            truncated = full is null && row.Preview.Length >= _store.PreviewMaxChars;
             payloads = Win32ClipboardAccess.TextOnlyPayloads(full ?? row.Preview);
         }
 
@@ -785,7 +814,7 @@ public partial class HistoryWindow : Window
             ? "Image copied, and added to the stack as the newest clip."
             : truncated
                 ? "Copied and added to the stack - but this entry predates full-text archiving, so only the "
-                    + $"first {ClipStore.PreviewMaxChars:N0} characters were kept."
+                    + $"first {_store.PreviewMaxChars:N0} characters were kept."
                 : "Copied, and added to the stack as the newest clip - Ctrl+V will offer it first.";
     }
 

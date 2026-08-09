@@ -142,7 +142,7 @@ public sealed class CaptureServiceTests : IDisposable
     [Fact]
     public void RecordsFullTextForEntriesTooLongForThePreview()
     {
-        var long_ = new string('a', ClipStore.PreviewMaxChars + 500);
+        var long_ = new string('a', _store.PreviewMaxChars + 500);
         _clipboard.EnqueueRead(FakeClipboardAccess.TextSnapshot(long_, "devenv.exe"));
 
         var capture = Build();
@@ -151,7 +151,7 @@ public sealed class CaptureServiceTests : IDisposable
 
         var entry = Assert.Single(_store.SearchHistory(null));
 
-        Assert.Equal(ClipStore.PreviewMaxChars, entry.Preview.Length);
+        Assert.Equal(_store.PreviewMaxChars, entry.Preview.Length);
         Assert.NotNull(entry.BlobHash);
 
         var archived = _store.Blobs.TryRead(entry.BlobHash!);

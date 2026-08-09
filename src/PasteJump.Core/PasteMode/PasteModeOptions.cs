@@ -25,4 +25,9 @@ public sealed class PasteModeOptions
 
     /// <summary>Formatter id applied on entry when <see cref="ResetFormatterOnEntry"/> is set.</summary>
     public string? DefaultFormatterId { get; init; }
+
+    /// <summary>
+    /// Characters of clip text the overlay shows before eliding. The original used 200.
+    /// </summary>
+    public int OverlayPreviewChars { get; init; } = PasteModeController.DefaultOverlayPreviewChars;
 }

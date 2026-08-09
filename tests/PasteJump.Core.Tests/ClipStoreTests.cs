@@ -420,4 +420,37 @@ public sealed class ClipStoreTests : IDisposable
 
         Assert.Equal("durable", reopened.GetOrdered()[0].Preview);
     }
+
+    /// <summary>
+    /// The preview cap is a setting, so the store has to read it at write time rather than having baked it in.
+    /// It governs both stores: <c>history_fts</c> indexes the history preview, so this is also how far search
+    /// reaches into a long clip.
+    /// </summary>
+    [Fact]
+    public void PreviewMaxChars_GovernsWhatIsStored()
+    {
+        _store.PreviewMaxChars = 300;
+
+        var clip = _store.Add(TextSnapshot(new string('a', 5_000)));
+
+        Assert.Equal(300, clip.Preview.Length);
+    }
+
+    [Fact]
+    public void PreviewMaxChars_AppliesToTheHistoryArchiveToo()
+    {
+        _store.PreviewMaxChars = 300;
+        _store.AddHistory(
+            DateTimeOffset.UnixEpoch,
+            ClipKind.Text,
+            new string('a', 5_000),
+            blob: null,
+            totalBytes: 5_000);
+
+        Assert.Equal(300, _store.SearchHistory(null).Single().Preview.Length);
+    }
+
+    [Fact]
+    public void PreviewMaxChars_DefaultsToTheDocumentedConstant()
+        => Assert.Equal(ClipStore.DefaultPreviewMaxChars, new ClipStore(AppPaths.At(_root)).PreviewMaxChars);
 }
