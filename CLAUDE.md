@@ -466,6 +466,11 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   Every route into a state has to call `ApplyTrayIcon`: the tray toggles *and* `OnSettingsApplied`, since
   "Watch the clipboard" is editable in the Settings dialog too. Pause originally updated only the tooltip,
   which is precisely why Pause and Disable were reported as being the same command.
+- **The artwork is full-bleed on purpose — do not add padding back.** The tile was inset 3.5% with a 23.5%
+  corner radius, which at 16 px cost a pixel on every side and rounded most of each corner away; the tray icon
+  was reported as looking small next to neighbours whose artwork runs edge to edge. Windows pads tray icons
+  itself, so padding them here as well only discards pixels the 16 px frame cannot spare. Inset is 0, the
+  radius is 19%, and the cards are 50%/36% of the frame rather than 44%/32.5%.
 - **A tray state cannot be marked with a badge or a corner dot.** The tray asks for 16 px, where a badge is
   about five pixels across and its detail anti-aliases into a smudge — so paused would be indistinguishable
   from disabled, which is the failure being fixed. Hue is the only signal that reliably survives at that

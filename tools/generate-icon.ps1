@@ -104,11 +104,14 @@ function New-PasteJumpBitmap {
     $s = [single]$Size
 
     # --- tile -----------------------------------------------------------------
-    # Only a hairline inset. The taskbar already pads its icons, so insetting further just throws
-    # away pixels that the 16 px frame cannot spare.
-    $inset = [single]([Math]::Max(0.5, $s * 0.035))
+    # No inset at all, and a tighter corner radius than before. Both are about apparent size in the
+    # notification area, which was reported as looking small: at 16 px the old 3.5% inset cost a pixel on every
+    # side, and a 23.5% radius rounds away most of each corner, so what remained read as a small blob beside
+    # neighbours whose artwork goes edge to edge. Windows pads tray icons itself; padding them again here just
+    # discards pixels the 16 px frame cannot spare.
+    $inset = [single]0
     $tileW = $s - (2 * $inset)
-    $radius = [single]($s * 0.235)
+    $radius = [single]($s * 0.19)
 
     $tile = New-RoundedPath -X $inset -Y $inset -W $tileW -H $tileW -Radius $radius
 
@@ -166,11 +169,14 @@ function New-PasteJumpBitmap {
     # not a stroked outline. That distinction is the whole trick: a hairline stroke anti-aliases to
     # a grey haze below about 24 px and the two cards fuse into one blob, which is exactly how the
     # previous icon failed. A filled carve-out is at least one whole pixel wide at every size.
-    $cardW = [single]($s * 0.44)
-    $cardH = [single]($s * 0.325)
+    # Enlarged along with the tile, for the same reason: two 7x5 marks in the middle of a 16 px frame is a
+    # quiet icon. The pair still fits with room to spare - the widest extent is the front card's right edge at
+    # 0.5 + 0.055 + 0.25 of the frame, about 0.81, leaving a comfortable margin for the carve-out.
+    $cardW = [single]($s * 0.50)
+    $cardH = [single]($s * 0.36)
     $cardR = [single]($s * 0.07)
 
-    $offset = [single]([Math]::Max(1.5, $s * 0.105))
+    $offset = [single]([Math]::Max(1.5, $s * 0.11))
     $gap = [single]([Math]::Max(1.0, $s * 0.035))
 
     $centreX = [single](($s - $cardW) / 2)
