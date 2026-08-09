@@ -441,8 +441,32 @@ public partial class App : Application
 
         Toast().Notify(
             total == 1 ? "Copied - 1 clip" : $"Copied - {total} clips",
-            SingleLine(clip.Preview),
+            ToastDetail(clip),
             TimeSpan.FromMilliseconds(_settings.CopyNotificationMs));
+    }
+
+    /// <summary>
+    /// The toast's second line. Text is flattened; a file list keeps its single line break.
+    /// <para>
+    /// That break is the one piece of structure <see cref="FileListPreview"/> puts in deliberately - the count
+    /// and folder above, the names below - so flattening it here would undo the point of naming them. Text
+    /// clips get no such consideration: their line breaks are the author's, arbitrary in number, and a toast
+    /// is not the place to honour them.
+    /// </para>
+    /// </summary>
+    private static string ToastDetail(Clip clip)
+    {
+        if (clip.Kind != ClipKind.Files || string.IsNullOrWhiteSpace(clip.Preview))
+        {
+            return SingleLine(clip.Preview);
+        }
+
+        var lines = clip.Preview.ReplaceLineEndings("\n").Split('\n', 2);
+
+        // Only the names are clamped. The header is one short line and is the part worth guaranteeing.
+        return lines.Length == 2
+            ? lines[0] + Environment.NewLine + SingleLine(lines[1])
+            : SingleLine(clip.Preview);
     }
 
     /// <summary>

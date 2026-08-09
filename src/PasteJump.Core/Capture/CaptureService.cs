@@ -275,7 +275,12 @@ public sealed class CaptureService
             blob = Encoding.UTF8.GetBytes(full);
         }
 
+        // Files are named here too, and for the stronger reason: this is the row history_fts indexes, so
+        // "[files]" meant a file copy could never be found by searching for a file in it.
         var preview = snapshot.Text
+            ?? (snapshot.Kind == ClipKind.Files
+                ? FileListPreview.TryDescribe(snapshot.Payloads)
+                : null)
             ?? snapshot.Kind switch
             {
                 ClipKind.Image => "[image]",

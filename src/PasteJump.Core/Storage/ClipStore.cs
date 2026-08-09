@@ -853,6 +853,14 @@ public sealed class ClipStore : IDisposable
             return Truncate(snapshot.Text, PreviewMaxChars);
         }
 
+        // Names the files rather than storing "[files]", which is what makes a file copy findable: history_fts
+        // indexes this column. Null only when the CF_HDROP is missing or malformed.
+        if (snapshot.Kind == ClipKind.Files
+            && FileListPreview.TryDescribe(snapshot.Payloads) is { Length: > 0 } files)
+        {
+            return Truncate(files, PreviewMaxChars);
+        }
+
         return snapshot.Kind switch
         {
             ClipKind.Image => "[image]",
