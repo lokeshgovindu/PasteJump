@@ -73,9 +73,9 @@ internal static class Program
                 {
                     var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
 
-                    // Select a row that is not the first, so the screenshot shows selection against
-                    // both a normal and an alternating row.
-                    window.Loaded += (_, _) => window.SelectRowForSmokeTest(2);
+                    // Row 0 is the seeded image FILE, so the screenshot shows the shape with the most going on:
+                    // path above, thumbnail below, dimensions and size in the footer.
+                    window.Loaded += (_, _) => window.SelectRowForSmokeTest(0);
                     return window;
                 });
 
@@ -316,6 +316,105 @@ internal static class Program
 
         // An image row too, so the Kind column and the image preview branch are both reached.
         store.AddHistory(DateTimeOffset.UtcNow, ClipKind.Image, "[image]", null, 1_234_567);
+
+        // A copied image FILE, which is a third preview shape again: the path stays visible and a thumbnail of
+        // it appears underneath. Written as a real file on disk because that branch decodes from disk - seeding
+        // a path that does not exist would exercise nothing and look identical to the feature being broken.
+        var imagePath = Path.Combine(Path.GetTempPath(), "pastejump-smoke-preview.png");
+        File.WriteAllBytes(imagePath, SamplePng());
+
+        store.AddHistory(
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            ClipKind.Files,
+            FileListPreview.Describe([imagePath]),
+            null,
+            new FileInfo(imagePath).Length);
+    }
+
+    /// <summary>
+    /// A PNG built by hand, so the harness needs no image on the machine and no System.Drawing reference.
+    /// <para>
+    /// Deliberately larger than the pane: it was 2x2 at first, and the screenshot showed a single dot -
+    /// correct, since the preview declines to upscale, but useless for judging the layout. A real photograph
+    /// is downscaled, so the test image has to be too if the shot is to represent anything.
+    /// </para>
+    /// </summary>
+    private static byte[] SamplePng()
+    {
+        const int Width = 480;
+        const int Height = 300;
+
+        using var stream = new MemoryStream();
+
+        stream.Write([0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A]);
+
+        var header = new byte[13];
+        BitConverter.GetBytes(Width).Reverse().ToArray().CopyTo(header, 0);
+        BitConverter.GetBytes(Height).Reverse().ToArray().CopyTo(header, 4);
+        header[8] = 8;      // bit depth
+        header[9] = 2;      // truecolour
+        WriteChunk(stream, "IHDR", header);
+
+        // A diagonal gradient, so the thumbnail is obviously an image rather than a flat block.
+        var raw = new byte[Height * ((Width * 3) + 1)];
+        var at = 0;
+
+        for (var y = 0; y < Height; y++)
+        {
+            raw[at++] = 0;  // filter: none
+
+            for (var x = 0; x < Width; x++)
+            {
+                raw[at++] = (byte)(x * 255 / Width);
+                raw[at++] = (byte)(y * 255 / Height);
+                raw[at++] = 0xF0;
+            }
+        }
+
+        using var deflated = new MemoryStream();
+        using (var zlib = new System.IO.Compression.ZLibStream(
+            deflated, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+        {
+            zlib.Write(raw);
+        }
+
+        WriteChunk(stream, "IDAT", deflated.ToArray());
+        WriteChunk(stream, "IEND", []);
+
+        return stream.ToArray();
+
+        static void WriteChunk(Stream target, string type, byte[] data)
+        {
+            var length = BitConverter.GetBytes(data.Length);
+            Array.Reverse(length);
+            target.Write(length);
+
+            var typeAndData = new byte[4 + data.Length];
+            Encoding.ASCII.GetBytes(type).CopyTo(typeAndData, 0);
+            data.CopyTo(typeAndData, 4);
+            target.Write(typeAndData);
+
+            var crc = BitConverter.GetBytes(Crc32(typeAndData));
+            Array.Reverse(crc);
+            target.Write(crc);
+        }
+
+        static uint Crc32(byte[] bytes)
+        {
+            var crc = 0xFFFFFFFFu;
+
+            foreach (var b in bytes)
+            {
+                crc ^= b;
+
+                for (var i = 0; i < 8; i++)
+                {
+                    crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320u : crc >> 1;
+                }
+            }
+
+            return crc ^ 0xFFFFFFFFu;
+        }
     }
 
     private static void TryDelete(string path)

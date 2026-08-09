@@ -413,7 +413,7 @@ public partial class HistoryWindow : Window
             PreviewHeader.Text = "Preview";
             PreviewBox.Text = string.Empty;
             PreviewBox.Visibility = Visibility.Visible;
-            ShowImage(null, null, null);
+            ShowImage(null, null, null, 0, 0);
             return;
         }
 
@@ -426,9 +426,10 @@ public partial class HistoryWindow : Window
 
             if (bitmap is not null)
             {
-                // Whole pane: the picture is the content, and there is no path to show above it.
+                // Whole pane: the picture is the content, and there is no path to show above it. A stored image
+                // is decoded in full, so its own dimensions are the true ones here.
                 PreviewScroller.Visibility = Visibility.Collapsed;
-                ShowImage(bitmap, null, storedBytes: bytes!.LongLength);
+                ShowImage(bitmap, null, bytes!.LongLength, bitmap.PixelWidth, bitmap.PixelHeight);
                 return;
             }
         }
@@ -440,11 +441,11 @@ public partial class HistoryWindow : Window
         // case where both halves of the pane are wanted at once.
         if (row.Kind == ClipKind.Files && TryLoadFirstImageFile(row.Preview) is { } file)
         {
-            ShowImage(file.Bitmap, file.Path, file.FileBytes);
+            ShowImage(file.Bitmap, file.Path, file.FileBytes, file.PixelWidth, file.PixelHeight);
             return;
         }
 
-        ShowImage(null, null, null);
+        ShowImage(null, null, null, 0, 0);
     }
 
     /// <summary>
@@ -455,7 +456,7 @@ public partial class HistoryWindow : Window
     /// half the pane when there is a thumbnail to show.
     /// </para>
     /// </summary>
-    private void ShowImage(BitmapSource? bitmap, string? path, long? storedBytes)
+    private void ShowImage(BitmapSource? bitmap, string? path, long? storedBytes, int pixelWidth, int pixelHeight)
     {
         if (bitmap is null)
         {
@@ -474,7 +475,9 @@ public partial class HistoryWindow : Window
         PreviewTextRow.Height = path is null ? new GridLength(0) : GridLength.Auto;
         PreviewImageRow.Height = new GridLength(1, GridUnitType.Star);
 
-        PreviewDimensions.Text = $"{bitmap.PixelWidth} × {bitmap.PixelHeight}";
+        // The file's dimensions, passed in rather than read off the bitmap: a thumbnail has been resized, so
+        // its own PixelWidth is the size we asked for and not the image's.
+        PreviewDimensions.Text = $"{pixelWidth} × {pixelHeight}";
         PreviewBytes.Text = storedBytes is { } bytes ? FormatBytes(bytes) : string.Empty;
         PreviewFooter.Visibility = Visibility.Visible;
     }
@@ -487,7 +490,7 @@ public partial class HistoryWindow : Window
     /// one picture, and a copy of forty photographs should not read forty files to fill it.
     /// </para>
     /// </summary>
-    private static (BitmapSource Bitmap, string Path, long FileBytes)? TryLoadFirstImageFile(string? preview)
+    private static ImageFilePreview? TryLoadFirstImageFile(string? preview)
     {
         foreach (var path in FileListPreview.TryReadPathsFromDescription(preview))
         {
@@ -505,19 +508,39 @@ public partial class HistoryWindow : Window
                     continue;
                 }
 
+                using var stream = info.OpenRead();
+
+                // The real dimensions come from the header, before any decode, because the decoded bitmap
+                // cannot report them: DecodePixelWidth resizes, so PixelWidth afterwards is the size WE asked
+                // for. Reporting that as the image's resolution was wrong in both directions - it claimed
+                // 640x802 for a 1016x1274 photograph and 640x640 for a 2x2 test file.
+                var header = BitmapDecoder.Create(
+                    stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+
+                var frame = header.Frames[0];
+                var pixelWidth = frame.PixelWidth;
+                var pixelHeight = frame.PixelHeight;
+
+                stream.Position = 0;
+
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
-                bitmap.UriSource = new Uri(info.FullName);
+                bitmap.StreamSource = stream;
 
-                // Capped, and OnLoad so the file handle is released rather than held for the window's life.
-                // Without the cap, selecting a 40-megapixel photograph decodes all of it to fill a pane a few
-                // hundred pixels wide.
-                bitmap.DecodePixelWidth = 640;
+                // Only ever downwards. Capping a large photograph avoids decoding forty megapixels to fill a
+                // pane a few hundred pixels wide; applying the same cap to a small image would enlarge it,
+                // which is both pointless and how the wrong resolution got reported.
+                if (pixelWidth > ThumbnailMaxWidth)
+                {
+                    bitmap.DecodePixelWidth = ThumbnailMaxWidth;
+                }
+
+                // OnLoad, so the bitmap does not depend on the stream after this using block closes it.
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 bitmap.EndInit();
                 bitmap.Freeze();
 
-                return (bitmap, info.FullName, info.Length);
+                return new ImageFilePreview(bitmap, info.FullName, info.Length, pixelWidth, pixelHeight);
             }
             catch (Exception)
             {
@@ -528,6 +551,17 @@ public partial class HistoryWindow : Window
 
         return null;
     }
+
+    /// <summary>What the pane needs about a copied image file. The dimensions are the file's, not the thumbnail's.</summary>
+    private sealed record ImageFilePreview(
+        BitmapSource Bitmap,
+        string Path,
+        long FileBytes,
+        int PixelWidth,
+        int PixelHeight);
+
+    /// <summary>Widest thumbnail worth decoding. The pane is a few hundred pixels; this leaves room to enlarge it.</summary>
+    private const int ThumbnailMaxWidth = 640;
 
     /// <summary>
     /// Extensions worth attempting. An allow-list rather than "try everything": the alternative is opening and
