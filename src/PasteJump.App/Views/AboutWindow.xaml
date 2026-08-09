@@ -35,14 +35,23 @@
                    RenderOptions.BitmapScalingMode="HighQuality" />
 
             <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
-                <TextBlock Text="PasteJump"
-                           Foreground="{DynamicResource TextBrush}"
-                           FontSize="20"
-                           FontWeight="SemiBold" />
+                <!--
+                    The product name IS the repository link, rather than a bare URL on a line of its own at the
+                    bottom. Same place the eye already is, and it reads as a title instead of as an address.
+                -->
+                <TextBlock FontSize="20" FontWeight="SemiBold">
+                    <Hyperlink NavigateUri="https://github.com/lokeshgovindu/PasteJump"
+                               RequestNavigate="OnRequestNavigate"
+                               ToolTip="github.com/lokeshgovindu/PasteJump">PasteJump</Hyperlink>
+                </TextBlock>
                 <TextBlock x:Name="VersionText"
                            Foreground="{DynamicResource MutedTextBrush}"
                            FontSize="12"
                            Margin="0,2,0,0" />
+                <TextBlock x:Name="BuildText"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           FontSize="11"
+                           Margin="0,1,0,0" />
             </StackPanel>
         </StackPanel>
 
@@ -59,17 +68,12 @@
             <Run Text="No Clipjump code was copied." />
         </TextBlock>
 
+        <!-- Inlines are built in code: the author's name inside the copyright line is a link, and both the
+             line and the name come from assembly attributes rather than being spelt out twice. -->
         <TextBlock x:Name="CopyrightText"
                    Margin="0,14,0,0"
                    Foreground="{DynamicResource MutedTextBrush}"
                    FontSize="11" />
-
-        <TextBlock Margin="0,10,0,0" FontSize="11" Foreground="{DynamicResource MutedTextBrush}">
-            <Hyperlink x:Name="RepositoryLink"
-                       NavigateUri="https://github.com/lokeshgovindu/PasteJump"
-                       RequestNavigate="OnRequestNavigate"
-                       Foreground="{DynamicResource AccentBrush}">github.com/lokeshgovindu/PasteJump</Hyperlink>
-        </TextBlock>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
             <Button x:Name="CopyDetailsButton"

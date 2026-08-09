@@ -13,6 +13,16 @@ public sealed class ImportReport
     public int Skipped { get; set; }
 
     /// <summary>
+    /// History rows already present, so not imported again.
+    /// <para>
+    /// Counted separately from <see cref="Skipped"/>, which means "could not be imported". A duplicate is a
+    /// success - it is the import being idempotent - and reporting the two as one number would make a second
+    /// run of a clean import look like thousands of failures.
+    /// </para>
+    /// </summary>
+    public int Duplicates { get; set; }
+
+    /// <summary>
     /// Set when the user stopped the run part-way. Whatever had already been imported is kept: the import is
     /// idempotent, so resuming later simply skips those rows rather than duplicating them.
     /// </summary>
@@ -204,10 +214,21 @@ public static class LegacyClipjumpImporter
                 var text = Win32TextOf(payloads);
                 var snapshot = new ClipboardSnapshot(payloads, text, KindOf(payloads, text), ProvenanceTag);
 
-                // Duplicates allowed: two Clipjump clips holding the same text are two clips the user kept, and
-                // collapsing them would silently import fewer than reported.
-                target.Add(snapshot, allowDuplicates: true);
-                report.ClipsImported++;
+                // Duplicates NOT allowed, which is a reversal: it was true here on the reasoning that two
+                // Clipjump clips holding the same text are two clips the user kept. That reasoning ignored the
+                // second run - importing twice made a second copy of every clip, the same way the history import
+                // did. Add promotes the existing clip instead, so a re-import refreshes the order rather than
+                // doubling the stack, and the report counts it as a duplicate rather than as an import.
+                target.Add(snapshot, allowDuplicates: false, out var wasNewClip);
+
+                if (wasNewClip)
+                {
+                    report.ClipsImported++;
+                }
+                else
+                {
+                    report.Duplicates++;
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -340,34 +361,40 @@ public static class LegacyClipjumpImporter
 
                 var captured = ParseLegacyTimestamp(timeText);
 
-                if (type == 1)
+                if (type != 1 && string.IsNullOrEmpty(data))
                 {
-                    var blob = TryReadLegacyImage(clipjumpFolder, fileId);
-
-                    target.AddHistory(
-                        captured,
-                        ClipKind.Image,
-                        string.IsNullOrWhiteSpace(data) ? "[image]" : data,
-                        blob,
-                        size,
-                        ProvenanceTag);
+                    // Nothing to import and nothing to report: an empty text row carried no content in
+                    // Clipjump either.
+                    report.Skipped++;
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(data))
+                    // AddHistoryIfAbsent rather than AddHistory, which is what makes running this twice
+                    // harmless. The dialog claimed exactly that for months while nothing checked, so a history
+                    // imported four times held four copies of everything - 28,488 rows where 7,122 were meant.
+                    var inserted = type == 1
+                        ? target.AddHistoryIfAbsent(
+                            captured,
+                            ClipKind.Image,
+                            string.IsNullOrWhiteSpace(data) ? "[image]" : data,
+                            TryReadLegacyImage(clipjumpFolder, fileId),
+                            size,
+                            ProvenanceTag)
+                        : target.AddHistoryIfAbsent(captured, ClipKind.Text, data, null, size, ProvenanceTag);
+
+                    if (inserted is null)
                     {
-                        report.Skipped++;
-                        continue;
+                        report.Duplicates++;
                     }
+                    else
+                    {
+                        report.Imported++;
 
-                    target.AddHistory(captured, ClipKind.Text, data, null, size, ProvenanceTag);
-                }
-
-                report.Imported++;
-
-                if (report.OldestImported is null || captured < report.OldestImported)
-                {
-                    report.OldestImported = captured;
+                        if (report.OldestImported is null || captured < report.OldestImported)
+                        {
+                            report.OldestImported = captured;
+                        }
+                    }
                 }
             }
             catch (Exception ex)

@@ -121,6 +121,27 @@
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
     </Style>
 
+    <!--
+        Implicit rather than keyed, which is the whole point: WPF's built-in Hyperlink is a fixed blue with a
+        permanent underline, and that blue is illegible on the dark palette. Anywhere a link is added without
+        remembering to style it, this is what catches it.
+
+        The underline appears on hover only. A permanently underlined link inside a sentence competes with the
+        text around it, and the accent colour already carries the affordance - Windows 11's own dialogs do the
+        same. Foreground has to be re-stated on hover as well, or the pointer turns the link WPF's blue: the
+        built-in template's own IsMouseOver trigger would otherwise win over this setter.
+    -->
+    <Style TargetType="Hyperlink">
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="TextDecorations" Value="{x:Null}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                <Setter Property="TextDecorations" Value="Underline" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style TargetType="TextBox">
         <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />

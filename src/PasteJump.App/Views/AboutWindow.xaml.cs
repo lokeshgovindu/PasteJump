@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Navigation;
 using PasteJump.Core;
 
@@ -21,7 +23,59 @@ public partial class AboutWindow : Window
         // Current, not Display: this is the one place the full four-part number belongs, because it is
         // the number someone reads back in a bug report.
         VersionText.Text = $"Version {AppVersion.Current}";
-        CopyrightText.Text = AppVersion.Copyright;
+
+        ShowBuildTimestamp();
+        ShowCopyright();
+    }
+
+    /// <summary>
+    /// Shows when this build was produced, in local time. Local rather than UTC because the reader is placing
+    /// it against "when did I install this", and the row is hidden entirely rather than showing "unknown" when
+    /// there is no stamp - an empty fact is not worth a line.
+    /// </summary>
+    private void ShowBuildTimestamp()
+    {
+        if (AppVersion.BuildTimestamp is not { } built)
+        {
+            BuildText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        BuildText.Text = "Built " + built.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+    }
+
+    /// <summary>
+    /// Renders the copyright line with the author's name as a link to their profile.
+    /// <para>
+    /// Inlines rather than a single string, because only part of the line is a link. Both halves come from
+    /// assembly attributes: writing the name here as well would be a second copy of it, and the copy on screen
+    /// is the one that goes stale.
+    /// </para>
+    /// </summary>
+    private void ShowCopyright()
+    {
+        var credit = CreditLineSplitter.Split(AppVersion.Copyright, AppVersion.Author);
+
+        CopyrightText.Inlines.Clear();
+        CopyrightText.Inlines.Add(new Run(credit.Prefix));
+
+        if (!credit.HasAuthor || !Uri.TryCreate(AppVersion.AuthorUrl, UriKind.Absolute, out var profile))
+        {
+            // No name found, or no profile to point at. The line still reads correctly, just without a link.
+            CopyrightText.Inlines.Add(new Run(credit.Author + credit.Suffix));
+            return;
+        }
+
+        var link = new Hyperlink(new Run(credit.Author))
+        {
+            NavigateUri = profile,
+            ToolTip = profile.Host + profile.AbsolutePath,
+        };
+
+        link.RequestNavigate += OnRequestNavigate;
+
+        CopyrightText.Inlines.Add(link);
+        CopyrightText.Inlines.Add(new Run(credit.Suffix));
     }
 
     private void OnCloseClicked(object sender, RoutedEventArgs e) => Close();
@@ -62,8 +116,15 @@ public partial class AboutWindow : Window
     /// </summary>
     private void OnCopyDetailsClicked(object sender, RoutedEventArgs e)
     {
+        // The build stamp goes in too. Two people on the same version number can be on different builds, and
+        // this is the line that tells them apart in a bug report.
+        var built = AppVersion.BuildTimestamp is { } time
+            ? $"Built {time.ToLocalTime():yyyy-MM-dd HH:mm}{Environment.NewLine}"
+            : string.Empty;
+
         var details =
             $"PasteJump {AppVersion.Current}{Environment.NewLine}" +
+            built +
             $"Windows {Environment.OSVersion.Version}{Environment.NewLine}" +
             $".NET {Environment.Version}{Environment.NewLine}" +
             $"{(Environment.Is64BitProcess ? "x64" : "x86")} process";

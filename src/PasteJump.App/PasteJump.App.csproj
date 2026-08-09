@@ -56,6 +56,29 @@
   </ItemGroup>
 
   <!--
+    Build timestamp, shown in the About window under the version.
+
+    It cannot come from the PE header: Deterministic is on in Directory.Build.props, so the field that used
+    to hold a link time holds a content hash instead. Nor from the exe's own file time, which is what a copy
+    or an unzip decides rather than what the build did.
+
+    Two consequences worth knowing before moving this:
+
+    - Only this project carries it, not Directory.Build.props. The value changes on every evaluation, so the
+      generated attribute file changes, so the project recompiles on every build. Confining that to the entry
+      assembly keeps Core, Interop, Import and the test projects incremental.
+    - It does make THIS assembly non-reproducible, which is a deliberate exception to Deterministic rather
+      than an oversight: two builds of the same commit differ in this one string. AppVersion falls back to
+      the executable's file time when the attribute is missing, so a host without it still shows something.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BuildTimestampUtc</_Parameter1>
+      <_Parameter2>$([System.DateTime]::UtcNow.ToString("O"))</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!--
     pastejump.ico is shipped two ways on purpose, and each one is reachable only by its own mechanism -
     which is why this looks redundant and is not.
 

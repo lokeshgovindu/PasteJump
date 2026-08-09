@@ -405,6 +405,10 @@ public partial class HistoryWindow : Window
         ClearButton.Content = ShowingClips ? "Clear _Clips" : "Clear _History";
         PinButton.Visibility = ShowingClips ? Visibility.Visible : Visibility.Collapsed;
 
+        // The cue names the store being searched. It said "history" in both views, which is the same confusion
+        // between the two stores that the view switch exists to dispel.
+        SearchCue.Text = ShowingClips ? "Search clips…  (Ctrl+K)" : "Search history…  (Ctrl+K)";
+
         Refresh();
     }
 
@@ -987,5 +991,58 @@ public partial class HistoryWindow : Window
         StatusText.Text = clips == 0
             ? "History cleared."
             : $"History cleared. {clips} clip{(clips == 1 ? string.Empty : "s")} still available to Ctrl+V.";
+    }
+
+    /// <summary>
+    /// Collapses exact duplicates in whichever store is on screen.
+    /// <para>
+    /// Confirmed, because it deletes rows and cannot be undone - but stated as what it is: the survivors are
+    /// indistinguishable from what is removed. It exists because imports were not idempotent until
+    /// <c>AddHistoryIfAbsent</c>, so anyone who ran the Clipjump import more than once has a copy per run and
+    /// no other way to get rid of them short of clearing everything.
+    /// </para>
+    /// </summary>
+    private void OnDeduplicateClicked(object sender, RoutedEventArgs e)
+    {
+        var clips = ShowingClips;
+        var before = clips ? _store.Count : _store.HistoryCount;
+
+        var accepted = MessageDialog.Show(
+            "Entries that are an exact duplicate of another are removed, keeping one of each. Nothing that "
+                + "differs in any way is touched.\n\n"
+                + (clips
+                    ? "A clip is judged by its content, which is the same test the gesture uses to recognise a "
+                        + "re-copy. The newest of each set is kept, and a pinned one always wins."
+                    : "An entry is judged by its timestamp, its kind, its text and its image, so two "
+                        + "screenshots taken in the same second are not mistaken for one. The oldest of each "
+                        + "set is kept.")
+                + "\n\nThis cannot be undone.",
+            headline: clips ? "Remove duplicate clips?" : "Remove duplicate history entries?",
+            kind: DialogKind.Warning,
+            buttons: DialogButtons.OkCancel,
+            owner: this) == DialogResultKind.Accepted;
+
+        if (!accepted)
+        {
+            return;
+        }
+
+        var removed = clips ? _store.DeduplicateClips() : _store.DeduplicateHistory();
+
+        if (removed > 0)
+        {
+            // Only when something went: the blob sweep walks every row in both stores, which is not work worth
+            // doing to discover that nothing was orphaned.
+            _store.CollectGarbage();
+        }
+
+        Refresh();
+
+        var noun = clips ? "clip" : "history entry";
+        var plural = clips ? "clips" : "history entries";
+
+        StatusText.Text = removed == 0
+            ? $"No duplicates found among the {before} {plural}."
+            : $"Removed {removed} duplicate {(removed == 1 ? noun : plural)}. {before - removed} left.";
     }
 }

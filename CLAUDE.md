@@ -19,7 +19,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 445 passing (`dotnet test`) |
+| Tests | 480 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -69,7 +69,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      445 tests.
+tests/PasteJump.Core.Tests      480 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -282,6 +282,18 @@ that immediately caught two real bugs. Expect to do the same again.
   that settled it. Parsing `cache/clips/1007.avc` shows a single `CF_DIB` and no bitmap duplicate, so a
   decade of shipped use says nothing real depends on the copies. Note this filters at capture, deliberately
   departing from "store faithfully, filter on the way out" — the cost being avoided *is* the storage.
+- **The import was not idempotent, and said it was.** The dialog claimed "entries already imported are
+  skipped" while `Skipped` only ever counted empty rows and errors, so every run re-inserted everything —
+  a user who imported four times had 28,488 history rows where 7,122 were meant, each entry four times.
+  `AddHistoryIfAbsent` is now the only path the importer uses, and the clip half no longer passes
+  `allowDuplicates: true`. The natural key is `(captured_utc, kind, preview, blob_hash)` and the **blob hash
+  is not optional**: every image row previews as `[image]`, so two different screenshots in the same second
+  are indistinguishable without it and dropping it from the key throws one of them away. Compare with `IS`,
+  not `=` — SQLite's `=` never matches NULL against NULL, so with `=` nothing textual is ever recognised.
+  `DeduplicateHistory` and `DeduplicateClips` repair stores written before this; history keeps the **oldest**
+  of a group (it is a record of when something was copied) and clips keep the **newest**, pinned first (it is
+  a thing to paste, and position is what the user navigates by). `history_fts` follows deletions through its
+  `AFTER DELETE` trigger, which is why the repair can be one `DELETE`.
 - **History retention and the Clipjump import express contradictory intentions.** Retention means "do not
   keep history older than N days" and runs at every start-up; importing a Clipjump history means "keep this",
   and a real one spans years — 11,115 entries over three years in the case that surfaced this, of which a
@@ -504,7 +516,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 445 tests
+dotnet test                                         # 480 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

@@ -1173,7 +1173,13 @@ public partial class App : Application
         // claim - and it happens for a cancelled run too, which still imported everything up to the stop.
         _historyWindow?.QueueRefresh();
 
-        var summary = $"Imported {report.Imported} history entries.\nSkipped {report.Skipped}.\n\n"
+        // Duplicates are called out separately from skips, and phrased as the import having been run before
+        // rather than as a failure - which is what they are, now that the import checks.
+        var duplicates = report.Duplicates > 0
+            ? $"\nAlready present, so left alone: {report.Duplicates}."
+            : string.Empty;
+
+        var summary = $"Imported {report.Imported} history entries.\nSkipped {report.Skipped}.{duplicates}\n\n"
             + $"Imported {report.ClipsImported} clips into the Ctrl+V stack"
             + (report.ClipsSkipped > 0
                 ? $", skipping {report.ClipsSkipped} that held no replayable format."

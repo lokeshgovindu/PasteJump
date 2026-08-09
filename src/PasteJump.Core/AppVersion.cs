@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 
 namespace PasteJump.Core;
@@ -15,6 +16,12 @@ public static class AppVersion
 
     private static readonly Lazy<string> CachedCopyright = new(ResolveCopyright);
 
+    private static readonly Lazy<string> CachedAuthor = new(() => Metadata("Author"));
+
+    private static readonly Lazy<string> CachedAuthorUrl = new(() => Metadata("AuthorUrl"));
+
+    private static readonly Lazy<DateTimeOffset?> CachedBuildTime = new(ResolveBuildTime);
+
     /// <summary>Version as <c>major.minor.build.revision</c>, e.g. <c>2026.1.0.0</c>.</summary>
     public static string Current => Cached.Value;
 
@@ -27,6 +34,31 @@ public static class AppVersion
     /// </para>
     /// </summary>
     public static string Copyright => CachedCopyright.Value;
+
+    /// <summary>
+    /// The author's name, from assembly metadata. Empty when the attribute is absent.
+    /// <para>
+    /// An <c>AssemblyMetadata</c> attribute rather than <c>&lt;Authors&gt;</c>, which is a NuGet packaging
+    /// property and emits no attribute at all, and rather than <c>AssemblyCompany</c>, which is the product
+    /// name here. The About window needs the name on its own to turn that part of the copyright line into a
+    /// link, and it must be the same string the copyright was built from or the match would fail.
+    /// </para>
+    /// </summary>
+    public static string Author => CachedAuthor.Value;
+
+    /// <summary>The author's profile URL, from assembly metadata. Empty when absent.</summary>
+    public static string AuthorUrl => CachedAuthorUrl.Value;
+
+    /// <summary>
+    /// When this build was produced, or null when it cannot be established.
+    /// <para>
+    /// From an <c>AssemblyMetadata</c> attribute stamped by <c>PasteJump.App.csproj</c>, because the PE
+    /// header's timestamp field holds a content hash under a deterministic build rather than a time. Falls
+    /// back to the executable's own last-write time, which is right for a published exe and merely
+    /// approximate for one that has been copied by something that did not preserve it.
+    /// </para>
+    /// </summary>
+    public static DateTimeOffset? BuildTimestamp => CachedBuildTime.Value;
 
     // There is deliberately no shortened Display form. It existed only to trim a trailing ".0" for the tray
     // tooltip, and the tooltip now shows the full four-part version - it is the quickest place to read the
@@ -62,5 +94,53 @@ public static class AppVersion
             ?.Copyright;
 
         return string.IsNullOrWhiteSpace(copyright) ? string.Empty : copyright;
+    }
+
+    /// <summary>
+    /// One <c>AssemblyMetadata</c> value from this assembly. Own assembly rather than the entry assembly, for
+    /// the same reason as the copyright: every project in the build carries these, and the UI smoke harness
+    /// would otherwise show blanks because its entry assembly is the harness.
+    /// </summary>
+    private static string Metadata(string key)
+    {
+        var value = typeof(AppVersion).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => string.Equals(a.Key, key, StringComparison.Ordinal))
+            ?.Value;
+
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value;
+    }
+
+    private static DateTimeOffset? ResolveBuildTime()
+    {
+        // Entry assembly, unlike the metadata above: only the app project stamps this, because the value
+        // changes on every evaluation and would otherwise make every project recompile on every build.
+        var stamped = (Assembly.GetEntryAssembly() ?? typeof(AppVersion).Assembly)
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => string.Equals(a.Key, "BuildTimestampUtc", StringComparison.Ordinal))
+            ?.Value;
+
+        if (DateTimeOffset.TryParse(
+                stamped,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var parsed))
+        {
+            return parsed;
+        }
+
+        // The executable's own file time. Approximate - a copy can change it - but better than nothing for a
+        // host that carries no stamp, which is every project here except the app.
+        try
+        {
+            var path = Environment.ProcessPath;
+
+            return string.IsNullOrEmpty(path) ? null : new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
+        }
+        catch (Exception)
+        {
+            // A path we cannot stat is not worth failing the About window over.
+            return null;
+        }
     }
 }

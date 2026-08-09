@@ -44,10 +44,16 @@
 
         <!-- Toolbar -->
         <Grid Grid.Row="0" Margin="0,0,0,10">
+            <!--
+                The search box takes the star, not the middle. It used to be a fixed 320 in an Auto column with
+                the gap between them starred, which meant the toolbar had no give: adding one button pushed the
+                total past the window width and the squeeze landed on the density label, which clipped to "y"
+                while the search box overlapped it. A field that narrows is the right thing to sacrifice.
+            -->
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="150" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal">
@@ -81,6 +87,10 @@
                         Click="OnDeleteClicked"
                         Content="_Delete"
                         ToolTip="Remove the selected entries from history (Delete)" />
+                <Button x:Name="DeduplicateButton"
+                        Click="OnDeduplicateClicked"
+                        Content="Remove D_uplicates"
+                        ToolTip="Collapse entries that are exact duplicates, keeping one of each. Acts on whichever of the two stores is shown. Imports before this version were not idempotent, so importing Clipjump more than once left a copy per run." />
                 <Button x:Name="ClearButton"
                         Click="OnClearClicked"
                         Content="Clear _History"
@@ -110,7 +120,10 @@
 
             <!-- Search box with a cue banner. WPF has no native placeholder, so the hint is a
                  TextBlock layered behind the box and hidden as soon as there is text. -->
-            <Grid Grid.Column="2" Width="320">
+            <!-- Stretched, with no MaxWidth and no alignment. Both were tried and both shrink it to its content:
+                 an aligned element sizes to what it wants, and MaxWidth inside a stretched slot centres what is
+                 left over. Filling the remainder is what a search field should do anyway. -->
+            <Grid Grid.Column="2">
                 <TextBox x:Name="SearchBox" MinHeight="32" VerticalAlignment="Center"
                          TextChanged="OnSearchTextChanged"
                          ToolTip="Search history by content. Ctrl+E, Ctrl+K or Ctrl+F to jump here; Esc to clear." />

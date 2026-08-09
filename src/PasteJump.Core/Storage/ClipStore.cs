@@ -387,6 +387,50 @@ public sealed class ClipStore : IDisposable
     /// <summary>
     /// Trims the stack to <paramref name="maxClips"/>, oldest unpinned first. Returns how many went.
     /// </summary>
+    /// <summary>
+    /// Removes clips whose content duplicates another, keeping the newest of each and preferring a pinned one.
+    /// Returns how many were deleted.
+    /// <para>
+    /// The counterpart to <see cref="DeduplicateHistory"/>, and needed for the same reason: the clip half of the
+    /// Clipjump import passed <c>allowDuplicates: true</c>, so importing twice made a second copy of every clip.
+    /// Content hash is the whole key here - it is what "the same clip" means everywhere else in this class, so
+    /// nothing distinguishable is lost.
+    /// </para>
+    /// <para>
+    /// Newest wins rather than oldest, unlike history. A history entry is a record of when something was copied,
+    /// so the first occurrence is the true one; a clip is a thing to paste, and its position in the stack is
+    /// what the user navigates by - keeping the older row would send a duplicate to the back of the stack.
+    /// Pinned beats unpinned regardless, since discarding the pin would lose a deliberate act.
+    /// </para>
+    /// </summary>
+    public int DeduplicateClips()
+    {
+        lock (_gate)
+        {
+            using var cmd = _connection.CreateCommand();
+
+            // MAX over (pinned, sort_key) is not expressible directly, so the survivor is chosen by ordering
+            // within each hash group: pinned first, then newest.
+            cmd.CommandText = """
+                DELETE FROM clip
+                WHERE id NOT IN (
+                    SELECT id FROM (
+                        SELECT id, ROW_NUMBER() OVER (
+                            PARTITION BY content_hash
+                            ORDER BY pinned DESC, sort_key DESC
+                        ) AS rank_in_group
+                        FROM clip
+                    )
+                    WHERE rank_in_group = 1
+                );
+                """;
+
+            // clip_format and clip_tag cascade on delete, so the payload rows go with them. The blobs they
+            // referenced are left to CollectGarbage, which is where every other delete path leaves them too.
+            return cmd.ExecuteNonQuery();
+        }
+    }
+
     public int EvictBeyond(int maxClips)
     {
         if (maxClips <= 0)
@@ -523,6 +567,96 @@ public sealed class ClipStore : IDisposable
             cmd.Parameters.AddWithValue("$from", (object?)importedFrom ?? DBNull.Value);
 
             return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+    }
+
+    /// <summary>
+    /// Adds a history entry unless an identical one is already there, returning its new id or null when it was
+    /// skipped. This is what makes re-importing safe.
+    /// <para>
+    /// The natural key is captured time, kind, preview <em>and</em> blob hash. The hash is part of it on purpose:
+    /// every image row previews as <c>[image]</c>, so two different screenshots taken in the same second are
+    /// indistinguishable without it and a dedupe on the first three columns alone would throw one of them away.
+    /// A re-import cannot be fooled by that, because blobs are content-addressed - the same picture always
+    /// hashes the same.
+    /// </para>
+    /// <para>
+    /// The hash is computed rather than written when the row turns out to be a duplicate, so a skipped row does
+    /// not leave an orphan blob behind for <c>CollectGarbage</c> to find later.
+    /// </para>
+    /// </summary>
+    public long? AddHistoryIfAbsent(
+        DateTimeOffset capturedUtc,
+        ClipKind kind,
+        string preview,
+        byte[]? blob,
+        long totalBytes,
+        string? importedFrom = null)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+
+        var blobHash = blob is { Length: > 0 } ? BlobStore.ComputeHash(blob) : null;
+        var truncated = Truncate(preview, PreviewMaxChars);
+
+        lock (_gate)
+        {
+            using var check = _connection.CreateCommand();
+
+            // IS rather than =, which is SQLite's null-safe comparison. With = a text row's NULL blob_hash
+            // would never match itself, so nothing textual would ever be recognised as a duplicate.
+            check.CommandText = """
+                SELECT 1 FROM history
+                WHERE captured_utc = $time AND kind = $kind AND preview = $preview AND blob_hash IS $hash
+                LIMIT 1;
+                """;
+            check.Parameters.AddWithValue("$time", ToDb(capturedUtc));
+            check.Parameters.AddWithValue("$kind", (int)kind);
+            check.Parameters.AddWithValue("$preview", truncated);
+            check.Parameters.AddWithValue("$hash", (object?)blobHash ?? DBNull.Value);
+
+            if (check.ExecuteScalar() is not null)
+            {
+                return null;
+            }
+        }
+
+        // Outside the lock, and via AddHistory so there is one insert statement in this class rather than two
+        // that could drift. The gap between the check and the insert is not a race worth guarding: every write
+        // goes through this instance, and an import is the only caller.
+        return AddHistory(capturedUtc, kind, preview, blob, totalBytes, importedFrom);
+    }
+
+    /// <summary>
+    /// Removes history entries that duplicate an earlier one exactly, keeping the oldest row of each group.
+    /// Returns how many were deleted.
+    /// <para>
+    /// Needed because imports were not idempotent before <see cref="AddHistoryIfAbsent"/> existed: the dialog
+    /// said entries already imported were skipped, and nothing checked - so a history imported four times held
+    /// four of everything. Same natural key as the insert-time check, for the same reason.
+    /// </para>
+    /// <para>
+    /// The FTS index follows automatically: <c>history_fts</c> is external-content with an AFTER DELETE trigger,
+    /// so deleting here removes the index entry too. Doing this with raw SQL rather than row by row matters at
+    /// the size that provokes it - tens of thousands of rows.
+    /// </para>
+    /// </summary>
+    public int DeduplicateHistory()
+    {
+        lock (_gate)
+        {
+            using var cmd = _connection.CreateCommand();
+
+            // MIN(id) keeps the earliest row of each group, so ids stay stable for whatever was imported first
+            // rather than the survivor changing on every run.
+            cmd.CommandText = """
+                DELETE FROM history
+                WHERE id NOT IN (
+                    SELECT MIN(id) FROM history
+                    GROUP BY captured_utc, kind, preview, blob_hash
+                );
+                """;
+
+            return cmd.ExecuteNonQuery();
         }
     }
 

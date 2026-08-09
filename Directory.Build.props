@@ -38,7 +38,29 @@
     <Company>PasteJump</Company>
     <Authors>Lokesh Govindu</Authors>
     <Copyright>Copyright (c) 2026 Lokesh Govindu</Copyright>
+    <PasteJumpAuthorUrl>https://github.com/lokeshgovindu</PasteJumpAuthorUrl>
   </PropertyGroup>
+
+  <!--
+    Author and profile URL as assembly metadata, because neither is readable at runtime otherwise:
+    <Authors> is a NuGet packaging property and produces no assembly attribute, and <Company> is
+    "PasteJump" rather than a person. The About window needs both to turn the name inside the copyright
+    line into a link, and reading them from here keeps one definition instead of a second copy in XAML
+    that would go stale the first time only one was updated.
+
+    Constant values, so unlike the build timestamp in PasteJump.App.csproj these do not make every
+    build recompile.
+  -->
+  <ItemGroup Label="Product identity">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Author</_Parameter1>
+      <_Parameter2>$(Authors)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>AuthorUrl</_Parameter1>
+      <_Parameter2>$(PasteJumpAuthorUrl)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
 
   <!--
     Versioning: major.minor.build.revision, year-based major. Set here so every project and the

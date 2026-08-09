@@ -172,6 +172,71 @@ public sealed class LegacyImportTests : IDisposable
         Assert.Equal(2, _store.HistoryCount);
     }
 
+    /// <summary>
+    /// Running the import a second time adds nothing. The dialog promised this for months while nothing
+    /// checked, and a user who ran it four times ended up with 28,488 history rows where 7,122 were meant.
+    /// </summary>
+    [Fact]
+    public void ImportingTwiceDoesNotDuplicateAnything()
+    {
+        CreateLegacyDatabase(connection =>
+        {
+            InsertLegacyRow(connection, "first legacy clip", 0, null, "2024-01-01 09:00:00", 20);
+            InsertLegacyRow(connection, "second legacy clip", 0, null, "2024-01-02 09:00:00", 21);
+        });
+
+        RunImport(_legacyFolder);
+        var second = RunImport(_legacyFolder);
+
+        Assert.Equal(2, _store.HistoryCount);
+
+        // Counted as duplicates rather than as failures: a second run is the import working, not erring.
+        Assert.Equal(0, second.Imported);
+        Assert.Equal(2, second.Duplicates);
+        Assert.Equal(0, second.Skipped);
+        Assert.Empty(second.Errors);
+    }
+
+    /// <summary>Four runs, as reported, and still one row per entry.</summary>
+    [Fact]
+    public void ImportingFourTimesLeavesOneCopyOfEachEntry()
+    {
+        CreateLegacyDatabase(connection =>
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                InsertLegacyRow(connection, $"legacy clip {i}", 0, null, $"2024-01-01 09:00:0{i}", 20);
+            }
+        });
+
+        for (var run = 0; run < 4; run++)
+        {
+            RunImport(_legacyFolder);
+        }
+
+        Assert.Equal(10, _store.HistoryCount);
+    }
+
+    /// <summary>
+    /// And two source rows that genuinely differ only in their timestamp both survive, so the deduplication is
+    /// not quietly collapsing a real history down to its distinct texts.
+    /// </summary>
+    [Fact]
+    public void RepeatedTextAtDifferentTimesIsImportedEveryTime()
+    {
+        CreateLegacyDatabase(connection =>
+        {
+            InsertLegacyRow(connection, "copied twice", 0, null, "2024-01-01 09:00:00", 12);
+            InsertLegacyRow(connection, "copied twice", 0, null, "2024-01-01 09:05:00", 12);
+        });
+
+        var report = RunImport(_legacyFolder);
+
+        Assert.Equal(2, report.Imported);
+        Assert.Equal(0, report.Duplicates);
+        Assert.Equal(2, _store.HistoryCount);
+    }
+
     [Fact]
     public void ImportedEntriesAreSearchable()
     {
