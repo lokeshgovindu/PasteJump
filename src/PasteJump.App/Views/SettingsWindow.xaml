@@ -49,21 +49,26 @@
             desired height, while a TextBox defaults to VerticalAlignment="Stretch" and grew to fill the row.
             MinHeight cannot fix that, since the taller control was already above any floor worth setting.
 
-            VerticalAlignment="Center" is what fixes the stretching, and MinHeight then equalises the two - a
-            floor above both natural heights, so they match without either being constrained.
+            VerticalAlignment="Center" is the whole fix, and it is the only thing set. It stops a TextBox
+            stretching to fill its row - which is what made the two disagree, 28 against 35 - and once neither
+            stretches they size to their content and arrive at the same height on their own: both templates spend
+            8px of vertical padding and 2px of border around one line of text, so equal fonts give equal heights.
 
-            MinHeight and not Height, which was the first attempt and clipped the values inside: a fixed 30
-            leaves 20px once the template has taken 2 for borders and 8 for padding, and a 13px font's line box
-            is about 18, so any rounding cut the bottom off every number and file name. A floor cannot do that -
-            the control grows if its content needs more room, which is exactly the property wanted here.
+            No height of any kind, after two attempts that each caused a visible fault. Height="30" clipped the
+            values, because a hard height leaves the content whatever is left after chrome and 20px is not enough
+            for an 18px line box once rounding is against you. MinHeight="32" cured the clipping and then padded
+            every control with 4px of slack it had no use for. Constraining nothing is what fits the text exactly,
+            and it is also the only version that follows a font size change without being retuned.
         -->
         <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="MinHeight" Value="32" />
             <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="7,2" />
+            <Setter Property="MinHeight" Value="27" />
         </Style>
         <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="MinHeight" Value="32" />
             <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="MinHeight" Value="27" />
         </Style>
 
         <!-- Label / editor row. Every setting below uses this shape, so it is defined once. -->
