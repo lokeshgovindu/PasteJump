@@ -194,6 +194,50 @@ public class FileListPreviewTests
         }
     }
 
+    /// <summary>
+    /// The description round-trips back to the paths. The history window needs them again to show a thumbnail,
+    /// and a row keeps only the preview text - so these two functions must not drift apart.
+    /// </summary>
+    [Fact]
+    public void DescriptionRoundTripsBackToItsPaths()
+    {
+        // One file, several sharing a folder, and several that do not - the three shapes Describe produces.
+        string[][] cases =
+        [
+            [@"D:\Photos\holiday.jpg"],
+            [@"D:\Photos\a.jpg", @"D:\Photos\b.png"],
+            [@"D:\A\report.docx", @"D:\B\report.docx"],
+        ];
+
+        foreach (var paths in cases)
+        {
+            Assert.Equal(paths, FileListPreview.TryReadPathsFromDescription(FileListPreview.Describe(paths)));
+        }
+    }
+
+    /// <summary>A folder's trailing marker is not part of its path when read back.</summary>
+    [Fact]
+    public void FolderMarkerIsStrippedOnTheWayBack()
+    {
+        var described = FileListPreview.Describe(
+            [@"D:\Work\a.txt", @"D:\Work\Reports"],
+            p => p.EndsWith("Reports", StringComparison.Ordinal));
+
+        Assert.Equal([@"D:\Work\a.txt", @"D:\Work\Reports"],
+            FileListPreview.TryReadPathsFromDescription(described));
+    }
+
+    /// <summary>
+    /// Text that merely contains a path is not a file list. Without this a copied path would sprout a
+    /// thumbnail and a resolution, claiming to be something it is not.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData(@"D:\Photos\holiday.jpg")]
+    [InlineData("see the file\nD:\\Photos\\holiday.jpg")]
+    public void PlainTextIsNotReadAsAFileList(string text)
+        => Assert.Empty(FileListPreview.TryReadPathsFromDescription(text));
+
     /// <summary>Null, not a description of nothing, so the caller keeps its own placeholder.</summary>
     [Fact]
     public void PayloadSetWithoutHdropIsNotDescribed()

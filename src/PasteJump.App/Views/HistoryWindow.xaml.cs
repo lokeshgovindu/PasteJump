@@ -413,8 +413,7 @@ public partial class HistoryWindow : Window
             PreviewHeader.Text = "Preview";
             PreviewBox.Text = string.Empty;
             PreviewBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = Visibility.Collapsed;
-            PreviewImage.Source = null;
+            ShowImage(null, null, null);
             return;
         }
 
@@ -427,17 +426,126 @@ public partial class HistoryWindow : Window
 
             if (bitmap is not null)
             {
-                PreviewImage.Source = bitmap;
-                PreviewImage.Visibility = Visibility.Visible;
+                // Whole pane: the picture is the content, and there is no path to show above it.
                 PreviewScroller.Visibility = Visibility.Collapsed;
+                ShowImage(bitmap, null, storedBytes: bytes!.LongLength);
                 return;
             }
         }
 
-        PreviewImage.Visibility = Visibility.Collapsed;
         PreviewScroller.Visibility = Visibility.Visible;
         PreviewBox.Text = row.Preview;
+
+        // A copied image FILE: the path stays visible and the picture goes underneath it, which is the one
+        // case where both halves of the pane are wanted at once.
+        if (row.Kind == ClipKind.Files && TryLoadFirstImageFile(row.Preview) is { } file)
+        {
+            ShowImage(file.Bitmap, file.Path, file.FileBytes);
+            return;
+        }
+
+        ShowImage(null, null, null);
     }
+
+    /// <summary>
+    /// Shows or hides the thumbnail and the footer together, and sizes the two content rows to suit.
+    /// <para>
+    /// Row heights are set here rather than in XAML because the same pane serves three shapes: text only,
+    /// picture only, and a path above a picture. Collapsing a row to zero is what keeps the text from taking
+    /// half the pane when there is a thumbnail to show.
+    /// </para>
+    /// </summary>
+    private void ShowImage(BitmapSource? bitmap, string? path, long? storedBytes)
+    {
+        if (bitmap is null)
+        {
+            PreviewImage.Source = null;
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewFooter.Visibility = Visibility.Collapsed;
+            PreviewTextRow.Height = new GridLength(1, GridUnitType.Star);
+            PreviewImageRow.Height = new GridLength(0);
+            return;
+        }
+
+        PreviewImage.Source = bitmap;
+        PreviewImage.Visibility = Visibility.Visible;
+
+        // With a path above it the text gets only what it needs; without one it gets nothing.
+        PreviewTextRow.Height = path is null ? new GridLength(0) : GridLength.Auto;
+        PreviewImageRow.Height = new GridLength(1, GridUnitType.Star);
+
+        PreviewDimensions.Text = $"{bitmap.PixelWidth} × {bitmap.PixelHeight}";
+        PreviewBytes.Text = storedBytes is { } bytes ? FormatBytes(bytes) : string.Empty;
+        PreviewFooter.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Loads the first path in a file list that names an image we can decode.
+    /// <para>
+    /// The paths come back out of the stored description, since a history row keeps no <c>CF_HDROP</c> - see
+    /// <see cref="FileListPreview.TryReadPathsFromDescription"/>. Only the first is used: the pane has room for
+    /// one picture, and a copy of forty photographs should not read forty files to fill it.
+    /// </para>
+    /// </summary>
+    private static (BitmapSource Bitmap, string Path, long FileBytes)? TryLoadFirstImageFile(string? preview)
+    {
+        foreach (var path in FileListPreview.TryReadPathsFromDescription(preview))
+        {
+            if (!ImageFileExtensions.Contains(Path.GetExtension(path)))
+            {
+                continue;
+            }
+
+            try
+            {
+                var info = new FileInfo(path);
+
+                if (!info.Exists)
+                {
+                    continue;
+                }
+
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(info.FullName);
+
+                // Capped, and OnLoad so the file handle is released rather than held for the window's life.
+                // Without the cap, selecting a 40-megapixel photograph decodes all of it to fill a pane a few
+                // hundred pixels wide.
+                bitmap.DecodePixelWidth = 640;
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                bitmap.Freeze();
+
+                return (bitmap, info.FullName, info.Length);
+            }
+            catch (Exception)
+            {
+                // Not decodable, gone, or unreadable. The next candidate gets a turn; the path text is still
+                // shown either way, so nothing is lost by giving up here.
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Extensions worth attempting. An allow-list rather than "try everything": the alternative is opening and
+    /// failing on every .exe and .zip in a copied folder, on the UI thread, on every selection change.
+    /// </summary>
+    private static readonly HashSet<string> ImageFileExtensions =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".ico", ".webp",
+        };
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.0} KB",
+        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):0.0} MB",
+        _ => $"{bytes / (1024.0 * 1024 * 1024):0.00} GB",
+    };
 
     private static BitmapSource? TryDecode(byte[] bytes)
     {

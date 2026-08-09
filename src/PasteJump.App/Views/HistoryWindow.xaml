@@ -18,19 +18,13 @@
         </Style>
 
         <!--
-            The toolbar is one row of controls, so they get one height - the same reasoning as the note in
-            SettingsWindow.xaml. The themed Button carries MinHeight="32" while the ComboBox carries 24 and the
-            TextBox none, so the density combo and the search box sat visibly short beside the buttons. 32 to
-            match the buttons, since here they are the majority of the row.
+            No implicit ComboBox or TextBox style here, deliberately. The toolbar's two editors need a height
+            matching its 32px buttons, and setting that window-wide was a bug: it also caught the multi-line
+            PreviewBox in the preview pane, which with 10px of padding left no room for a line of text, so the
+            preview went blank for every text entry. The height is set on those two controls directly instead -
+            a keyed style would not do either, since a keyed Style replaces the themed implicit one outright
+            and would take the ControlTemplate with it.
         -->
-        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
     </Window.Resources>
 
     <Window.InputBindings>
@@ -85,7 +79,7 @@
                            Foreground="{DynamicResource MutedTextBrush}"
                            VerticalAlignment="Center"
                            Margin="0,0,6,0" />
-                <ComboBox x:Name="DensityCombo"
+                <ComboBox x:Name="DensityCombo" Height="32"
                           Width="104"
                           VerticalAlignment="Center"
                           SelectionChanged="OnDensityChanged"
@@ -95,7 +89,7 @@
             <!-- Search box with a cue banner. WPF has no native placeholder, so the hint is a
                  TextBlock layered behind the box and hidden as soon as there is text. -->
             <Grid Grid.Column="2" Width="320">
-                <TextBox x:Name="SearchBox"
+                <TextBox x:Name="SearchBox" Height="32" VerticalAlignment="Center"
                          TextChanged="OnSearchTextChanged"
                          ToolTip="Search history by content. Ctrl+E, Ctrl+K or Ctrl+F to jump here; Esc to clear." />
 
@@ -201,6 +195,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0"
@@ -219,8 +214,19 @@
                                    TextTrimming="CharacterEllipsis" />
                     </Border>
 
+                    <!--
+                        Two rows rather than one overlapping pair, because a copied image FILE needs both at
+                        once: its path above and a thumbnail of it below. An image clip uses only the second,
+                        and text only the first, so each row's height is set per selection in ShowPreview.
+                    -->
                     <Grid Grid.Row="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition x:Name="PreviewTextRow" Height="*" />
+                            <RowDefinition x:Name="PreviewImageRow" Height="0" />
+                        </Grid.RowDefinitions>
+
                         <ScrollViewer x:Name="PreviewScroller"
+                                      Grid.Row="0"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Auto">
                             <TextBox x:Name="PreviewBox"
@@ -237,12 +243,41 @@
                         </ScrollViewer>
 
                         <Image x:Name="PreviewImage"
+                               Grid.Row="1"
                                Margin="10"
                                Stretch="Uniform"
                                StretchDirection="DownOnly"
                                Visibility="Collapsed"
-                               ToolTip="Stored image for this entry" />
+                               ToolTip="Image for this entry" />
                     </Grid>
+
+                    <!--
+                        Dimensions on the left, bytes on the right - the two facts you want about an image and
+                        cannot get from the picture itself. Collapsed for anything that is not an image, rather
+                        than showing empty fields.
+                    -->
+                    <Border x:Name="PreviewFooter"
+                            Grid.Row="2"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="0,1,0,0"
+                            CornerRadius="0,0,3,3"
+                            Padding="10,0"
+                            MinHeight="28"
+                            Visibility="Collapsed">
+                        <Grid>
+                            <TextBlock x:Name="PreviewDimensions"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource MutedTextBrush}"
+                                       FontSize="11" />
+                            <TextBlock x:Name="PreviewBytes"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource MutedTextBrush}"
+                                       FontSize="11" />
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

@@ -141,6 +141,83 @@ public static class FileListPreview
         return $"{header} in {shared}{Environment.NewLine}{string.Join(Environment.NewLine, names)}";
     }
 
+    /// <summary>
+    /// Reads the paths back out of a description produced by <see cref="Describe"/>.
+    /// <para>
+    /// Needed because a history row keeps only the preview text - the <c>CF_HDROP</c> payload is not stored
+    /// alongside it - and the history window wants the paths again to show a thumbnail of a copied image.
+    /// Parsing our own output is a coupling worth naming rather than hiding: it lives here, beside the writer,
+    /// and is covered by round-trip tests so the two cannot drift apart silently.
+    /// </para>
+    /// <para>
+    /// Returns an empty list for anything that is not one of our descriptions, including plain text that
+    /// merely happens to contain a path.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<string> TryReadPathsFromDescription(string? description)
+    {
+        if (string.IsNullOrEmpty(description))
+        {
+            return [];
+        }
+
+        var lines = description.ReplaceLineEndings("\n").Split('\n');
+
+        if (lines.Length < 2)
+        {
+            return [];
+        }
+
+        var header = lines[0];
+
+        // Only our own headers. Deliberately structural rather than a substring search: "see the file" contains
+        // " file" too, and a test caught exactly that - plain text sprouting a thumbnail and a resolution,
+        // claiming to be something it is not.
+        if (!IsCountHeader(header))
+        {
+            return [];
+        }
+
+        var marker = header.IndexOf(" in ", StringComparison.Ordinal);
+        var sharedDirectory = marker >= 0 ? header[(marker + 4)..] : null;
+
+        var paths = new List<string>(lines.Length - 1);
+
+        foreach (var line in lines.Skip(1))
+        {
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            // The trailing separator is the folder marker, not part of the name.
+            var entry = line.TrimEnd(Path.DirectorySeparatorChar);
+
+            paths.Add(sharedDirectory is null ? entry : Path.Combine(sharedDirectory, entry));
+        }
+
+        return paths;
+    }
+
+    /// <summary>
+    /// Whether a line is one of <see cref="CountHeader"/>'s: a number, then the word file or folder. Checking
+    /// the shape is what keeps ordinary prose - "see the file below" - from being read as a file list.
+    /// </summary>
+    private static bool IsCountHeader(string header)
+    {
+        var parts = header.Split(' ', 3);
+
+        if (parts.Length < 2 || !int.TryParse(parts[0], CultureInfo.CurrentCulture, out var count) || count < 1)
+        {
+            return false;
+        }
+
+        // The trailing comma of "2 files, 1 folder" belongs to the separator, not the noun.
+        var noun = parts[1].TrimEnd(',');
+
+        return noun is "file" or "files" or "folder" or "folders";
+    }
+
     private static string Mark(string path, bool isDirectory)
         => isDirectory && !path.EndsWith(Path.DirectorySeparatorChar) ? path + Path.DirectorySeparatorChar : path;
 
