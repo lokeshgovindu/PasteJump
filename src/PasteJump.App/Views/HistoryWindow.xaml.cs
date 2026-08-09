@@ -721,9 +721,20 @@ public partial class HistoryWindow : Window
             {
                 _selfWrites.NoteWrite(new ClipboardSnapshot(stored, null, row.Kind, null).ContentHash);
 
-                StatusText.Text = _clipboard.TryWrite(stored)
-                    ? $"Copied with all {stored.Count} format{(stored.Count == 1 ? string.Empty : "s")} intact."
-                    : "Could not open the clipboard - another application may be holding it.";
+                if (!_clipboard.TryWrite(stored))
+                {
+                    StatusText.Text = "Could not open the clipboard - another application may be holding it.";
+                    return;
+                }
+
+                // To the front as well, which is what Q does during the gesture. Copying a clip and then
+                // finding Ctrl+V still offering a different one would be indefensible.
+                _store.MoveToFront(row.Id);
+                Refresh();
+
+                StatusText.Text =
+                    $"Copied with all {stored.Count} format{(stored.Count == 1 ? string.Empty : "s")} intact, "
+                    + "and moved to the front of the stack.";
 
                 return;
             }
@@ -748,18 +759,34 @@ public partial class HistoryWindow : Window
         var kind = payloads[0].FormatId == CfDib ? ClipKind.Image : ClipKind.Text;
         var snapshot = new ClipboardSnapshot(payloads, kind == ClipKind.Text ? row.Preview : null, kind, null);
 
-        // Registered before writing so the capture service recognises this as our own write and
-        // does not file it as a brand-new clip.
+        // Registered before writing so the capture service recognises this as our own write and does not file
+        // it as a brand-new clip - it is added to the stack explicitly below instead, which also keeps it out
+        // of the history archive, where it already has a row.
         _selfWrites.NoteWrite(snapshot.ContentHash);
 
-        StatusText.Text = _clipboard.TryWrite(payloads)
-            ? kind == ClipKind.Image
-                ? "Image copied to clipboard."
-                : truncated
-                    ? $"Copied - but this entry predates full-text archiving, so only the first "
-                        + $"{ClipStore.PreviewMaxChars:N0} characters were kept."
-                    : "Copied to clipboard."
-            : "Could not open the clipboard - another application may be holding it.";
+        if (!_clipboard.TryWrite(payloads))
+        {
+            StatusText.Text = "Could not open the clipboard - another application may be holding it.";
+            return;
+        }
+
+        // The point of the archive. Until this line, copying a history entry put it on the system clipboard and
+        // nowhere else - so the gesture, which pastes from the stack rather than from the clipboard, went on
+        // offering something entirely different, and an imported history of thousands of entries was searchable
+        // and otherwise useless. Adding it makes it the newest clip, so Ctrl+V offers it first.
+        //
+        // Duplicates allowed regardless of the setting: the user has explicitly asked for this entry, and
+        // silently declining because an identical clip exists somewhere in the stack would look like the button
+        // had done nothing.
+        _store.Add(snapshot, allowDuplicates: true);
+        Refresh();
+
+        StatusText.Text = kind == ClipKind.Image
+            ? "Image copied, and added to the stack as the newest clip."
+            : truncated
+                ? "Copied and added to the stack - but this entry predates full-text archiving, so only the "
+                    + $"first {ClipStore.PreviewMaxChars:N0} characters were kept."
+                : "Copied, and added to the stack as the newest clip - Ctrl+V will offer it first.";
     }
 
     /// <summary>

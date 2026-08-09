@@ -161,8 +161,13 @@ preview, or one image — which is cheap enough to keep tens of thousands of and
   shorten what <kbd>Ctrl</kbd>+<kbd>V</kbd> offers. Each is cleared on its own.
 - A clip pushed out of the stack by the count limit is still in history — you can find it and copy it back,
   but you get the flattened version.
-- **Copy** in the history window therefore gives you text or an image, not the original formatting. To paste
-  something with its formatting intact it has to still be in the stack.
+- **Copy** in the history window puts the entry on the clipboard **and adds it to the stack as the newest
+  clip**, so <kbd>Ctrl</kbd>+<kbd>V</kbd> offers it first. That is what makes an archive — an imported Clipjump
+  history especially — worth having rather than merely searchable. What comes back is the flattened record
+  though: text or an image, not the original formatting. Formatting survives only while the clip is still in
+  the stack, where every format it was copied with is kept.
+- **Copy** in the clips view replays every format and moves that clip to the front, which is what <kbd>Q</kbd>
+  does during the gesture.
 - Text longer than 4096 characters is archived in full alongside the preview, so history search still finds
   it; that limit is why the preview column is capped and the full text kept separately.
 
