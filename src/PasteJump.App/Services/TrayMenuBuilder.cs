@@ -21,12 +21,10 @@ internal static class TrayMenuBuilder
         Action onHelp,
         Action onPauseToggle,
         Action onDisableToggle,
-        Action onClearClips,
         Action onRestart,
         Action onExit,
         bool isPaused,
-        bool isDisabled,
-        int clipCount)
+        bool isDisabled)
     {
         var menu = new ContextMenu();
 
@@ -49,14 +47,10 @@ internal static class TrayMenuBuilder
         menu.Items.Add(MenuItemFor("_Settings…", onSettings));
         menu.Items.Add(MenuItemFor("Paste-Mode _Keys…", onHelp));
 
-        // Clearing the clip stack had no route but the X cycle inside the gesture - which is how a real
-        // 41-clip history got wiped by accident, and simultaneously so obscure that someone wanting to do it
-        // deliberately could not find it. The count is in the label because it is the number about to go, and
-        // because it makes the difference from "Clear History" visible at the point of choosing.
-        menu.Items.Add(MenuItemFor(
-            clipCount == 1 ? "C_lear 1 clip…" : $"C_lear {clipCount} clips…",
-            onClearClips));
-
+        // No "clear clips" item here, deliberately. One was added and then removed: the gesture's X cycle
+        // already reaches DELETE ALL and now confirms before acting, which was the real problem with it, and
+        // the Paste Mode tab names the keys. A destructive item one click away in the tray earned nothing
+        // beyond a mouse-only route, in an application whose whole premise is the keyboard.
         menu.Items.Add(new Separator());
 
         // Distinct from Pause above, and the difference is worth the two menu items. Pause stops capturing

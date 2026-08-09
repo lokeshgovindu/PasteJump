@@ -607,12 +607,10 @@ public partial class App : Application
             onHelp: ShowShortcutHelp,
             onPauseToggle: TogglePaused,
             onDisableToggle: ToggleDisabled,
-            onClearClips: ClearClipsFromMenu,
             onRestart: RestartFromMenu,
             onExit: ExitApplication,
             isPaused: !_settings.MonitorClipboard,
-            isDisabled: !_keyboardHook.IsInstalled,
-            clipCount: _store.Count);
+            isDisabled: !_keyboardHook.IsInstalled);
 
         TrayMenuBuilder.ShowAt(menu, x, y);
     }
@@ -681,54 +679,6 @@ public partial class App : Application
         _settingsStore.Save(_settings);
 
         _settingsWindow?.ReloadDensity(density);
-    }
-
-    /// <summary>
-    /// Clears the clip stack from the tray, with a confirmation.
-    /// <para>
-    /// Exists because the only previous route was the paste-mode <c>X</c> cycle: destructive enough to wipe a
-    /// real history by accident, and obscure enough that doing it on purpose meant knowing an undocumented
-    /// keystroke. Unpinned only, matching <c>DeleteAllUnpinned</c> - pinning is the one promise this must keep.
-    /// </para>
-    /// <para>
-    /// The history archive is untouched, and the prompt says so. The two stores are separate here as they are in
-    /// Clipjump, which keeps <c>cache/clips</c> and <c>cache/history</c> apart for the same reason: the stack is
-    /// bounded by a clip count, the archive by a retention period.
-    /// </para>
-    /// </summary>
-    private void ClearClipsFromMenu()
-    {
-        var total = _store.Count;
-
-        if (total == 0)
-        {
-            OnTransientMessage("There are no clips to clear.");
-            return;
-        }
-
-        var pinned = _store.GetOrdered().Count(static c => c.Pinned);
-
-        var message = pinned == 0
-            ? "This cannot be undone. The searchable history archive is not affected."
-            : $"This cannot be undone. {pinned} pinned clip{(pinned == 1 ? string.Empty : "s")} will be kept, "
-                + "and the searchable history archive is not affected.";
-
-        if (MessageDialog.Show(
-                message,
-                headline: $"Clear {total - pinned} clip{(total - pinned == 1 ? string.Empty : "s")} "
-                    + "from the Ctrl+V stack?",
-                kind: DialogKind.Warning,
-                buttons: DialogButtons.OkCancel) != DialogResultKind.Accepted)
-        {
-            return;
-        }
-
-        _store.DeleteAll(includePinned: false);
-
-        // The controller caches its window, so without this the gesture would still offer clips that are gone.
-        _controller.NotifyClipCaptured();
-
-        OnTransientMessage($"Cleared {total - pinned} clip{(total - pinned == 1 ? string.Empty : "s")}.");
     }
 
     private void ShowAbout()
