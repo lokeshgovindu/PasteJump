@@ -24,30 +24,30 @@ from us.</p>
 <p>Copying is unaffected the whole time, because capture watches the clipboard rather than the keyboard
 and no hook can suppress a clipboard notification. That asymmetry is the tell.</p>
 
-<h2>The two ways out</h2>
+<h2>What to do about it</h2>
 
-<p>Both are under <b>Settings, Paste Mode</b>, and they fix opposite halves of the problem. It matters
-which one you need:</p>
+<div class="warn">
+<p><b>Close the other clipboard manager.</b> That is the answer, and in this release it is the only one.
+Two clipboard managers cannot share <code>Ctrl</code>+<code>V</code>.</p>
+</div>
+
+<p>Two settings exist that would give each program a chord of its own, and they fix opposite halves of the
+problem &mdash; but both are <b>disabled in this release</b> pending more work, and you will find them
+greyed out under <b>Settings, Paste Mode</b>:</p>
 
 <table>
-<tr><th>Setting</th><th>Fixes</th></tr>
+<tr><th>Setting</th><th>Would change</th></tr>
 
-<tr><td class="name">Keystroke Sent to Paste<br>&rarr; <code>Shift</code>+<code>Insert</code></td>
+<tr><td class="name">Keystroke Sent to Paste</td>
 <td>What PasteJump <b>sends</b>, so the other manager's hook has nothing to swallow.
-<code>Shift</code>+<code>Insert</code> is the legacy Windows paste chord; almost every application still
-honours it and no clipboard manager claims it. A few applications do bind it to something else, so it is
-worth a quick test in the ones you care about.</td></tr>
+<code>Shift</code>+<code>Insert</code> is the legacy Windows paste chord and no clipboard manager claims
+it. Tried against a real conflict, it did <i>not</i> help &mdash; which is part of why it is switched off
+rather than offered as a remedy.</td></tr>
 
-<tr><td class="name">Hold Ctrl and Tap This Key<br>&rarr; any free letter</td>
+<tr><td class="name">Hold Ctrl and Tap This Key</td>
 <td>What PasteJump <b>listens for</b>, so the two stop competing for <code>Ctrl</code>+<code>V</code> at
-all. The cleaner fix of the two, at the cost of retraining your fingers.</td></tr>
+all. The more promising of the two, at the cost of retraining your fingers.</td></tr>
 </table>
-
-<div class="note">
-<p><b>Closing the other manager is still the best answer.</b> Two clipboard managers cannot share
-<code>Ctrl</code>+<code>V</code>, and no setting changes that &mdash; these two only let each have a chord
-of its own.</p>
-</div>
 
 <h2>Ruling PasteJump out</h2>
 

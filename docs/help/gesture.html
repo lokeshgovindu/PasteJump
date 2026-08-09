@@ -90,12 +90,13 @@ gesture can do, and it is the only one that prompts. Pinned clips survive it.</p
 
 <h2>Moving the gesture off Ctrl+V</h2>
 
-<p><code>V</code> is only the default. <b>Settings, Paste Mode, Hold Ctrl and tap this key</b> moves the
-gesture to any letter not already used above. That is the cleanest fix when something else on the machine
-owns <code>Ctrl</code>+<code>V</code> &mdash; see <a href="coexisting.html">Running alongside another
-clipboard manager</a>.</p>
+<p><code>V</code> is only the default in principle. <b>Settings, Paste Mode, Hold Ctrl and Tap This Key</b>
+would move the gesture to any letter not already used above, which would be the cleanest fix when
+something else on the machine owns <code>Ctrl</code>+<code>V</code> &mdash; but that control is
+<b>disabled in this release</b> pending more work, so the gesture is <code>Ctrl</code>+<code>V</code> for
+now. See <a href="coexisting.html">Running alongside another clipboard manager</a>.</p>
 
-<p>Letters already bound to an action cannot be chosen, because the trigger key doubles as "step to an
+<p>Letters already bound to an action would not be offered, because the trigger key doubles as "step to an
 older clip" and would otherwise shadow that action for ever.</p>
 
 <h2>What the overlay shows</h2>

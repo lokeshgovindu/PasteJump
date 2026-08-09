@@ -69,17 +69,17 @@ intercepts the paste PasteJump sends before the application you are pasting into
 symptom is distinctive: **copying keeps working and pasting silently does nothing**, because capture
 watches the clipboard rather than the keyboard.
 
-PasteJump detects the common managers at start-up and offers a way out. There are two, and they fix
-opposite halves of the problem — both under **Settings → Paste mode**:
+PasteJump detects the common managers at start-up and says so. **The remedy is to close the other one**, and
+in this release that is the only remedy.
 
-- **Keystroke sent to paste** → <kbd>Shift</kbd>+<kbd>Insert</kbd>. Changes what PasteJump *sends*, so the
-  other manager's hook cannot swallow it. The legacy Windows paste chord; almost every application still
-  honours it and no clipboard manager claims it.
-- **Hold Ctrl and tap this key** → any free letter. Changes what PasteJump *listens for*, so the two stop
-  competing for <kbd>Ctrl</kbd>+<kbd>V</kbd> at all. The cleaner fix of the two, at the cost of retraining
-  your fingers.
+Two settings exist that would give each program a chord of its own, fixing opposite halves of the problem, but
+both are **disabled in the UI** pending more work — greyed out under **Settings → Paste mode**:
 
-Closing the other manager is still the best answer.
+- **Keystroke sent to paste** → <kbd>Shift</kbd>+<kbd>Insert</kbd> would change what PasteJump *sends*, so the
+  other manager's hook has nothing to swallow. Tried against a real conflict it did not help, which is part of
+  why it is switched off rather than offered as a fix.
+- **Hold Ctrl and tap this key** → any free letter would change what PasteJump *listens for*, so the two stop
+  competing for <kbd>Ctrl</kbd>+<kbd>V</kbd> at all. The more promising of the two.
 
 ### Build and test
 
