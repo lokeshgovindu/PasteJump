@@ -225,6 +225,20 @@ public sealed class BlobCompressionTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_root, ".compressed")));
     }
 
+    /// <summary>
+    /// A pass that stopped on its budget must not write the marker, or whatever it did not reach would never be
+    /// converted at all.
+    /// <para>
+    /// Asserted as an end state rather than as exact per-pass counts, and that is a fix rather than a
+    /// weakening. This test failed once in roughly forty runs, only ever inside a full-suite run and never
+    /// in twenty-five isolated ones. The mechanism is in <c>CompactLegacyBlobs</c>: a transient
+    /// <c>IOException</c> - a virus scanner holding a temp file for a moment is enough - is deliberately
+    /// swallowed and the blob skipped, but the budget has already been charged for reading it. The pass then
+    /// returns one fewer than expected and stops, so <c>Assert.Equal(1, ...)</c> saw 0. Tolerating that IO
+    /// error is correct for production, where the next launch simply tries again; it is only the exact count
+    /// that was never a safe thing to assert.
+    /// </para>
+    /// </summary>
     [Fact]
     public void Stopping_on_the_budget_does_not_claim_the_store_is_converted()
     {
@@ -233,11 +247,84 @@ public sealed class BlobCompressionTests : IDisposable
             WriteLegacy(FakeDib(50_000 + i));
         }
 
-        Assert.Equal(1, _blobs.CompactLegacyBlobs(byteBudget: 1));
+        var marker = Path.Combine(_root, ".compressed");
 
-        // No marker, or the remaining two would never be converted.
-        Assert.False(File.Exists(Path.Combine(_root, ".compressed")));
-        Assert.Equal(2, _blobs.CompactLegacyBlobs());
+        var stopped = _blobs.CompactLegacyBlobs(byteBudget: 1);
+
+        // Stopped early, so it cannot have finished the store - that is the whole claim.
+        Assert.InRange(stopped, 0, 2);
+        Assert.False(File.Exists(marker));
+        Assert.Contains(LegacyBlobs(), static _ => true);
+
+        // And an unbudgeted pass finishes what the first one left, whatever that was.
+        _blobs.CompactLegacyBlobs();
+
+        Assert.True(File.Exists(marker));
+        Assert.Empty(LegacyBlobs());
+    }
+
+    /// <summary>
+    /// A blob the filesystem would not let us rewrite is skipped without the marker being written, so the next
+    /// pass picks it up.
+    /// <para>
+    /// Found while chasing the flake above, and it was a real defect rather than a test problem: the skip is
+    /// caught and the loop then ends normally, so the pass looked complete and wrote the sentinel - which
+    /// short-circuits every future pass. One transient lock stranded that blob uncompressed for ever. Harmless
+    /// to read, since an unmarked blob is returned verbatim, but disk space that never comes back and a marker
+    /// that claims something untrue.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void A_locked_blob_is_retried_on_the_next_pass()
+    {
+        var kept = WriteLegacy(FakeDib(2_000));
+        var locked = WriteLegacy(FakeDib(3_000));
+
+        var marker = Path.Combine(_root, ".compressed");
+
+        using (File.Open(PathOf(locked), FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.Equal(1, _blobs.CompactLegacyBlobs());
+
+            // The pass ran to the end of the store, but it did not convert everything, so it must not say so.
+            Assert.False(File.Exists(marker));
+        }
+
+        // Released, so the retry succeeds and the store is genuinely converted this time.
+        Assert.Equal(1, _blobs.CompactLegacyBlobs());
+        Assert.True(File.Exists(marker));
+        Assert.Empty(LegacyBlobs());
+
+        // And the blob that was converted first is untouched by the second pass.
+        Assert.Equal(FakeDib(2_000), _blobs.TryRead(kept));
+    }
+
+    /// <summary>
+    /// Blobs still lacking the <c>PJB1</c> marker. The end state this asserts on is what actually matters -
+    /// "everything is converted" - and unlike a conversion count it cannot be thrown off by one blob having
+    /// been skipped and picked up on the following pass.
+    /// </summary>
+    private IEnumerable<string> LegacyBlobs()
+    {
+        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+        {
+            var name = Path.GetFileName(file);
+
+            if (name.Equals(".compressed", StringComparison.OrdinalIgnoreCase)
+                || name.Contains(".tmp-", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var head = new byte[4];
+
+            using var stream = File.OpenRead(file);
+
+            if (stream.Read(head) < 4 || !head.AsSpan().SequenceEqual("PJB1"u8))
+            {
+                yield return file;
+            }
+        }
     }
 
     [Fact]

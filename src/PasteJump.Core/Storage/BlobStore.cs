@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Security.Cryptography;
 
 namespace PasteJump.Core.Storage;
@@ -140,6 +140,14 @@ public sealed class BlobStore
         long spent = 0;
         var withinBudget = true;
 
+        // Set when a blob is skipped because the filesystem would not co-operate. It gates the sentinel for the
+        // same reason the budget does: the marker asserts that every blob IS compressed, and one skipped blob
+        // makes that false. Without this a single transient lock - a virus scanner holding a file for a moment
+        // is enough - stranded that blob uncompressed for ever, because the sentinel then short-circuited every
+        // future pass. Harmless to read, since an unmarked blob is returned verbatim, but it is disk space that
+        // never comes back and a marker that lies.
+        var skippedOnError = false;
+
         foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
         {
             if (spent >= byteBudget)
@@ -191,12 +199,13 @@ public sealed class BlobStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Locked or vanished mid-pass. Nothing is lost - the original is still there and the next
-                // launch will try again.
+                // Locked or vanished mid-pass. Nothing is lost - the original is still there - but the next
+                // launch only tries again if no sentinel is written, hence the flag.
+                skippedOnError = true;
             }
         }
 
-        if (withinBudget)
+        if (withinBudget && !skippedOnError)
         {
             try
             {
