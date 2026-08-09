@@ -43,6 +43,18 @@ public sealed class HistoryRow
 
     public string? BlobHash { get; init; }
 
+    /// <summary>
+    /// True when this row is a clip from the stack rather than a history entry. The two differ in more than
+    /// where they came from: a clip carries every clipboard format, so Copy replays it faithfully and its image
+    /// preview comes from the payloads; a history entry has one flattened record and a blob at most.
+    /// </summary>
+    public bool IsClip { get; init; }
+
+    /// <summary>Only meaningful for a clip. Pinned clips sort first and survive DELETE ALL.</summary>
+    public bool Pinned { get; init; }
+
+    public string PinnedText => Pinned ? "PINNED" : string.Empty;
+
     public string KindText => Kind switch
     {
         ClipKind.Text => "Text",
@@ -245,6 +257,12 @@ public partial class HistoryWindow : Window
     }
 
     /// <summary>
+    /// Switches to the clip stack. Exists for the UI smoke harness: the two views differ in their columns,
+    /// buttons and status line, so a screenshot of one says nothing about the other.
+    /// </summary>
+    public void ShowClipsForSmokeTest() => ViewCombo.SelectedIndex = 0;
+
+    /// <summary>
     /// Selects a row by index. Exists for the UI smoke harness, so a screenshot can show the selected
     /// state rather than only the default first-row selection.
     /// </summary>
@@ -269,17 +287,56 @@ public partial class HistoryWindow : Window
         _refreshDebounce.Start();
     }
 
-    private void Refresh()
+    /// <summary>Whether the grid is currently showing the clip stack rather than the history archive.</summary>
+    private bool ShowingClips => ViewCombo.SelectedIndex == 0;
+
+    /// <summary>
+    /// Loads the clip stack.
+    /// <para>
+    /// Filtered here rather than in SQL because the archive's full-text index covers <c>history</c> only, and
+    /// the stack is bounded by a clip count - a few hundred rows - so a plain scan over previews and tags costs
+    /// nothing and needs no second index that could disagree with the first.
+    /// </para>
+    /// </summary>
+    private void LoadClips()
     {
-        var selectedId = (EntriesGrid.SelectedItem as HistoryRow)?.Id;
-
-        var entries = _store.SearchHistory(SearchBox.Text);
-
-        _rows.Clear();
-
+        var term = SearchBox.Text?.Trim();
         var number = 1;
 
-        foreach (var entry in entries)
+        foreach (var clip in _store.GetOrdered())
+        {
+            if (!string.IsNullOrEmpty(term)
+                && !clip.Preview.Contains(term, StringComparison.OrdinalIgnoreCase)
+                && !clip.Tags.Any(t => t.Contains(term, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            _rows.Add(new HistoryRow
+            {
+                Id = clip.Id,
+                Number = number++,
+                Preview = clip.Preview,
+                CapturedUtc = clip.CreatedUtc,
+                Bytes = clip.TotalBytes,
+                Kind = clip.Kind,
+                IsClip = true,
+                Pinned = clip.Pinned,
+            });
+        }
+
+        var total = _store.Count;
+
+        StatusText.Text = string.IsNullOrWhiteSpace(term)
+            ? $"{_rows.Count} clip{(_rows.Count == 1 ? string.Empty : "s")} the Ctrl+V gesture can reach"
+            : $"{_rows.Count} of {total} clips match";
+    }
+
+    private void LoadHistory()
+    {
+        var number = 1;
+
+        foreach (var entry in _store.SearchHistory(SearchBox.Text))
         {
             _rows.Add(new HistoryRow
             {
@@ -296,8 +353,8 @@ public partial class HistoryWindow : Window
         var total = _store.HistoryCount;
 
         StatusText.Text = string.IsNullOrWhiteSpace(SearchBox.Text)
-            ? $"{_rows.Count} of {total} entries"
-            : $"{_rows.Count} matches of {total} entries";
+            ? $"{_rows.Count} of {total} history entries"
+            : $"{_rows.Count} matches of {total} history entries";
 
         // Said outright when the query hit its cap, rather than leaving the two numbers to be compared. A
         // window silently showing a fraction of the store is indistinguishable from an import that failed -
@@ -305,6 +362,36 @@ public partial class HistoryWindow : Window
         if (_rows.Count < total && string.IsNullOrWhiteSpace(SearchBox.Text))
         {
             StatusText.Text += $" — showing the newest {_rows.Count}; search to reach the rest";
+        }
+    }
+
+    private void OnViewChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Guard: SelectionChanged fires while the combo is being populated, before the grid exists.
+        if (EntriesGrid is null)
+        {
+            return;
+        }
+
+        ClearButton.Content = ShowingClips ? "Clear _Clips" : "Clear _History";
+        PinButton.Visibility = ShowingClips ? Visibility.Visible : Visibility.Collapsed;
+
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        var selectedId = (EntriesGrid.SelectedItem as HistoryRow)?.Id;
+
+        _rows.Clear();
+
+        if (ShowingClips)
+        {
+            LoadClips();
+        }
+        else
+        {
+            LoadHistory();
         }
 
         UpdateSearchCue();
@@ -624,6 +711,24 @@ public partial class HistoryWindow : Window
             return;
         }
 
+        // A clip still has every format it was copied with, so it is replayed exactly - which is the whole
+        // difference between the two views. A history entry can only offer its flattened record.
+        if (row.IsClip)
+        {
+            var stored = _store.GetPayloads(row.Id);
+
+            if (stored.Count > 0)
+            {
+                _selfWrites.NoteWrite(new ClipboardSnapshot(stored, null, row.Kind, null).ContentHash);
+
+                StatusText.Text = _clipboard.TryWrite(stored)
+                    ? $"Copied with all {stored.Count} format{(stored.Count == 1 ? string.Empty : "s")} intact."
+                    : "Could not open the clipboard - another application may be holding it.";
+
+                return;
+            }
+        }
+
         var payloads = TryBuildImagePayloads(row);
         var truncated = false;
 
@@ -701,11 +806,88 @@ public partial class HistoryWindow : Window
 
         foreach (var row in selected)
         {
-            _store.DeleteHistory(row.Id);
+            if (row.IsClip)
+            {
+                _store.Delete(row.Id);
+            }
+            else
+            {
+                _store.DeleteHistory(row.Id);
+            }
         }
 
         Refresh();
-        StatusText.Text = $"Deleted {selected.Count} entr{(selected.Count == 1 ? "y" : "ies")}.";
+
+        StatusText.Text = selected[0].IsClip
+            ? $"Deleted {selected.Count} clip{(selected.Count == 1 ? string.Empty : "s")}. "
+                + "The history entries are still there."
+            : $"Deleted {selected.Count} histor{(selected.Count == 1 ? "y entry" : "y entries")}.";
+    }
+
+    /// <summary>
+    /// Clears the clip stack, keeping pinned clips. The counterpart of the gesture's DELETE ALL, and now the
+    /// discoverable route to it - the keystroke remains for anyone already in the middle of a paste.
+    /// </summary>
+    private void ClearClips()
+    {
+        var total = _store.Count;
+        var pinned = _store.GetOrdered().Count(static c => c.Pinned);
+        var going = total - pinned;
+
+        if (going == 0)
+        {
+            StatusText.Text = total == 0
+                ? "There are no clips to clear."
+                : $"All {total} clip{(total == 1 ? " is" : "s are")} pinned, so nothing would be cleared.";
+            return;
+        }
+
+        var message = pinned == 0
+            ? "This cannot be undone. The history archive is not affected."
+            : $"This cannot be undone. {pinned} pinned clip{(pinned == 1 ? string.Empty : "s")} will be kept, "
+                + "and the history archive is not affected.";
+
+        if (MessageDialog.Show(
+                message,
+                headline: $"Clear {going} clip{(going == 1 ? string.Empty : "s")} from the Ctrl+V stack?",
+                kind: DialogKind.Warning,
+                buttons: DialogButtons.OkCancel,
+                owner: this) != DialogResultKind.Accepted)
+        {
+            return;
+        }
+
+        _store.DeleteAll(includePinned: false);
+        Refresh();
+
+        StatusText.Text = $"Cleared {going} clip{(going == 1 ? string.Empty : "s")}. "
+            + "The history entries are still there.";
+    }
+
+    /// <summary>Pins or unpins the selected clips. Pinned clips sort first and survive DELETE ALL.</summary>
+    private void OnPinClicked(object sender, RoutedEventArgs e)
+    {
+        var selected = EntriesGrid.SelectedItems.OfType<HistoryRow>().Where(static r => r.IsClip).ToList();
+
+        if (selected.Count == 0)
+        {
+            return;
+        }
+
+        // Whatever the first selection is not, so a mixed selection ends up uniform rather than each item
+        // flipping to the opposite of itself.
+        var pin = !selected[0].Pinned;
+
+        foreach (var row in selected)
+        {
+            _store.SetPinned(row.Id, pin);
+        }
+
+        Refresh();
+
+        StatusText.Text = pin
+            ? $"Pinned {selected.Count} clip{(selected.Count == 1 ? string.Empty : "s")}."
+            : $"Unpinned {selected.Count} clip{(selected.Count == 1 ? string.Empty : "s")}.";
     }
 
     /// <summary>
@@ -719,6 +901,12 @@ public partial class HistoryWindow : Window
     /// </summary>
     private void OnClearClicked(object sender, RoutedEventArgs e)
     {
+        if (ShowingClips)
+        {
+            ClearClips();
+            return;
+        }
+
         var clips = _store.Count;
 
         var accepted = MessageDialog.Show(

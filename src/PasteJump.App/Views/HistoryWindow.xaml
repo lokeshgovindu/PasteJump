@@ -51,6 +51,28 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <!--
+                    One window, two stores. A switch rather than a second window because the two are constantly
+                    confused - a clip deleted from the stack is still in history, and clearing history shortens
+                    neither - and seeing them in the same grid, with the same columns, is what makes the
+                    difference legible rather than something to be explained.
+                -->
+                <ComboBox x:Name="ViewCombo"
+                          MinHeight="32"
+                          Width="120"
+                          Margin="0,0,10,0"
+                          VerticalAlignment="Center"
+                          SelectionChanged="OnViewChanged"
+                          ToolTip="Clips are what Ctrl+V pastes from, with every clipboard format intact. History is the searchable log, which keeps a flattened record.">
+                    <ComboBoxItem Content="Clips" />
+                    <ComboBoxItem Content="History" IsSelected="True" />
+                </ComboBox>
+
+                <Button x:Name="PinButton"
+                        Click="OnPinClicked"
+                        Content="_Pin"
+                        Visibility="Collapsed"
+                        ToolTip="Pin or unpin the selected clips. Pinned clips sort first and survive Delete All." />
                 <Button x:Name="CopyButton"
                         Click="OnCopyClicked"
                         Content="_Copy"
@@ -149,6 +171,14 @@
                                         Width="70"
                                         SortMemberPath="Kind"
                                         ElementStyle="{StaticResource CellText}" />
+
+                    <!-- Empty for a history entry, which cannot be pinned. Kept in both views rather than
+                         swapped in and out, so the column layout does not shift when the view changes. -->
+                    <DataGridTextColumn Header=""
+                                        Binding="{Binding PinnedText}"
+                                        Width="58"
+                                        SortMemberPath="Pinned"
+                                        ElementStyle="{StaticResource MutedCellText}" />
 
                     <DataGridTextColumn Header="When"
                                         Binding="{Binding LocalTimeText}"

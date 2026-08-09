@@ -79,6 +79,21 @@ internal static class Program
                     return window;
                 });
 
+                // The same window showing the clip stack instead. A separate shot because the two views differ
+                // in their columns, their buttons and their status line, so one proves nothing about the other.
+                Check("HistoryWindow-Clips", () =>
+                {
+                    var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
+
+                    window.Loaded += (_, _) =>
+                    {
+                        window.ShowClipsForSmokeTest();
+                        window.SelectRowForSmokeTest(0);
+                    };
+
+                    return window;
+                });
+
                 // Cycles every tab. TabControl only realises the SELECTED tab's content, so without
                 // this the other tabs' templates are never instantiated and a broken one goes unseen -
                 // which is exactly the class of failure this harness exists to catch.
