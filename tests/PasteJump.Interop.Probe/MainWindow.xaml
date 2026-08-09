@@ -27,7 +27,9 @@
                     <Button x:Name="RemoveHookButton" Click="OnRemoveHook" Content="Remove hook" Padding="10,4" Margin="0,0,6,0" IsEnabled="False" />
                     <Button x:Name="ShowOverlayButton" Click="OnToggleOverlay" Content="Toggle probe overlay" Padding="10,4" Margin="0,0,6,0" />
                     <Button x:Name="ClearLogButton" Click="OnClearLog" Content="Clear log" Padding="10,4" Margin="0,0,6,0" />
-                    <Button x:Name="SaveReportButton" Click="OnSaveReport" Content="Save report" Padding="10,4" Margin="0,0,20,0" />
+                    <Button x:Name="SaveReportButton" Click="OnSaveReport" Content="Save report" Padding="10,4" Margin="0,0,6,0"
+                            ToolTip="Also saved automatically when this window closes, so nothing is lost by forgetting." />
+                    <TextBlock Text="(auto-saves on close)" VerticalAlignment="Center" Margin="0,0,20,0" Opacity="0.7" />
                     <TextBlock x:Name="HookStatsText" VerticalAlignment="Center" FontFamily="Consolas" />
                 </StackPanel>
 

@@ -234,7 +234,9 @@ public partial class MainWindow : Window
     /// result can be picked up without being told where it went.
     /// </para>
     /// </summary>
-    private void OnSaveReport(object sender, RoutedEventArgs e)
+    private void OnSaveReport(object sender, RoutedEventArgs e) => SaveReport();
+
+    private void SaveReport()
     {
         var directory = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "phase0");
 
@@ -446,6 +448,15 @@ public partial class MainWindow : Window
 
     private void TearDown()
     {
+        // Saved on the way out, not only when Save report is pressed. Three separate sessions of this harness
+        // produced no file at all because nothing is recorded until that button is clicked, and the person
+        // running it has no reason to expect that - the log is right there on screen looking saved. Closing
+        // the window is the one action guaranteed to happen, so it is the one the write hangs off.
+        if (_eventCount > 0 || _captured is not null)
+        {
+            SaveReport();
+        }
+
         _hook?.Dispose();
         _overlay?.Close();
     }
