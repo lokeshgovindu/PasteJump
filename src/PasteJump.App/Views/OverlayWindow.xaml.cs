@@ -127,6 +127,7 @@ public partial class OverlayWindow : Window
         {
             PreviewText.Visibility = Visibility.Collapsed;
             PreviewImage.Visibility = Visibility.Collapsed;
+            ImageFacts.Visibility = Visibility.Collapsed;
             EmptyText.Visibility = Visibility.Visible;
             return;
         }
@@ -142,6 +143,10 @@ public partial class OverlayWindow : Window
                 PreviewImage.Source = bitmap;
                 PreviewImage.Visibility = Visibility.Visible;
                 PreviewText.Visibility = Visibility.Collapsed;
+
+                // Dimensions only. The clip's stored byte count is not on the model, and the decoded size of a
+                // DIB would be a different number from the one history reports for the same clip.
+                ShowImageFacts($"{bitmap.PixelWidth} × {bitmap.PixelHeight}", null);
                 return;
             }
         }
@@ -151,7 +156,34 @@ public partial class OverlayWindow : Window
         PreviewText.Text = string.IsNullOrEmpty(model.PreviewText)
             ? DescribeKind(model.Kind)
             : model.PreviewText;
+
+        // A copied image file keeps its path above and gains a thumbnail below it. Cached, because this runs on
+        // every tap of the trigger key - see FileThumbnailCache.
+        if (model.Kind == ClipKind.Files && FileThumbnailCache.TryGet(model.PreviewText) is { } thumb)
+        {
+            PreviewImage.Source = thumb.Bitmap;
+            PreviewImage.Visibility = Visibility.Visible;
+            ShowImageFacts($"{thumb.PixelWidth} × {thumb.PixelHeight}", FormatBytes(thumb.FileBytes));
+            return;
+        }
+
+        ImageFacts.Visibility = Visibility.Collapsed;
     }
+
+    private void ShowImageFacts(string dimensions, string? bytes)
+    {
+        ImageDimensions.Text = dimensions;
+        ImageBytes.Text = bytes ?? string.Empty;
+        ImageFacts.Visibility = Visibility.Visible;
+    }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.0} KB",
+        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):0.0} MB",
+        _ => $"{bytes / (1024.0 * 1024 * 1024):0.00} GB",
+    };
 
     private static string DescribeKind(ClipKind kind) => kind switch
     {

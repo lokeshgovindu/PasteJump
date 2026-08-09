@@ -155,9 +155,20 @@
                 </Grid>
             </Border>
 
-            <!-- Body: text preview or image thumbnail -->
+            <!--
+                Body: text, or a thumbnail, or - for a copied image file - the path with a thumbnail beneath it
+                and its dimensions and size below that. Stacked rows rather than overlapping children, because
+                that third case needs two of them visible at once.
+            -->
             <Grid Margin="10,8,10,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
                 <TextBlock x:Name="PreviewText"
+                           Grid.Row="0"
                            Foreground="{DynamicResource TextBrush}"
                            FontFamily="Consolas"
                            FontSize="12"
@@ -166,13 +177,26 @@
                            LineHeight="16" />
 
                 <Image x:Name="PreviewImage"
+                       Grid.Row="1"
                        MaxHeight="220"
                        MaxWidth="520"
                        Stretch="Uniform"
+                       StretchDirection="DownOnly"
                        HorizontalAlignment="Left"
                        Visibility="Collapsed" />
 
+                <!-- Dimensions left, bytes right: the two facts a picture cannot tell you about itself. -->
+                <Grid x:Name="ImageFacts" Grid.Row="2" Margin="0,6,0,0" Visibility="Collapsed">
+                    <TextBlock x:Name="ImageDimensions"
+                               HorizontalAlignment="Left"
+                               Style="{StaticResource ChipText}" />
+                    <TextBlock x:Name="ImageBytes"
+                               HorizontalAlignment="Right"
+                               Style="{StaticResource ChipText}" />
+                </Grid>
+
                 <TextBlock x:Name="EmptyText"
+                           Grid.Row="0"
                            Foreground="{DynamicResource MutedTextBrush}"
                            FontSize="12"
                            FontStyle="Italic"
