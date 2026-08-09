@@ -8,6 +8,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/PasteJump.Core.Tests/PasteJump.Core.Tests.csproj" />
     <Project Path="tests/PasteJump.Interop.Probe/PasteJump.Interop.Probe.csproj" />
+    <Project Path="tests/PasteJump.SpikeRunner/PasteJump.SpikeRunner.csproj" />
     <Project Path="tests/PasteJump.UiSmoke/PasteJump.UiSmoke.csproj" />
   </Folder>
 </Solution>

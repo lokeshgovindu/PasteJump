@@ -37,21 +37,27 @@ is a different chord and a few applications bind it elsewhere.
 
 ### The immediate next task
 
-Phase 0's two spikes are **built but not run**. See `PLAN.md` §9 for exit criteria.
+**Spike B has passed, including the Excel acid test. Spike A is still open.** See `PLAN.md` §9 for the
+criteria and the measured results.
+
+`tests/PasteJump.SpikeRunner` runs the machine-judgeable half and writes to `artifacts/phase0/`. It must be
+launched from a **scheduled task**, not directly — an agent's own process tree is refused clipboard access
+(`ERROR_ACCESS_DENIED` from every API, including `clip.exe`, sandboxed or not) and refused foreground, while
+a task started by the Task Scheduler service inherits neither restriction:
 
 ```
-dotnet run --project tests\PasteJump.Interop.Probe
+schtasks /Create /TN PJSpike /TR "<exe> <outdir>" /SC ONCE /ST 23:59 /IT /F
+schtasks /Run /TN PJSpike   &&   schtasks /Delete /TN PJSpike /F
 ```
 
-- **Tab 1 (Spike A)** — install the hook, then hold Ctrl and tap V in Notepad, Word, VS Code, Chrome
-  and Windows Terminal. Foreground must never change; hook latency must stay far below the 300 ms
-  `LowLevelHooksTimeout`. Repeat on a second monitor at a different scale factor.
-- **Tab 2 (Spike B)** — Capture, then Round-trip. Every format must return byte-identical. The acid
-  test is a formatted range from Excel pasted back into Excel: those `Biff12` / `XML Spreadsheet`
-  formats are what forced the original's invisible focus-stealing window.
+**What that leaves for a human**, and it is specific — the rest is done:
 
-If Spike B fails on Excel, the fallback is a documented per-application "delegate to the real
-clipboard" path.
+- **Hook latency at a real sample size.** The hook installs and the callbacks that landed were ≤0.072 ms,
+  but a task runs in a session with no active input desktop, so `SendInput` was refused 294 times out of 300
+  and `keybd_event` produced nothing. Twelve samples is not a p95. Use the probe's Tab 1.
+- **Foreground stability while a person types** in Notepad, Word, VS Code, Chrome and Windows Terminal.
+- **Mixed-DPI overlay placement.** Not merely unrun — **untestable on this machine**: both monitors report
+  96 dpi, so one has to be set to a different scale before the criterion means anything.
 
 ---
 

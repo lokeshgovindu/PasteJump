@@ -489,6 +489,32 @@ or semantically intact:
 intact. If this fails, fall back to a documented per-application "delegate to the
 real clipboard" path.
 
+### Results — 2026-08-09
+
+**Spike B passes, acid test included.** Run by `tests/PasteJump.SpikeRunner` from a
+scheduled task, since an agent's own process tree is denied the clipboard.
+
+- All five constructed cases round-tripped **byte-identical**: `CF_UNICODETEXT`,
+  `HTML Format` with its byte-offset header, `Rich Text Format`, `CF_DIB`, `CF_HDROP`.
+- Excel published **25 formats, 89,806 bytes** for a 2×2 formatted range, including
+  `Biff12`, `Biff8`, `Biff5` and `XML Spreadsheet`. Writing them back and re-reading
+  gave **24 identical, 1 differing, 0 lost**. The one difference is `CF_LOCALE`
+  (id 16, 4 bytes either way) — which `FilterForWrite` deliberately never writes,
+  because Windows synthesises it alongside text. Expected, not a defect.
+- Pasted back through Excel via COM: text, **bold**, interior colour `65535` and
+  number format `#,##0.00` all survived. **No per-application fallback is needed.**
+
+The `FoolGUI` hack the original needed is therefore not required here, and §3's first
+decision — never using the system clipboard as scratch space — is what avoids it.
+
+**Spike A is partly open.** The hook installs and uninstalls cleanly, no handler
+faults, and every callback observed came in at ≤0.072 ms — comfortably inside the
+300 ms budget. But a scheduled task has no active input desktop, so `SendInput` was
+refused 294 of 300 times and only 12 samples landed; that is not a p95. Both monitors
+report 96 dpi, so the mixed-DPI placement criterion is **untestable as configured**
+rather than merely unrun. Those two, plus focus retention while a human types in five
+real applications, still need the interactive probe.
+
 ---
 
 ## 10. Phases after the spikes

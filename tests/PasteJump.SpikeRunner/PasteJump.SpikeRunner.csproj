@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless Phase 0 spike runner. Not shipped, and a companion to PasteJump.Interop.Probe rather than a
+    replacement: the probe needs a human because some criteria only a human can judge - whether the
+    foreground app kept focus while THEY typed, whether a pasted Excel range looks right. This runs the
+    parts a machine can judge, so those are not blocked on finding an hour.
+
+    WindowsForms only for its message pump: a WH_KEYBOARD_LL hook is delivered to the installing thread's
+    message queue, so a console app with no pump would install the hook and then never see a callback.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>PasteJump.SpikeRunner</AssemblyName>
+    <RootNamespace>PasteJump.SpikeRunner</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PasteJump.Core\PasteJump.Core.csproj" />
+    <ProjectReference Include="..\..\src\PasteJump.Interop\PasteJump.Interop.csproj" />
+  </ItemGroup>
+
+</Project>
