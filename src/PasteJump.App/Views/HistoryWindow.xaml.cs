@@ -708,10 +708,24 @@ public partial class HistoryWindow : Window
         StatusText.Text = $"Deleted {selected.Count} entr{(selected.Count == 1 ? "y" : "ies")}.";
     }
 
+    /// <summary>
+    /// Clears the history archive, and says plainly that the clip stack is a different thing.
+    /// <para>
+    /// The distinction is deliberate - an archive you search versus the stack Ctrl+V walks - but it was
+    /// invisible: a button labelled "Clear All" in a window called Clipboard History was read, reasonably, as
+    /// clearing everything, and it was reported as clips still appearing afterwards. The store was behaving
+    /// correctly and the words were wrong.
+    /// </para>
+    /// </summary>
     private void OnClearClicked(object sender, RoutedEventArgs e)
     {
+        var clips = _store.Count;
+
         var accepted = MessageDialog.Show(
-            "This cannot be undone.",
+            "This cannot be undone.\n\n"
+                + $"The {clips} clip{(clips == 1 ? string.Empty : "s")} the Ctrl+V gesture walks are a separate "
+                + "store and are NOT affected. To clear those, hold Ctrl, tap X three times until the red "
+                + "DELETE ALL banner appears, then release.",
             headline: $"Delete all {_store.HistoryCount} history entries?",
             kind: DialogKind.Warning,
             buttons: DialogButtons.OkCancel,
@@ -725,6 +739,9 @@ public partial class HistoryWindow : Window
         _store.ClearHistory();
         _store.CollectGarbage();
         Refresh();
-        StatusText.Text = "History cleared.";
+
+        StatusText.Text = clips == 0
+            ? "History cleared."
+            : $"History cleared. {clips} clip{(clips == 1 ? string.Empty : "s")} still available to Ctrl+V.";
     }
 }
