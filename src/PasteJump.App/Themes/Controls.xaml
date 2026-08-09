@@ -358,10 +358,27 @@
                               StrokeEndLineCap="Round" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
+                        <!--
+                            Disabled first, so hover cannot re-light a control that cannot be used - trigger
+                            order is declaration order, and a later IsMouseOver would otherwise win.
+                        -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{DynamicResource SurfaceBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush"
+                                    Value="{DynamicResource BorderBrush}" />
+                            <Setter TargetName="Arrow" Property="Stroke"
+                                    Value="{DynamicResource ControlDisabledTextBrush}" />
+                        </Trigger>
+
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsEnabled" Value="True" />
+                            </MultiTrigger.Conditions>
                             <Setter TargetName="Chrome" Property="BorderBrush"
                                     Value="{DynamicResource AccentBrush}" />
-                        </Trigger>
+                        </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
