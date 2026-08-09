@@ -114,8 +114,12 @@ While Ctrl is down:
 | <kbd>Enter</kbd> | Paste and stay open, for pasting several clips in a row |
 | <kbd>F1</kbd> | Show this list |
 | release <kbd>Ctrl</kbd> | Paste |
-| release with <kbd>Shift</kbd> | Paste, then delete the clip ("paste popping") |
+| <kbd>Shift</kbd> pressed *after* the overlay opens | Paste, then delete the clip ("paste popping") |
 | <kbd>Esc</kbd> | Cancel and restore the previous clipboard |
+
+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is **not** PasteJump's — it passes straight through to the
+application, because every terminal pastes with it and browsers use it for paste-as-plain-text. Paste popping
+is reached by adding <kbd>Shift</kbd> once the overlay is already up.
 
 In search mode you can let go of Ctrl and just type; it filters on clip content **and** tags.
 <kbd>Enter</kbd> pastes the match, <kbd>Esc</kbd> cancels.
@@ -126,6 +130,44 @@ gesture to any letter not already used above — useful if something else on you
 **Open history with**, off by default since a global hotkey takes that chord from every other application.
 
 Paste formats: Original, Plain text, Collapse whitespace, Sentence case, Unindent.
+
+---
+
+## Two stores: clips and history
+
+PasteJump keeps what you copy in **two** places, and confusing them is the single easiest thing to do here.
+Clipjump does the same — `cache/clips` and `cache/history` are separate directories there — for the reason
+below.
+
+| | **Clips** (the stack) | **History** (the archive) |
+|---|---|---|
+| What it is | the clipboards the gesture pastes from | a log of everything you have copied |
+| Reached by | <kbd>Ctrl</kbd>+<kbd>V</kbd> | the history window (tray icon, or **Open history with**) |
+| Holds | **every clipboard format** of each copy | one preview, plus at most one blob |
+| Bounded by | a clip count — **Maximum clips kept**, default 200 | a period — **Days of history to keep**, default 180 |
+| Searchable | by content and tags, during the gesture | full-text, in the history window |
+| Pinning | yes | no |
+| Cleared by | <kbd>X</kbd> ×3 → DELETE ALL, during the gesture | **Clear History** in the history window |
+
+**Why two.** A clip in the stack is the *complete* clipboard: copy a range from Excel and that is 25 formats
+and about 90 KB — `Biff12`, `XML Spreadsheet`, HTML, RTF, a bitmap, and twenty more. Replaying all of it is
+what makes a paste indistinguishable from the original <kbd>Ctrl</kbd>+<kbd>V</kbd>, and it is why the stack
+is capped by count rather than kept for ever. History stores a flattened record of the same copy — the text
+preview, or one image — which is cheap enough to keep tens of thousands of and to index for search.
+
+**What follows from that:**
+
+- Deleting a clip during the gesture does **not** remove its history entry. Clearing history does **not**
+  shorten what <kbd>Ctrl</kbd>+<kbd>V</kbd> offers. Each is cleared on its own.
+- A clip pushed out of the stack by the count limit is still in history — you can find it and copy it back,
+  but you get the flattened version.
+- **Copy** in the history window therefore gives you text or an image, not the original formatting. To paste
+  something with its formatting intact it has to still be in the stack.
+- Text longer than 4096 characters is archived in full alongside the preview, so history search still finds
+  it; that limit is why the preview column is capped and the full text kept separately.
+
+Both live in one SQLite database — `data/pastejump.db`, beside the executable by default — as the `clip` and
+`history` tables. Payloads too large to sit in a row go to `data/blobs`, content-addressed and deflated.
 
 ---
 
