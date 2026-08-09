@@ -95,6 +95,22 @@
             <Setter Property="Margin" Value="23,3,0,12" />
         </Style>
 
+        <!--
+            A resolved path that opens in Explorer when clicked. Styled by hand rather than with a Hyperlink,
+            because there is no themed Hyperlink in Controls.xaml and an unstyled one renders in WPF's built-in
+            blue - illegible on the dark palette, which is the failure mode this project keeps meeting. Accent
+            colour, a hand cursor and an underline on hover carry the affordance without a new control type.
+        -->
+        <Style x:Key="PathLink" TargetType="TextBlock" BasedOn="{StaticResource SettingHelp}">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="TextDecorations" Value="Underline" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Section heading within a tab, for the few places a tab holds more than one group. -->
         <Style x:Key="SectionHeading" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
@@ -536,9 +552,11 @@
                                       SelectionChanged="OnDataLocationChanged" />
                         </Grid>
                         <TextBlock x:Name="ClipsLocationPathText"
-                                   Style="{StaticResource SettingHelp}"
+                                   Style="{StaticResource PathLink}"
                                    FontFamily="Consolas"
-                                   Margin="0,3,0,2" />
+                                   Margin="0,3,0,2"
+                                   MouseLeftButtonUp="OnOpenClipsFolder"
+                                   ToolTip="Open this folder in File Explorer" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="The clip database and the stored images. Choose your user profile if the PasteJump folder is not writable, or to share one history between several copies of PasteJump." />
 
@@ -553,9 +571,11 @@
                                       SelectionChanged="OnDataLocationChanged" />
                         </Grid>
                         <TextBlock x:Name="SettingsLocationPathText"
-                                   Style="{StaticResource SettingHelp}"
+                                   Style="{StaticResource PathLink}"
                                    FontFamily="Consolas"
-                                   Margin="0,3,0,2" />
+                                   Margin="0,3,0,2"
+                                   MouseLeftButtonUp="OnOpenSettingsFolder"
+                                   ToolTip="Open this folder in File Explorer" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="PasteJump.json, holding everything on these tabs. Keeping it beside the program is what lets a portable copy carry its own configuration." />
 

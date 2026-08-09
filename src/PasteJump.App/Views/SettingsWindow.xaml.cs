@@ -492,6 +492,54 @@ public partial class SettingsWindow : Window
         RefreshExcludedStatus(added == 1 ? $"Added {chosen[0]}." : $"Added {added} programs.");
     }
 
+    private void OnOpenClipsFolder(object sender, MouseButtonEventArgs e)
+        => OpenDataFolder(SelectedClipsLocation);
+
+    private void OnOpenSettingsFolder(object sender, MouseButtonEventArgs e)
+        => OpenDataFolder(SelectedSettingsLocation);
+
+    /// <summary>
+    /// Opens a data folder in Explorer.
+    /// <para>
+    /// The path is recomputed from the selected location rather than read off the label, because the label may
+    /// carry a "(restart required)" suffix once the combo has been changed - handing that to Explorer would
+    /// simply fail. For the same reason the folder may not exist yet: the move happens on the next start-up, so
+    /// the pending destination is a directory that has never been created. Falling back to its parent shows the
+    /// user where it is going to be rather than reporting an error about a folder they have just chosen.
+    /// </para>
+    /// </summary>
+    private void OpenDataFolder(DataLocation location)
+    {
+        var path = Path.Combine(AppPaths.RootFor(location), "data");
+
+        var target = Directory.Exists(path)
+            ? path
+            : Directory.GetParent(path)?.FullName;
+
+        if (target is null || !Directory.Exists(target))
+        {
+            ValidationText.Text = $"{path} does not exist yet. It is created when PasteJump next starts.";
+            ValidationText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        try
+        {
+            // UseShellExecute, because explorer.exe is being asked to interpret a path rather than run as a
+            // child process with inherited handles.
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = target,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            ValidationText.Text = $"Could not open {target}: {ex.Message}";
+            ValidationText.Visibility = Visibility.Visible;
+        }
+    }
+
     private void OnBrowseTextEditorClicked(object sender, RoutedEventArgs e)
         => BrowseForEditor(TextEditorBox, "Choose the program to open text clips with");
 
