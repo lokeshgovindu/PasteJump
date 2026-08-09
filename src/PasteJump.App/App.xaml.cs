@@ -1144,15 +1144,27 @@ public partial class App : Application
     /// </summary>
     private void RunLegacyImport(string candidate, Window? owner)
     {
+        // The clip limit is passed rather than assumed, so the import can never fill the stack past what the
+        // store keeps - which would evict the excess at once and take the user's own recent clips with it.
         var report = ImportProgressDialog.Run(
-            (progress, token) => Import.LegacyClipjumpImporter.ImportHistory(candidate, _store, progress, token),
+            (progress, token) => Import.LegacyClipjumpImporter.ImportHistory(
+                candidate, _store, progress, token, maxClips: _settings.EffectiveMaxClips),
             owner);
 
         // Refreshed before the summary, so the numbers on screen already match what the dialog is about to
         // claim - and it happens for a cancelled run too, which still imported everything up to the stop.
         _historyWindow?.QueueRefresh();
 
-        var summary = $"Imported {report.Imported} entries.\nSkipped {report.Skipped}." +
+        var summary = $"Imported {report.Imported} history entries.\nSkipped {report.Skipped}.\n\n"
+            + $"Imported {report.ClipsImported} clips into the Ctrl+V stack"
+            + (report.ClipsSkipped > 0
+                ? $", skipping {report.ClipsSkipped} that held no replayable format."
+                : ".")
+            + (report.ClipsImported > 0
+                ? "\nImported clips keep their text, images and file lists; rich formatting cannot be "
+                    + "recovered, because Clipjump recorded those formats by a number that is only "
+                    + "meaningful within the Windows session that wrote it."
+                : string.Empty) +
             (report.Errors.Count > 0
                 ? $"\n\nProblems:\n{string.Join('\n', report.Errors.Take(5))}"
                 : string.Empty);

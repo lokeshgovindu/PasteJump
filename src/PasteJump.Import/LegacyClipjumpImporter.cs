@@ -29,6 +29,16 @@ public sealed class ImportReport
     /// </summary>
     public DateTimeOffset? OldestImported { get; set; }
 
+    /// <summary>Clip files replayed into the paste stack, so the gesture can reach them.</summary>
+    public int ClipsImported { get; set; }
+
+    /// <summary>
+    /// Clip files that held nothing replayable — only formats whose ids are session-scoped, so their meaning
+    /// cannot be recovered. Reported rather than hidden, because "995 of 1004" is a materially different
+    /// outcome from "all of them" and the user is entitled to know which they got.
+    /// </summary>
+    public int ClipsSkipped { get; set; }
+
     public List<string> Errors { get; } = [];
 }
 
@@ -64,11 +74,17 @@ public static class LegacyClipjumpImporter
     /// download. Without a token the only way out of a slow import is killing the process.
     /// </para>
     /// </param>
+    /// <param name="maxClips">
+    /// How many <c>.avc</c> clip files to replay into the paste stack, newest first. Zero imports history only.
+    /// Should be the store's own clip limit: importing more than the stack keeps would evict the excess
+    /// immediately, and take the user's own recent clips with it.
+    /// </param>
     public static ImportReport ImportHistory(
         string clipjumpFolder,
         ClipStore target,
         IProgress<ImportProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int maxClips = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clipjumpFolder);
         ArgumentNullException.ThrowIfNull(target);
@@ -104,7 +120,146 @@ public static class LegacyClipjumpImporter
             TryDelete(tempCopy);
         }
 
+        // After history, and outside its try, so a history failure still leaves the clips importable and a clip
+        // failure cannot lose the history that already succeeded.
+        if (maxClips > 0 && !report.Cancelled)
+        {
+            try
+            {
+                ImportClips(clipjumpFolder, target, report, maxClips, progress, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                report.Cancelled = true;
+            }
+            catch (Exception ex)
+            {
+                report.Errors.Add($"Clips: {ex.Message}");
+            }
+        }
+
         return report;
+    }
+
+    /// <summary>
+    /// Replays Clipjump's <c>.avc</c> clip files into the paste stack, newest first, up to
+    /// <paramref name="maxClips"/>.
+    /// <para>
+    /// This is what makes importing worth doing rather than merely searchable: history is a flattened archive
+    /// the gesture cannot paste from, so without this an imported installation of thousands of entries left
+    /// <c>Ctrl+V</c> with nothing new to offer.
+    /// </para>
+    /// <para>
+    /// Newest first and capped, because the stack is bounded by a clip count. Importing a thousand clips into a
+    /// store that keeps two hundred would spend the whole budget on the oldest ones read and then evict them,
+    /// which is worse than useless - it would also push out the clips the user copied today.
+    /// </para>
+    /// </summary>
+    private static void ImportClips(
+        string clipjumpFolder,
+        ClipStore target,
+        ImportReport report,
+        int maxClips,
+        IProgress<ImportProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var directory = Path.Combine(clipjumpFolder, "cache", "clips");
+
+        if (!Directory.Exists(directory))
+        {
+            return;
+        }
+
+        // Ordered by write time, which is what "newest" means to the user, with the numeric file name as the
+        // tie-break since Clipjump allocates those in sequence.
+        var files = new DirectoryInfo(directory)
+            .EnumerateFiles("*.avc")
+            .OrderByDescending(static f => f.LastWriteTimeUtc)
+            .ThenByDescending(static f => int.TryParse(Path.GetFileNameWithoutExtension(f.Name), out var n) ? n : 0)
+            .Take(maxClips)
+            .ToList();
+
+        // Reported from zero again for this phase. A clip pass can run a minute on a large installation - image
+        // clips are multi-megabyte uncompressed DIBs - and a dialog whose bar sat still for that long after
+        // finishing the history would look like a hang, which is how a slow import gets killed half-done.
+        var processed = 0;
+        progress?.Report(new ImportProgress(0, files.Count));
+
+        // Oldest of the selected set first, so the newest Clipjump clip ends up newest in the stack rather than
+        // buried under the others.
+        foreach (var file in Enumerable.Reverse(files))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                var payloads = ClipjumpClipFile.TryReadPayloads(File.ReadAllBytes(file.FullName));
+
+                if (payloads.Count == 0)
+                {
+                    report.ClipsSkipped++;
+                    continue;
+                }
+
+                var text = Win32TextOf(payloads);
+                var snapshot = new ClipboardSnapshot(payloads, text, KindOf(payloads, text), ProvenanceTag);
+
+                // Duplicates allowed: two Clipjump clips holding the same text are two clips the user kept, and
+                // collapsing them would silently import fewer than reported.
+                target.Add(snapshot, allowDuplicates: true);
+                report.ClipsImported++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                report.ClipsSkipped++;
+
+                if (report.Errors.Count < 20)
+                {
+                    report.Errors.Add($"{file.Name}: {ex.Message}");
+                }
+            }
+
+            // Outside the try, as in the history pass, so a file that failed still advances the bar.
+            progress?.Report(new ImportProgress(++processed, files.Count));
+        }
+    }
+
+    /// <summary>
+    /// The text of an imported payload set, decoded from <c>CF_UNICODETEXT</c> only.
+    /// <para>
+    /// No <c>CF_TEXT</c> fallback, for the reason recorded in <c>Win32ClipboardAccess.ExtractText</c>: that
+    /// format is in the system ANSI codepage while .NET's <c>Encoding.Default</c> is UTF-8, so decoding it
+    /// that way would mangle every non-ASCII character.
+    /// </para>
+    /// </summary>
+    private static string? Win32TextOf(IReadOnlyList<ClipPayload> payloads)
+    {
+        var unicode = payloads.FirstOrDefault(static p => p.FormatId == 13);
+
+        if (unicode is null)
+        {
+            return null;
+        }
+
+        var text = System.Text.Encoding.Unicode.GetString(unicode.Data);
+        var nul = text.IndexOf('\0', StringComparison.Ordinal);
+
+        return nul >= 0 ? text[..nul] : text;
+    }
+
+    private static ClipKind KindOf(IReadOnlyList<ClipPayload> payloads, string? text)
+    {
+        if (payloads.Any(static p => p.FormatId == 15))
+        {
+            return ClipKind.Files;
+        }
+
+        if (payloads.Any(static p => p.FormatId is 8 or 17))
+        {
+            return ClipKind.Image;
+        }
+
+        return string.IsNullOrEmpty(text) ? ClipKind.Other : ClipKind.Text;
     }
 
     /// <summary>
