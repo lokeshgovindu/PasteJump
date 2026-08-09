@@ -195,13 +195,20 @@
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Hold Ctrl and Tap This Key" />
+                            <!--
+                                Disabled rather than removed, deliberately: it still shows what the trigger
+                                actually is, which is worth reading even when it cannot be changed. Left in
+                                place for a future release. The value is still collected from the combo on OK,
+                                so what is displayed is what gets saved - nothing to carry forward by hand.
+                            -->
                             <ComboBox x:Name="TriggerKeyCombo"
                                       Grid.Column="1"
+                                      IsEnabled="False"
                                       SelectionChanged="OnTriggerKeyChanged" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Margin="0,3,0,2"
-                                   Text="The key that opens paste mode, and that steps to an older clip once it is open. Only letters not already used by another paste-mode action are offered. Change it to stop competing with another clipboard manager for Ctrl+V." />
+                                   Text="The key that opens paste mode, and that steps to an older clip once it is open. Not adjustable in this release — shown so you can see what the gesture is." />
                         <TextBlock x:Name="TriggerKeyHintText"
                                    Style="{StaticResource SettingHelp}"
                                    Margin="0,0,0,12" />
@@ -212,10 +219,10 @@
                                 <ColumnDefinition Width="190" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Keystroke Sent to Paste" />
-                            <ComboBox x:Name="PasteKeystrokeCombo" Grid.Column="1" />
+                            <ComboBox x:Name="PasteKeystrokeCombo" Grid.Column="1" IsEnabled="False" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
-                                   Text="What PasteJump presses in the target application once it has put your clip on the clipboard. Leave it on Ctrl+V unless pasting stops working while another clipboard manager runs: Windows shows injected keystrokes to every keyboard hook, so a manager holding Ctrl+V can swallow ours before the application sees it. Shift+Insert is the legacy paste chord and is almost never claimed." />
+                                   Text="What PasteJump presses in the target application once it has put your clip on the clipboard. Not adjustable in this release — Shift+Insert was offered as a way to coexist with another clipboard manager, but it did not help in practice, so it needs more work before it earns a control here." />
 
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
