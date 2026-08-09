@@ -16,6 +16,21 @@
             <Setter Property="Margin" Value="0,0,6,0" />
             <Setter Property="MinWidth" Value="84" />
         </Style>
+
+        <!--
+            The toolbar is one row of controls, so they get one height - the same reasoning as the note in
+            SettingsWindow.xaml. The themed Button carries MinHeight="32" while the ComboBox carries 24 and the
+            TextBox none, so the density combo and the search box sat visibly short beside the buttons. 32 to
+            match the buttons, since here they are the majority of the row.
+        -->
+        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </Window.Resources>
 
     <Window.InputBindings>

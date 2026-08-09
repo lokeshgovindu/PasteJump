@@ -43,6 +43,26 @@
             <Setter Property="MinWidth" Value="84" />
         </Style>
 
+        <!--
+            One explicit height for both editors. They were 28 and 35 - measured off a screenshot, not guessed -
+            because nothing was making them agree: the themed ComboBox carries MinHeight="24" and sits at its own
+            desired height, while a TextBox defaults to VerticalAlignment="Stretch" and grew to fill the row.
+            MinHeight cannot fix that, since the taller control was already above any floor worth setting.
+
+            Height plus Center is therefore deliberate rather than lazy: it is the only combination that makes a
+            combo and a text box on the same row identical by construction instead of by coincidence. Safe for
+            single-line editors, and it scales with DPI like every other WPF unit. 30 sits between the two
+            former heights and matches the 32px buttons closely enough to read as one family.
+        -->
+        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
         <!-- Label / editor row. Every setting below uses this shape, so it is defined once. -->
         <Style x:Key="SettingRow" TargetType="Grid">
             <Setter Property="Margin" Value="0,7,0,0" />
