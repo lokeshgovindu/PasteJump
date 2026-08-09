@@ -239,7 +239,17 @@
                                    Text="The key that opens paste mode, and that steps to an older clip once it is open. Not adjustable in this release — shown so you can see what the gesture is." />
                         <TextBlock x:Name="TriggerKeyHintText"
                                    Style="{StaticResource SettingHelp}"
-                                   Margin="0,0,0,12" />
+                                   Margin="0,0,0,2" />
+
+                        <!--
+                            The other gesture keys are only listed in the Paste-mode keys dialog, which nobody
+                            has a reason to open. That was reported the hard way: someone met paste popping by
+                            accident and had nowhere to look it up. Naming the dialog here is the smallest fix
+                            that does not duplicate the whole list.
+                        -->
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Margin="0,0,0,12"
+                                   Text="Once paste mode is open, other keys act on the clip — X cycles cancel and delete, F searches, Z changes the format, Space pins, and Shift deletes the clip after pasting. The full list is under Paste-mode Keys in the tray menu, or press F1 during the gesture. Ctrl+Shift+V is deliberately left to the application, since terminals paste with it." />
 
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>

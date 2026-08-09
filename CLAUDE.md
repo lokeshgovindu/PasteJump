@@ -126,6 +126,15 @@ that immediately caught two real bugs. Expect to do the same again.
   hook, makes it strictly worse: returning 1 removes the event from the chain **and** from delivery to
   the target window, so nothing pastes anywhere. The only avenue is a chord the rival has not claimed,
   hence the `PasteKeystroke` setting and `Shift+Insert`. Two managers cannot share Ctrl+V.
+- **`Ctrl+Shift+V` must pass straight through — it is not ours.** Every terminal pastes with it (Visual
+  Studio's, VS Code's, Windows Terminal's) and browsers and editors use it for paste-as-plain-text. The
+  recognizer therefore declines to open a session when Shift is already held at the trigger, and the guard
+  belongs *there* rather than in the controller, because the damage is the **swallow**: consuming the `V`
+  means the application never receives the chord it owns and gets our paste instead of its own. Shift also
+  means "pop", so the clip was deleted on the way out — reported as "Ctrl+Shift+V has stopped working" from a
+  Visual Studio terminal. Paste popping is unaffected: press Shift *after* the gesture is open, which is what
+  the key list always said. A modifier that other applications combine with our trigger is a chord we do not
+  own, and the same reasoning would apply to `Ctrl+Alt+V`.
 - **The trigger key is configurable, so nothing may hard-code `V` or "Ctrl+V".** `TriggerKey` in `Core`
   owns the rules; `VirtualKeyTranslator.ToGestureKey` takes the trigger VK and checks it *first*, and `V` is
   deliberately absent from the binding table so it falls through to search input when it is not the

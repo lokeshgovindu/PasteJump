@@ -134,6 +134,19 @@ public sealed class PasteGestureRecognizer
         // ---- entry
         if (key == GestureKey.Paste && IsControlDown && !_controller.IsActive)
         {
+            // Ctrl+Shift+V is not ours. It is how every terminal pastes - Visual Studio's, VS Code's,
+            // Windows Terminal's - and how browsers and editors paste as plain text. Starting a session here
+            // would swallow the V, so the application never receives the chord it owns and gets our paste
+            // instead of its own; and because Shift also means "pop", the clip was then deleted. Reported from
+            // a Visual Studio terminal, where it looked simply like Ctrl+Shift+V had stopped working.
+            //
+            // Paste popping still exists: press Shift AFTER the gesture is open, which is what the key list
+            // has always described. This only declines to claim the chord as an entry point.
+            if (_controller.ShiftHeld)
+            {
+                return false;
+            }
+
             var kind = _controller.Begin();
 
             if (kind == PasteCommitKind.PassedThrough)

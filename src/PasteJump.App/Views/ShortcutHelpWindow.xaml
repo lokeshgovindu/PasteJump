@@ -94,7 +94,7 @@
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste the shown clip" />
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="+ Shift" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Hold Shift as you release to delete the clip after pasting (paste popping)" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Press Shift once paste mode is already open, then release, to delete the clip after pasting (paste popping). Ctrl+Shift+V is left alone — it belongs to terminals and to paste-as-plain-text." />
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste and stay open, to paste several clips in a row" />

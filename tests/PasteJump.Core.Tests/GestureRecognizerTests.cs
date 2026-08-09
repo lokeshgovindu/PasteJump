@@ -62,6 +62,62 @@ public class GestureRecognizerTests
         Assert.True(controller.IsActive);
     }
 
+    /// <summary>
+    /// Ctrl+Shift+V belongs to the application. Every terminal pastes with it and browsers use it to paste as
+    /// plain text, so swallowing the V substitutes our paste for theirs - and because Shift also means "pop",
+    /// it deleted the clip on the way. Reported from a Visual Studio terminal as Ctrl+Shift+V having stopped
+    /// working.
+    /// </summary>
+    [Fact]
+    public void CtrlShiftV_IsPassedThroughAndOpensNothing()
+    {
+        var (recognizer, controller, host) = Build();
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Shift, isDown: true);
+
+        var swallowed = recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        Assert.False(swallowed);
+        Assert.False(controller.IsActive);
+
+        // And nothing was pasted on our behalf either - the application handles the chord itself.
+        Assert.Empty(host.PastedClips);
+    }
+
+    /// <summary>
+    /// Paste popping survives, reached the way the key list describes it: Shift pressed once the gesture is
+    /// already open. Giving up Ctrl+Shift+V as an entry point costs nothing here.
+    /// </summary>
+    [Fact]
+    public void ShiftAfterEntry_StillPopsTheClip()
+    {
+        // Built here rather than through the helper, so the catalog is in reach to assert the deletion.
+        var catalog = new FakeClipCatalog();
+        catalog.Add("clip 1");
+        catalog.Add("clip 2");
+        catalog.Add("clip 3");
+
+        var host = new RecordingPasteModeHost();
+        var controller = new PasteModeController(
+            catalog, host, new FormatterRegistry(),
+            new PasteModeOptions { PreserveClipPosition = false });
+
+        var recognizer = new PasteGestureRecognizer(controller);
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        Assert.True(controller.IsActive);
+
+        recognizer.Handle(GestureKey.Shift, isDown: true);
+        recognizer.Handle(GestureKey.Control, isDown: false);
+
+        Assert.Single(host.PastedClips);
+        Assert.Equal(2, catalog.Snapshot().Count);
+        Assert.Equal(1, catalog.DeleteCallCount);
+    }
+
     [Fact]
     public void PasteKeyWithoutModifier_IsPassedThrough()
     {
