@@ -724,8 +724,7 @@ public partial class HistoryWindow : Window
         var accepted = MessageDialog.Show(
             "This cannot be undone.\n\n"
                 + $"The {clips} clip{(clips == 1 ? string.Empty : "s")} the Ctrl+V gesture walks are a separate "
-                + "store and are NOT affected. To clear those, hold Ctrl, tap X three times until the red "
-                + "DELETE ALL banner appears, then release.",
+                + "store and are NOT affected. To clear those, use \"Clear clips\" in the tray menu.",
             headline: $"Delete all {_store.HistoryCount} history entries?",
             kind: DialogKind.Warning,
             buttons: DialogButtons.OkCancel,

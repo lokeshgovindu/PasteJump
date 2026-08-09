@@ -483,9 +483,21 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Editor for Text Clips (H key)" />
                             <TextBox x:Name="TextEditorBox" Grid.Column="1" />
+                            <!--
+                                Browse, because nobody knows an executable's path off the top of their head and a
+                                wrong guess fails at the moment you press H rather than here. Same reasoning as
+                                the picker on the Excluded Apps tab.
+                            -->
+                            <Button Grid.Column="2"
+                                    Click="OnBrowseTextEditorClicked"
+                                    Content="_Browse…"
+                                    MinWidth="0"
+                                    Padding="10,2"
+                                    ToolTip="Choose the program to open text clips with" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="Opened when you press H during the gesture on a text clip. The clip is written to a temporary file first; editing it does not change the stored clip." />
@@ -494,9 +506,16 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Editor for Image Clips (H key)" />
                             <TextBox x:Name="ImageEditorBox" Grid.Column="1" />
+                            <Button Grid.Column="2"
+                                    Click="OnBrowseImageEditorClicked"
+                                    Content="B_rowse…"
+                                    MinWidth="0"
+                                    Padding="10,2"
+                                    ToolTip="Choose the program to open image clips with" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="The same, for a clip that holds a picture. The clip is written to a temporary .bmp first. Text wins when a clip carries both, which is common — copying a table from a browser gives you text and a bitmap at once." />

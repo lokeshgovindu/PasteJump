@@ -492,6 +492,88 @@ public partial class SettingsWindow : Window
         RefreshExcludedStatus(added == 1 ? $"Added {chosen[0]}." : $"Added {added} programs.");
     }
 
+    private void OnBrowseTextEditorClicked(object sender, RoutedEventArgs e)
+        => BrowseForEditor(TextEditorBox, "Choose the program to open text clips with");
+
+    private void OnBrowseImageEditorClicked(object sender, RoutedEventArgs e)
+        => BrowseForEditor(ImageEditorBox, "Choose the program to open image clips with");
+
+    /// <summary>
+    /// Picks an executable into <paramref name="box"/>.
+    /// <para>
+    /// Unlike the excluded-apps picker, the full path is kept rather than the file name: this value is handed to
+    /// <c>Process.Start</c>, so a bare name only works for something already on the PATH. Keeping the path is
+    /// what makes an editor that is not on the PATH - most of them - work at all.
+    /// </para>
+    /// <para>
+    /// Opens at whatever is currently in the box when that resolves to a real file, so browsing from
+    /// <c>notepad.exe</c> starts in System32 rather than wherever the dialog last was.
+    /// </para>
+    /// </summary>
+    private void BrowseForEditor(TextBox box, string title)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = title,
+            Filter = "Programs|*.exe;*.com;*.bat;*.cmd|All files|*.*",
+            CheckFileExists = true,
+        };
+
+        var current = ResolveExecutable(box.Text);
+
+        if (current is not null)
+        {
+            dialog.InitialDirectory = Path.GetDirectoryName(current);
+            dialog.FileName = Path.GetFileName(current);
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            box.Text = dialog.FileName;
+        }
+    }
+
+    /// <summary>
+    /// The full path of an editor setting, whether it is already a path or a bare name on the PATH. Null when
+    /// neither resolves, in which case the dialog simply opens wherever it last was.
+    /// </summary>
+    private static string? ResolveExecutable(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim().Trim('"');
+
+        try
+        {
+            if (Path.IsPathRooted(trimmed) && File.Exists(trimmed))
+            {
+                return trimmed;
+            }
+
+            // Bare names are the common case - notepad.exe and mspaint.exe both ship as defaults - and both
+            // live in a PATH directory rather than anywhere guessable.
+            foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var candidate = Path.Combine(directory.Trim(), trimmed);
+
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // A malformed path from a hand-edited settings file. Not worth failing the browse over.
+        }
+
+        return null;
+    }
+
     private void OnBrowseExcludedClicked(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
