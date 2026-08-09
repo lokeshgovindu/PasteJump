@@ -49,17 +49,20 @@
             desired height, while a TextBox defaults to VerticalAlignment="Stretch" and grew to fill the row.
             MinHeight cannot fix that, since the taller control was already above any floor worth setting.
 
-            Height plus Center is therefore deliberate rather than lazy: it is the only combination that makes a
-            combo and a text box on the same row identical by construction instead of by coincidence. Safe for
-            single-line editors, and it scales with DPI like every other WPF unit. 30 sits between the two
-            former heights and matches the 32px buttons closely enough to read as one family.
+            VerticalAlignment="Center" is what fixes the stretching, and MinHeight then equalises the two - a
+            floor above both natural heights, so they match without either being constrained.
+
+            MinHeight and not Height, which was the first attempt and clipped the values inside: a fixed 30
+            leaves 20px once the template has taken 2 for borders and 8 for padding, and a 13px font's line box
+            is about 18, so any rounding cut the bottom off every number and file name. A floor cannot do that -
+            the control grows if its content needs more room, which is exactly the property wanted here.
         -->
         <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="Height" Value="30" />
+            <Setter Property="MinHeight" Value="32" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="Height" Value="30" />
+            <Setter Property="MinHeight" Value="32" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 

@@ -79,7 +79,7 @@
                            Foreground="{DynamicResource MutedTextBrush}"
                            VerticalAlignment="Center"
                            Margin="0,0,6,0" />
-                <ComboBox x:Name="DensityCombo" Height="32"
+                <ComboBox x:Name="DensityCombo" MinHeight="32"
                           Width="104"
                           VerticalAlignment="Center"
                           SelectionChanged="OnDensityChanged"
@@ -89,7 +89,7 @@
             <!-- Search box with a cue banner. WPF has no native placeholder, so the hint is a
                  TextBlock layered behind the box and hidden as soon as there is text. -->
             <Grid Grid.Column="2" Width="320">
-                <TextBox x:Name="SearchBox" Height="32" VerticalAlignment="Center"
+                <TextBox x:Name="SearchBox" MinHeight="32" VerticalAlignment="Center"
                          TextChanged="OnSearchTextChanged"
                          ToolTip="Search history by content. Ctrl+E, Ctrl+K or Ctrl+F to jump here; Esc to clear." />
 
