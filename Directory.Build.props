@@ -81,7 +81,7 @@
     three drift apart.
   -->
   <PropertyGroup Label="Versioning">
-    <PasteJumpVersion>2026.1.0.0</PasteJumpVersion>
+    <PasteJumpVersion>2026.2.0.0</PasteJumpVersion>
     <AssemblyVersion>$(PasteJumpVersion)</AssemblyVersion>
     <FileVersion>$(PasteJumpVersion)</FileVersion>
     <InformationalVersion>$(PasteJumpVersion)</InformationalVersion>

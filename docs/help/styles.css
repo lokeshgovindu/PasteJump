@@ -124,6 +124,32 @@ div.note p, div.warn p {
     margin: 0;
 }
 
+/*
+    Figures. No <figure>/<figcaption>: the viewer's document mode predates them, so a div and a p is what
+    renders consistently. max-width rather than width so a shot narrower than the page is not stretched -
+    every image here is a real window capture, and enlarging one only blurs it.
+*/
+div.shot {
+    margin: 14px 0 18px 0;
+}
+
+div.shot img {
+    max-width: 100%;
+    border: 1px solid #c9d2dc;
+    background: #ffffff;
+}
+
+div.shot p {
+    margin: 5px 0 0 0;
+    font-size: 8.5pt;
+    color: #6b7683;
+}
+
+/* A small capture shown inline at its own size, for the overlay and the toast. */
+div.shot-inline img {
+    border: 1px solid #c9d2dc;
+}
+
 a { color: #1a5fb4; }
 a:hover { color: #103a6b; }
 

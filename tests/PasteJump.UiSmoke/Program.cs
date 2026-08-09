@@ -8,6 +8,7 @@ using PasteJump.Core.Abstractions;
 using PasteJump.Core.Capture;
 using PasteJump.Core.Formatting;
 using PasteJump.Core.Model;
+using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
 
@@ -157,7 +158,13 @@ internal static class Program
                     return toast;
                 });
 
-                Check("OverlayWindow", () => new OverlayWindow());
+                // Three real frames rather than one empty window. The empty overlay renders none of
+                // RenderBody's interesting paths - no preview, no chips, no banner - so it proved almost
+                // nothing, and it made a useless picture for the help file. These are also the shots
+                // docs/help uses, via tools/update-help-images.ps1.
+                Check("OverlayWindow", () => RenderOverlay(TextFrame()));
+                Check("OverlayWindow-Search", () => RenderOverlay(SearchFrame()));
+                Check("OverlayWindow-DeleteAll", () => RenderOverlay(DeleteAllFrame()));
             }
         }
 
@@ -170,6 +177,80 @@ internal static class Program
 
         return _failures == 0 ? 0 : 2;
     }
+
+    /// <summary>
+    /// Shows the overlay and renders one frame into it.
+    /// <para>
+    /// Rendered on Loaded rather than before Show, because Render measures itself and positions the window,
+    /// and both need a live HWND. The anchor is a fixed point rather than the caret: there is no caret in a
+    /// harness, and a repeatable position is what makes the screenshots comparable between runs.
+    /// </para>
+    /// </summary>
+    private static OverlayWindow RenderOverlay(PasteOverlayModel frame)
+    {
+        var overlay = new OverlayWindow();
+
+        overlay.Loaded += (_, _) => overlay.Render(frame, anchorX: 200, anchorY: 200);
+
+        return overlay;
+    }
+
+    /// <summary>A text clip mid-gesture, with tags, a source application and a pop pending.</summary>
+    private static PasteOverlayModel TextFrame() => new()
+    {
+        Position = 3,
+        Total = 41,
+        PreviewText =
+            "SELECT c.id, c.preview, c.total_bytes" + "\n" +
+            "  FROM clip c" + "\n" +
+            " WHERE c.pinned = 0" + "\n" +
+            " ORDER BY c.sort_key DESC;",
+        Kind = ClipKind.Text,
+        Pinned = true,
+        Tags = ["sql", "reporting"],
+        FormatterName = "Original",
+        CommitMode = PasteCommitMode.Paste,
+        IsSearching = false,
+        MatchCount = 0,
+        PopOnPaste = true,
+        IsEmpty = false,
+        SourceExecutable = "devenv.exe",
+    };
+
+    /// <summary>The same gesture in search mode, which adds the query row above the preview.</summary>
+    private static PasteOverlayModel SearchFrame() => new()
+    {
+        Position = 1,
+        Total = 41,
+        PreviewText = "https://github.com/lokeshgovindu/PasteJump",
+        Kind = ClipKind.Text,
+        Pinned = false,
+        FormatterName = "Plain text",
+        CommitMode = PasteCommitMode.Paste,
+        IsSearching = true,
+        SearchQuery = "github",
+        MatchCount = 4,
+        PopOnPaste = false,
+        IsEmpty = false,
+        SourceExecutable = "chrome.exe",
+    };
+
+    /// <summary>The X cycle at its last stop, which is the one worth showing a picture of.</summary>
+    private static PasteOverlayModel DeleteAllFrame() => new()
+    {
+        Position = 3,
+        Total = 41,
+        PreviewText = "the clip that will NOT be pasted, because X was tapped three times",
+        Kind = ClipKind.Text,
+        Pinned = false,
+        FormatterName = "Original",
+        CommitMode = PasteCommitMode.DeleteAll,
+        IsSearching = false,
+        MatchCount = 0,
+        PopOnPaste = false,
+        IsEmpty = false,
+        SourceExecutable = "notepad.exe",
+    };
 
     private static ResourceDictionary Load(string relative) => new()
     {

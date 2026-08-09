@@ -94,12 +94,19 @@ A compiled HTML Help manual is built separately, since it needs an external tool
 have:
 
 ```
+powershell -ExecutionPolicy Bypass -File tools/update-help-images.ps1   # after a UI change
 powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
 ```
 
-Sources are in `docs/help`; the result is `artifacts/help/PasteJump.chm` (~42 KB). It needs `hhc.exe` from
-Microsoft's HTML Help Workshop. The `.chm` is not shipped beside the exe — the deployment is deliberately one
-file — so it is a standalone document to publish with a release.
+Sources are in `docs/help`; the result is `artifacts/help/PasteJump.chm` (~408 KB, nine topics, sixteen
+screenshots). It needs `hhc.exe` from Microsoft's HTML Help Workshop.
+
+The screenshots are **produced by the UI smoke harness**, not taken by hand, so they cannot drift from the
+real XAML — `update-help-images.ps1` runs it and copies the light-theme shots into `docs/help/images`. They are
+checked in, so building the help does not require starting WPF.
+
+The `.chm` is not shipped beside the exe — the deployment is deliberately one file — so it is a standalone
+document to publish with a release.
 
 ---
 

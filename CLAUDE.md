@@ -14,7 +14,7 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 
 ## Current status
 
-**In user testing.** Version `2026.1.0.0` (set in `Directory.Build.props`).
+**In user testing.** Version `2026.2.0.0` (set in `Directory.Build.props`).
 
 | | |
 |---|---|
@@ -526,13 +526,24 @@ dotnet run --project tests/PasteJump.UiSmoke -- --shot out   # ...and save PNGs 
 The user manual is a compiled HTML Help file, built separately from `docs/help`:
 
 ```
+powershell -ExecutionPolicy Bypass -File tools/update-help-images.ps1   # after any UI change
 powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
 ```
 
-Three things about `hhc.exe` that do not behave like a normal build tool, all handled in the script and
+**The screenshots come from the UI smoke harness, never from a hand-taken capture.** That is what stops
+them drifting from the real XAML, and it is why the harness now renders three realistic `OverlayWindow`
+frames (text with chips, search, DELETE ALL) instead of one empty window — which also means `RenderBody`'s
+non-empty paths are finally exercised by the smoke run. `update-help-images.ps1` owns the mapping from
+harness shot name to help file name, so renaming a shot is a one-line change. Light theme only: a dark
+screenshot on a white help page reads as a defect. The images are checked in, so a help build never has to
+start WPF.
+
+Four things about `hhc.exe` that do not behave like a normal build tool, all handled in the script and
 all worth knowing before debugging it: **it exits 1 on success and 0 on failure**, it writes the `.chm`
-beside the `.hhp` and ignores any output path, and it is a 32-bit tool that lives outside the SDKs
-(`C:\Program Files (x86)\HTML Help Workshop`). Deliberately *not* wired into `dotnet build`: the tool is
+beside the `.hhp` and ignores any output path, it is a 32-bit tool that lives outside the SDKs
+(`C:\Program Files (x86)\HTML Help Workshop`), and **its "Graphics: 0" line is a lie** when images are
+listed in `[FILES]` rather than discovered by scanning — judge by the output size or by
+`hh.exe -decompile`. Deliberately *not* wired into `dotnet build`: the tool is
 optional and a machine without it would fail the build. The `.chm` is also not shipped beside the exe —
 the deployment is one file — so it is a document to attach to a release. Its CSS is deliberately
 old-fashioned (tables, floats, no flexbox or grid): the viewer is the IE engine in a legacy document mode.

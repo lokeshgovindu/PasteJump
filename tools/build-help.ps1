@@ -12,6 +12,9 @@
         is also what keeps build output out of the source tree.
       - It is a 32-bit tool that ships outside the SDKs, so it is looked for in its own install locations
         rather than expected on PATH.
+      - Its "Graphics" count reports 0 even when images ARE compiled in, because that counter only covers
+        images it discovered by scanning topics rather than ones listed in [FILES]. Judge inclusion by the
+        output size, or by decompiling with `hh.exe -decompile <dir> <chm>`. Do not chase the zero.
 
     Not part of `dotnet build`. The help is a separate deliverable, and making every build depend on an
     optional external tool would break the build on a machine that does not have it.
