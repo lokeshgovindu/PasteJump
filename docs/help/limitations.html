@@ -1,0 +1,69 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Limits and omissions</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>Limits and omissions</h1>
+<p class="lead">What PasteJump cannot do, and what it deliberately does not do.</p>
+
+<h2>Known limits</h2>
+
+<ul>
+<li><b>Elevated windows.</b> A non-elevated keyboard hook cannot see keystrokes in windows running as
+administrator, so the gesture does not work in them. Running PasteJump itself elevated via a scheduled
+task fixes it, at the cost of arranging that once.</li>
+
+<li><b>A copy can be lost under heavy clipboard contention.</b> The clipboard is a machine-wide lock;
+PasteJump retries with backoff and then twice more on a delay, but a process that holds it longer than
+that wins. Inherent to the Win32 clipboard.</li>
+
+<li><b>An image's reported size is larger than the file it came from,</b> and correctly so &mdash; the
+clipboard hands over raw pixels. See <a href="troubleshooting.html">Troubleshooting</a>.</li>
+
+<li><b>Full-text search only reaches as far as the stored preview.</b> Longer text is archived in full and
+comes back intact when copied, but is not searchable past the cap. Raise <b>Characters Kept per Entry</b>
+if that matters to you; it applies to new captures.</li>
+
+<li><b>File names past the preview cap are not searchable either,</b> and a file list stores no full-text
+archive the way long text does.</li>
+
+<li><b>Windows on ARM</b> needs a separate build; only 64-bit Intel/AMD is published today.</li>
+
+<li><b>The application icon is a generated placeholder,</b> drawn by a script rather than designed.</li>
+</ul>
+
+<h2>Not implemented, on purpose</h2>
+
+<p>Clipjump had these. They were audited and dropped rather than missed:</p>
+
+<ul>
+<li><b>Channels</b> &mdash; multiple independent clipboard stacks &mdash; and the Channel Organizer.
+Consequently the channel keys (Up, Down, PitSwap) do not exist, and the <code>X</code> cycle has no Move
+or Copy stages, since those moved clips <i>between</i> channels.</li>
+
+<li><b>The plugin system</b> and its public messaging API. Replaced by five built-in paste formats.</li>
+
+<li><b>Localisation.</b> English only.</li>
+
+<li><b>Action Mode</b>, copy-file-path, hold-clip, one-time-stop and incognito. A per-process ignore list
+covers the case that actually matters &mdash; see <b>Settings, Excluded Apps</b>.</li>
+
+<li><b>Three Clipjump settings</b> with no counterpart here: its store-compaction batch size, replaced
+wholesale by SQLite; its thumbnail quality, which does not apply because previews are rendered on demand
+from the original image; and its memory-flush and process-priority knobs, the first of which is a
+well-known anti-pattern that makes an application slower.</li>
+</ul>
+
+<h2>Credit</h2>
+
+<p>The interaction design is Avi Aryan's. <b>Clipjump</b> is an excellent AutoHotkey v1 utility whose last
+release was in 2016; PasteJump is an independent reimplementation of its observed behaviour and carries
+none of its code.</p>
+
+<p>PasteJump is MIT-licensed. Copyright &copy; 2026 Lokesh Govindu.</p>
+
+</body>
+</html>

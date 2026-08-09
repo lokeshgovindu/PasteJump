@@ -1,0 +1,116 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>The gesture</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>The gesture</h1>
+<p class="lead">Press <code>Ctrl</code>+<code>V</code> and keep <code>Ctrl</code> held. An overlay
+appears near the text caret. Release <code>Ctrl</code> to commit whatever it is showing.</p>
+
+<p>Every key below works while <code>Ctrl</code> is still down. You never have to look at the overlay to
+use it &mdash; it is there so you can, not because you must.</p>
+
+<h2>Moving through clips</h2>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">V</td><td>Step to an older clip. Tap again to keep going back.</td></tr>
+<tr><td class="key">C</td><td>Step back towards a newer clip.</td></tr>
+<tr><td class="key">A</td><td>Jump straight to the newest clip.</td></tr>
+<tr><td class="key">1 &ndash; 9</td><td>Jump that many clips at once.</td></tr>
+<tr><td class="key">&minus;</td><td>Reverse the direction the number keys jump in.</td></tr>
+</table>
+
+<h2>Pasting</h2>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">release Ctrl</td><td>Paste the clip being shown.</td></tr>
+<tr><td class="key">Enter</td><td>Paste and stay open, for pasting several clips in a row.</td></tr>
+<tr><td class="key">+ Shift</td><td>Press <code>Shift</code> <i>after</i> the overlay is already open,
+then release, to delete the clip once it has been pasted. This is called paste popping.</td></tr>
+<tr><td class="key">Z</td><td>Cycle the paste format: Original, Plain text, Collapse whitespace,
+Sentence case, Unindent.</td></tr>
+<tr><td class="key">S</td><td>Put the clip on the Windows clipboard <i>without</i> pasting it.</td></tr>
+</table>
+
+<div class="warn">
+<p><b><code>Ctrl</code>+<code>Shift</code>+<code>V</code> is not PasteJump's.</b> It passes straight
+through to the application, because every terminal pastes with it and browsers and editors use it for
+paste-as-plain-text. That is why paste popping is reached by adding <code>Shift</code> once the overlay
+is up, rather than by starting the gesture with it.</p>
+</div>
+
+<h2>Organising</h2>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">Space</td><td>Pin or unpin. Pinned clips sort first and survive Delete All.</td></tr>
+<tr><td class="key">Q</td><td>Move this clip to the front of the stack, so it is what the next
+<code>Ctrl</code>+<code>V</code> offers first.</td></tr>
+<tr><td class="key">T</td><td>Edit tags. Tags are searchable during the gesture.</td></tr>
+<tr><td class="key">H</td><td>Open the clip in an external editor. Text and images use separate editors,
+both set under <a href="settings.html">Settings, System</a>.</td></tr>
+<tr><td class="key">E</td><td>Export the clip to a file.</td></tr>
+<tr><td class="key">F1</td><td>Show the key list in a window.</td></tr>
+</table>
+
+<h2>Search</h2>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">F</td><td>Open search. <code>Ctrl</code> may then be released &mdash; just type to
+filter by clip content or by tag.</td></tr>
+<tr><td class="key">V / Ctrl+C</td><td>Move between matches while searching.</td></tr>
+<tr><td class="key">Enter</td><td>Paste the match.</td></tr>
+<tr><td class="key">Esc</td><td>Cancel.</td></tr>
+</table>
+
+<p>Search is the exception to "keep <code>Ctrl</code> held": releasing it while searching does not
+commit, so you can type a query at your own pace.</p>
+
+<h2>Deleting</h2>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">X</td><td>Cycle what releasing <code>Ctrl</code> will do: Cancel, then Delete this
+clip, then Delete All. A coloured banner shows the current mode. Pressing <code>X</code> repeatedly
+cycles those three and never returns to pasting.</td></tr>
+<tr><td class="key">Esc</td><td>Cancel immediately and restore the previous clipboard.</td></tr>
+</table>
+
+<div class="warn">
+<p><b>Delete All asks first.</b> Three taps of <code>X</code> reaches it, and releasing <code>Ctrl</code>
+commits whatever mode you are in, so it is reachable by accident. It is the only irreversible thing the
+gesture can do, and it is the only one that prompts. Pinned clips survive it.</p>
+</div>
+
+<h2>Moving the gesture off Ctrl+V</h2>
+
+<p><code>V</code> is only the default. <b>Settings, Paste Mode, Hold Ctrl and tap this key</b> moves the
+gesture to any letter not already used above. That is the cleanest fix when something else on the machine
+owns <code>Ctrl</code>+<code>V</code> &mdash; see <a href="coexisting.html">Running alongside another
+clipboard manager</a>.</p>
+
+<p>Letters already bound to an action cannot be chosen, because the trigger key doubles as "step to an
+older clip" and would otherwise shadow that action for ever.</p>
+
+<h2>What the overlay shows</h2>
+
+<ul>
+<li>The position in the stack, as <i>clip 3 of 41</i>.</li>
+<li>A preview: the text, or the picture for an image clip, or the file names for a file copy.</li>
+<li>Chips for the current paste format, whether the clip is pinned, whether <code>Shift</code> is
+holding a pop, its tags, and which application it was copied from.</li>
+<li>A banner when <code>X</code> has put you in Cancel, Delete or Delete All.</li>
+</ul>
+
+<p>The overlay never takes focus, so your typing target is untouched. How large an image preview may be,
+how much text is shown, and whether the overlay follows the caret or sits at a fixed position are all
+under <b>Settings, Appearance</b>.</p>
+
+</body>
+</html>

@@ -1,0 +1,154 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Settings</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>Settings</h1>
+<p class="lead">Right-click the tray icon and choose Settings. <b>Apply</b> commits without closing, so a
+timing value can be nudged and its effect watched; it stays disabled until something actually
+changes.</p>
+
+<h2>Capture</h2>
+
+<table>
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td class="name">Watch the Clipboard</td><td>Record what you copy at all. Turning this off makes
+PasteJump inert but resident; the gesture still pastes from clips already held. Same thing as Pause
+capture on the tray menu.</td></tr>
+<tr><td class="name">Store Images</td><td>Keep images from the clipboard. Off keeps the database
+small.</td></tr>
+<tr><td class="name">Record a Repeated Copy as a New Clip</td><td>Off &mdash; the default &mdash; means
+re-copying something you already have promotes the existing clip to the front instead of adding a second
+one.</td></tr>
+<tr><td class="name">Clips Kept in the Stack</td><td>How many clips <code>Ctrl</code>+<code>V</code> can
+reach. Pinned clips are exempt. The limit can be switched off, but leaving it on is wise: images arrive
+uncompressed, so a handful of screenshots costs more than thousands of text clips.</td></tr>
+</table>
+
+<h2>History</h2>
+
+<table>
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td class="name">Keep a Searchable History Archive</td><td>Whether to log copies to the archive as
+well as the stack.</td></tr>
+<tr><td class="name">Days of History to Keep</td><td>Entries older than this are removed. <code>0</code>
+keeps everything for ever. Pruning runs once at start-up rather than on a timer, so a change takes effect
+the next time PasteJump starts.</td></tr>
+<tr><td class="name">Characters Kept per Entry</td><td>How much of a long clip goes in the searchable
+preview. This is also how far into a clip search can reach, since only the preview is indexed. Text
+beyond it is archived whole either way, so raising it costs database size, not safety.</td></tr>
+<tr><td class="name">Rows the History Window Loads</td><td>A safeguard against an enormous archive making
+the window slow to open, not a page size. The window says when it is showing a subset.</td></tr>
+<tr><td class="name">Preview Image Width (px)</td><td>How large an image is decoded for the history
+preview pane. Higher is sharper and slower per row selected.</td></tr>
+<tr><td class="name">Import Clipjump History</td><td>See <a href="importing.html">Importing from
+Clipjump</a>.</td></tr>
+</table>
+
+<h2>Paste Mode</h2>
+
+<table>
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td class="name">Hold Ctrl and Tap This Key</td><td>The letter that opens the gesture. Only letters
+not already bound to a paste-mode action are offered, because the trigger doubles as "step to an older
+clip".</td></tr>
+<tr><td class="name">Keystroke Sent to Paste</td><td>What PasteJump sends to make the focused application
+paste: <code>Ctrl</code>+<code>V</code> or <code>Shift</code>+<code>Insert</code>. Not the same setting
+as the one above &mdash; see <a href="coexisting.html">Running alongside another clipboard
+manager</a>.</td></tr>
+<tr><td class="name">Warn when another clipboard manager is running</td><td>Shows a notification at
+start-up if a known rival is detected. It is a guess based on process names, and it says so.</td></tr>
+<tr><td class="name">Open History With</td><td>An optional system-wide shortcut for the history window,
+for example <code>Ctrl</code>+<code>Shift</code>+<code>H</code>. Empty by default, deliberately: a global
+hotkey takes that chord away from every other application on the desktop.</td></tr>
+<tr><td class="name">Reopen on the Clip I Was Last On</td><td>Whether the gesture resumes where it left
+off rather than starting at the newest clip. A new copy always resets the position regardless.</td></tr>
+<tr><td class="name">Open Straight into Search</td><td>Start the gesture in search mode.</td></tr>
+<tr><td class="name">Reset the Paste Format on Every Entry</td><td>Whether the format goes back to the
+default each time, instead of remembering the last one used.</td></tr>
+<tr><td class="name">Default Paste Format</td><td>Original, Plain text, Collapse whitespace, Sentence
+case or Unindent.</td></tr>
+</table>
+
+<h2>Excluded Apps</h2>
+
+<p>Processes listed here are ignored: while one of them is in the foreground, nothing it copies is
+recorded. Password managers are the obvious case. Add one by browsing to it, by picking from the list of
+running windows, or by typing the executable name.</p>
+
+<h2>Appearance</h2>
+
+<table>
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td class="name">Theme</td><td>Light, Dark, or Same as Windows. Applies immediately. Note the tray
+icon does not follow this &mdash; it follows the Windows <i>taskbar</i> colour, which is a separate
+Windows setting.</td></tr>
+<tr><td class="name">History List Density</td><td>Row spacing in the history window. The same control
+appears in that window.</td></tr>
+<tr><td class="name">Largest Image Preview (px)</td><td>The most room an image preview may take in the
+overlay during the gesture. A maximum, not a size: a smaller picture is drawn at its own dimensions and
+never enlarged. Raise it to judge a screenshot while pasting; lower it to keep the overlay out of the way
+of the document underneath.</td></tr>
+<tr><td class="name">Characters of Text Shown</td><td>How much of a text clip the overlay shows before
+eliding it. About what is worth reading in the second the gesture lasts, so it is far smaller than the
+amount stored.</td></tr>
+<tr><td class="name">Fixed Position (x, y)</td><td>Leave both empty &mdash; the default &mdash; to have
+the overlay appear beside the text caret, or beside the pointer where an application does not report one.
+Fill in both to pin it to one place on screen. One without the other is not accepted, because it would
+track the caret in one axis and not the other.</td></tr>
+<tr><td class="name">Show a Brief Notification</td><td>A small popup near the cursor confirming a copy was
+recorded, with its duration below. It never takes focus, and it is suppressed while the paste overlay is
+open.</td></tr>
+<tr><td class="name">Beep</td><td>A short tone on each capture, with its pitch and length. Useful when the
+notification is off, or when the copy happened on a monitor you were not looking at.</td></tr>
+</table>
+
+<h2>System</h2>
+
+<table>
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td class="name">Start PasteJump When I Sign In</td><td>Adds a shortcut to your Startup folder. No
+scheduled task and no elevation, so it cannot see keystrokes in windows running as
+administrator.</td></tr>
+<tr><td class="name">Pause Before Pasting (ms)</td><td>The gap between putting a clip on the clipboard and
+sending the paste keystroke. Raise it if a particular application pastes the <i>previous</i> clip: Office,
+Electron shells and remote-desktop clients cache the clipboard, and a keystroke arriving too early can be
+served from that stale cache.</td></tr>
+<tr><td class="name">Editor for Text Clips / Image Clips</td><td>What the <code>H</code> key opens. Two
+settings, because Notepad opening a bitmap is useless.</td></tr>
+<tr><td class="name">Store Clips In</td><td>Where the database and the image blobs live. Move it when the
+program folder is not writable &mdash; unzipping under <code>C:\Program Files</code> is the usual way to
+discover that &mdash; or to share one history between several copies.</td></tr>
+<tr><td class="name">Store Settings In</td><td>Where <code>PasteJump.json</code> lives. Rarely worth
+moving: keeping it beside the program is what lets a portable copy carry its own configuration.</td></tr>
+</table>
+
+<div class="note">
+<p><b>The two locations are independent, and moving either needs a restart.</b> PasteJump restarts,
+copies that half across, and leaves the old copy in place for you to delete. They cannot live in the
+settings file, because one of them decides where that file is &mdash; they are in
+<code>data-location.json</code> beside the executable.</p>
+</div>
+
+<h2>Advanced</h2>
+
+<p>Every setting PasteJump has, with its current value and the value a fresh install would have. Rows that
+differ from their default are banded and marked, which is the first thing to check when behaviour is
+surprising. The filter box at the top matches on name or value.</p>
+
+<p>Values are read-only here &mdash; edit them on the other tabs, or in <code>PasteJump.json</code> while
+PasteJump is closed. Two things can be done from this page:</p>
+
+<ul>
+<li><b>Reset</b> on a changed row puts that one setting back to its default.</li>
+<li><b>Reset All to Defaults</b> does the same for everything, including the excluded-apps list and both
+data locations. It asks first.</li>
+</ul>
+
+<p>Neither writes anything until you press OK or Apply, so Cancel still abandons a reset.</p>
+
+</body>
+</html>

@@ -1,0 +1,73 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>PasteJump</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>PasteJump</h1>
+<p class="lead">A keyboard-driven multiple-clipboard manager for Windows.</p>
+
+<p>Hold <code>Ctrl</code>, tap <code>V</code> to step back through what you have copied, release to
+paste. No window, no mouse, no hands leaving the keyboard. That gesture &mdash; a jog wheel for your
+clipboard &mdash; is the whole point of the program; everything else exists to support it.</p>
+
+<h2>Where it lives</h2>
+
+<p>PasteJump has no main window. It sits in the notification area, next to the clock:</p>
+
+<table>
+<tr><td class="name">Left-click the icon</td><td>Opens the clipboard history window.</td></tr>
+<tr><td class="name">Right-click the icon</td><td>The menu: history, settings, the key list, pause,
+disable, about and exit.</td></tr>
+</table>
+
+<p>The icon itself reports the state, by colour and by glyph so it still reads in greyscale:</p>
+
+<table>
+<tr><th>Icon</th><th>Meaning</th></tr>
+<tr><td class="name">Blue</td><td>Running normally: watching the clipboard, and the gesture works.</td></tr>
+<tr><td class="name">Amber, with pause bars</td><td>Capture is paused. Nothing new is recorded, but the
+gesture still pastes from the clips already held.</td></tr>
+<tr><td class="name">Grey</td><td>Disabled. The keyboard hook is uninstalled, so
+<code>Ctrl</code>+<code>V</code> passes straight through as if PasteJump were not running.</td></tr>
+</table>
+
+<div class="note">
+<p><b>Pause and Disable are not the same thing.</b> Pause stops recording and is remembered between
+runs, because it is a preference. Disable also releases <code>Ctrl</code>+<code>V</code> and is
+deliberately <i>not</i> remembered &mdash; a clipboard manager that quietly started up dead weeks later
+would look broken.</p>
+</div>
+
+<h2>Nothing to install</h2>
+
+<p>PasteJump ships as a single <code>PasteJump.exe</code> with nothing beside it and no .NET runtime
+required on the machine. It writes its data to a <code>data</code> folder next to the executable, so a
+copy on a USB stick carries its own history. See <a href="settings.html">Settings</a> if the program
+folder is not writable, which is what unzipping under <code>C:\Program Files</code> means in practice.</p>
+
+<h2>Where to go next</h2>
+
+<table>
+<tr><td class="name"><a href="gesture.html">The gesture</a></td><td>Every key that works while
+<code>Ctrl</code> is held. The one page worth reading in full.</td></tr>
+<tr><td class="name"><a href="stores.html">Clips and history</a></td><td>PasteJump keeps what you copy
+in two places. Confusing them is the easiest mistake to make here.</td></tr>
+<tr><td class="name"><a href="history-window.html">The history window</a></td><td>Searching, copying
+back, deleting, and removing duplicates.</td></tr>
+<tr><td class="name"><a href="settings.html">Settings</a></td><td>Every option, tab by tab.</td></tr>
+<tr><td class="name"><a href="importing.html">Importing from Clipjump</a></td><td>Bringing an existing
+Clipjump history and clip stack across.</td></tr>
+<tr><td class="name"><a href="coexisting.html">Another clipboard manager</a></td><td>Read this if
+copying works and pasting silently does nothing.</td></tr>
+<tr><td class="name"><a href="troubleshooting.html">Troubleshooting</a></td><td>The symptoms that have
+actually been reported, and what each one means.</td></tr>
+</table>
+
+<p class="footer">PasteJump is a ground-up reimplementation of Clipjump by Avi Aryan, from observed
+behaviour. No Clipjump code was copied.</p>
+
+</body>
+</html>

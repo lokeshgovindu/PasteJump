@@ -523,6 +523,21 @@ dotnet run --project tests/PasteJump.UiSmoke          # every window, both theme
 dotnet run --project tests/PasteJump.UiSmoke -- --shot out   # ...and save PNGs of each
 ```
 
+The user manual is a compiled HTML Help file, built separately from `docs/help`:
+
+```
+powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
+```
+
+Three things about `hhc.exe` that do not behave like a normal build tool, all handled in the script and
+all worth knowing before debugging it: **it exits 1 on success and 0 on failure**, it writes the `.chm`
+beside the `.hhp` and ignores any output path, and it is a 32-bit tool that lives outside the SDKs
+(`C:\Program Files (x86)\HTML Help Workshop`). Deliberately *not* wired into `dotnet build`: the tool is
+optional and a machine without it would fail the build. The `.chm` is also not shipped beside the exe —
+the deployment is one file — so it is a document to attach to a release. Its CSS is deliberately
+old-fashioned (tables, floats, no flexbox or grid): the viewer is the IE engine in a legacy document mode.
+Keep the HTML ASCII and use entities, since the compiler handles UTF-8 in the `.hhc`/`.hhk` badly.
+
 Icons are regenerated with Windows PowerShell 5.1, which has System.Drawing. `$PSScriptRoot` is not
 reliable in a parameter default under `-File`, so pass the paths explicitly:
 

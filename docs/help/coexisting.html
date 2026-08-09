@@ -1,0 +1,63 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Another clipboard manager</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>Running alongside another clipboard manager</h1>
+<p class="lead">You mostly cannot, and the symptom is distinctive enough to be worth recognising:
+<b>copying keeps working and pasting silently does nothing</b>.</p>
+
+<h2>Why it happens</h2>
+
+<p>Windows shows a keystroke that one program injects to <i>every</i> keyboard hook on the machine. That
+is deliberate and there is no API to opt out of it.</p>
+
+<p>So when a second clipboard manager holds <code>Ctrl</code>+<code>V</code>, it sees the paste PasteJump
+sends before the application you are pasting into does &mdash; and if it suppresses that key, as Clipjump
+does, the application never receives it. The rival then puts <i>its own</i> clip on the clipboard and
+injects its own paste, which PasteJump reads as a genuine user gesture because the keystroke did not come
+from us.</p>
+
+<p>Copying is unaffected the whole time, because capture watches the clipboard rather than the keyboard
+and no hook can suppress a clipboard notification. That asymmetry is the tell.</p>
+
+<h2>The two ways out</h2>
+
+<p>Both are under <b>Settings, Paste Mode</b>, and they fix opposite halves of the problem. It matters
+which one you need:</p>
+
+<table>
+<tr><th>Setting</th><th>Fixes</th></tr>
+
+<tr><td class="name">Keystroke Sent to Paste<br>&rarr; <code>Shift</code>+<code>Insert</code></td>
+<td>What PasteJump <b>sends</b>, so the other manager's hook has nothing to swallow.
+<code>Shift</code>+<code>Insert</code> is the legacy Windows paste chord; almost every application still
+honours it and no clipboard manager claims it. A few applications do bind it to something else, so it is
+worth a quick test in the ones you care about.</td></tr>
+
+<tr><td class="name">Hold Ctrl and Tap This Key<br>&rarr; any free letter</td>
+<td>What PasteJump <b>listens for</b>, so the two stop competing for <code>Ctrl</code>+<code>V</code> at
+all. The cleaner fix of the two, at the cost of retraining your fingers.</td></tr>
+</table>
+
+<div class="note">
+<p><b>Closing the other manager is still the best answer.</b> Two clipboard managers cannot share
+<code>Ctrl</code>+<code>V</code>, and no setting changes that &mdash; these two only let each have a chord
+of its own.</p>
+</div>
+
+<h2>Ruling PasteJump out</h2>
+
+<p>If you are not sure which program is interfering, choose <b>Disable PasteJump</b> from the tray menu.
+That uninstalls the keyboard hook and releases the history hotkey, so <code>Ctrl</code>+<code>V</code>
+behaves exactly as if PasteJump were not running &mdash; while leaving it available to re-enable from the
+same menu.</p>
+
+<p>Note that <b>Pause capture</b> is a different thing: it stops recording but the gesture still works.
+The tray icon distinguishes the two, amber for paused and grey for disabled.</p>
+
+</body>
+</html>

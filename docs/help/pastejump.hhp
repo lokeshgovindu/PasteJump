@@ -1,0 +1,28 @@
+[OPTIONS]
+Compatibility=1.1 or later
+Compiled file=PasteJump.chm
+Contents file=toc.hhc
+Index file=index.hhk
+Default Window=main
+Default topic=overview.html
+Display compile progress=No
+Full-text search=Yes
+Language=0x409 English (United States)
+Title=PasteJump Help
+
+[WINDOWS]
+main="PasteJump Help","toc.hhc","index.hhk","overview.html","overview.html",,,,,0x63520,220,0x304e,[60,40,860,700],0xb0000,,,,,,0
+
+[FILES]
+overview.html
+gesture.html
+stores.html
+history-window.html
+settings.html
+importing.html
+coexisting.html
+troubleshooting.html
+limitations.html
+styles.css
+
+[INFOTYPES]

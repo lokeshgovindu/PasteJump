@@ -88,6 +88,19 @@ dotnet build
 dotnet test
 ```
 
+### The help file
+
+A compiled HTML Help manual is built separately, since it needs an external tool that a build machine may not
+have:
+
+```
+powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
+```
+
+Sources are in `docs/help`; the result is `artifacts/help/PasteJump.chm` (~42 KB). It needs `hhc.exe` from
+Microsoft's HTML Help Workshop. The `.chm` is not shipped beside the exe — the deployment is deliberately one
+file — so it is a standalone document to publish with a release.
+
 ---
 
 ## The gesture
@@ -204,7 +217,7 @@ src/
   PasteJump.Import    One-time migration of Clipjump 12.x history.
   PasteJump.App       WPF: overlay, history window, settings, tray wiring.
 tests/
-  PasteJump.Core.Tests      160 tests over the state machine, store, capture path,
+  PasteJump.Core.Tests      480 tests over the state machine, store, capture path,
                           formatters and importer.
   PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 ```
@@ -241,12 +254,23 @@ stored id tomorrow would attach the bytes to an unrelated format.
 
 ## Migrating from Clipjump
 
-On first run PasteJump looks for a Clipjump installation and offers to import its history. The source
-folder is opened read-only via a temporary copy and is never modified. Imported rows are tagged
-`clipjump-12.5` so they can be identified later.
+On first run PasteJump looks for a Clipjump installation and offers to import. The source folder is opened
+read-only via a temporary copy and is never modified. Imported rows are tagged `clipjump-12.5` so they can be
+identified later.
 
-**History only.** The `.avc` clip files hold AutoHotkey's own `ClipboardAll` serialisation, which is
-reverse-engineerable but not worth it for data that turns over in days.
+**Both halves come across:** the history archive, and the clip stack from the `.avc` files — newest first and
+capped at your clip limit, so imported clips can actually be pasted with the gesture rather than only searched.
+Those files hold AutoHotkey's own `ClipboardAll` serialisation, a sequence of `{format, size, bytes}` records;
+text, images and file lists survive, while formats identified only by a session-scoped id are dropped rather
+than guessed at.
+
+**Running the import twice is safe** — an entry already present is recognised and left alone. That was not
+true before: the dialog said so while nothing checked, so each run inserted another copy of everything. If you
+imported more than once, **Remove Duplicates** in the history window repairs it.
+
+Watch for one conflict: **Days of History to Keep** prunes at every start-up, so importing years of history
+under a 180-day retention deletes most of it at the next launch. PasteJump spots this and offers to switch
+retention off.
 
 ---
 

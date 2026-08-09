@@ -1,0 +1,99 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Troubleshooting</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>Troubleshooting</h1>
+<p class="lead">The symptoms that have actually been reported, and what each one means.</p>
+
+<h2>Copying works, pasting does nothing</h2>
+
+<p>Almost always another clipboard manager holding <code>Ctrl</code>+<code>V</code>. The asymmetry is the
+tell &mdash; capture watches the clipboard, so it keeps working while the injected paste is being
+swallowed. See <a href="coexisting.html">Running alongside another clipboard manager</a>.</p>
+
+<h2>Ctrl+Shift+V has stopped pasting in my terminal</h2>
+
+<p>It should not have, and it does not in this version. <code>Ctrl</code>+<code>Shift</code>+<code>V</code>
+is left alone on purpose: it belongs to terminals and to paste-as-plain-text in browsers and editors, so
+PasteJump declines to open the gesture when <code>Shift</code> is already held at the trigger. Paste
+popping is reached by pressing <code>Shift</code> <i>after</i> the overlay is up.</p>
+
+<h2>The gesture does nothing in one particular window</h2>
+
+<p>Two likely causes:</p>
+
+<ul>
+<li><b>The window is running as administrator.</b> A non-elevated keyboard hook cannot see keystrokes in
+elevated windows, so the gesture cannot start there. This is a Windows security boundary, not a
+setting.</li>
+<li><b>Another program's hook is ahead of ours.</b> As above.</li>
+</ul>
+
+<h2>An application pastes the previous clip</h2>
+
+<p>Raise <b>Pause Before Pasting</b> under <b>Settings, System</b>. Office, Electron-based apps and
+remote-desktop clients cache the clipboard, and a paste keystroke arriving too early is served from that
+stale cache. 25 ms is the default; try 60&ndash;100.</p>
+
+<h2>An image reports a size far larger than the file it came from</h2>
+
+<p>That figure is correct. The clipboard carries images uncompressed, so a 146 KB PNG arrives as several
+megabytes of raw pixels, and the size column reports what the clipboard actually handed over. What is
+stored on disk is a small fraction of it &mdash; duplicate encodings of the same image are dropped at
+capture and everything stored is compressed.</p>
+
+<p>Comparing the figure against Clipjump's is misleading: Clipjump shows the size of the lossy JPEG
+thumbnail it generates, not of the clip.</p>
+
+<h2>My history is several times too long</h2>
+
+<p>An import from Clipjump run more than once, before imports became idempotent. Use <b>Remove
+Duplicates</b> in the <a href="history-window.html">history window</a>.</p>
+
+<h2>Thousands of imported entries vanished overnight</h2>
+
+<p>History retention. It means "do not keep history older than N days" and runs at every start-up, so an
+imported history spanning years is mostly deleted at the next launch. Set <b>Days of History to Keep</b>
+to <code>0</code>. PasteJump offers this after an import for exactly this reason.</p>
+
+<h2>The history window shows fewer entries than exist</h2>
+
+<p>It says so in the status line when it is showing a subset. Raise <b>Rows the History Window Loads</b>
+under <b>Settings, History</b>.</p>
+
+<h2>A copy was not recorded</h2>
+
+<p>The clipboard is a machine-wide lock, and another process can hold it. PasteJump retries with backoff
+and then twice more on a delay, but if a program holds the clipboard longer than that the copy is dropped.
+This is inherent to the Win32 clipboard rather than fixable &mdash; only made rarer.</p>
+
+<h2>The history hotkey does nothing</h2>
+
+<p>Another process already owns that chord; a registration that is refused is reported when it happens.
+Pick a different combination under <b>Settings, Paste Mode, Open History With</b>.</p>
+
+<h2>PasteJump will not start, or seems to start and vanish</h2>
+
+<p>An instance is already running &mdash; check the notification area. A second copy would install a
+second keyboard hook and fight the first over the clipboard, so it exits quietly instead.</p>
+
+<h2>Nothing is being recorded at all</h2>
+
+<p>Check the tray icon. Amber with pause bars means capture is paused; grey means PasteJump is disabled.
+Also check <b>Watch the Clipboard</b> under <b>Settings, Capture</b>, and whether the application you are
+copying from is on the <b>Excluded Apps</b> list.</p>
+
+<h2>Where the data is</h2>
+
+<p><code>data\pastejump.db</code> and <code>data\blobs</code>, beside the executable by default, or under
+<code>%LOCALAPPDATA%\PasteJump</code> if you moved them. The settings are <code>PasteJump.json</code> in
+whichever location <b>Store Settings In</b> names; the two pointers themselves live in
+<code>data-location.json</code> beside the executable. The Advanced tab shows all of these
+resolved.</p>
+
+</body>
+</html>

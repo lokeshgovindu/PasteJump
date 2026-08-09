@@ -1,0 +1,95 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>The history window</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>The history window</h1>
+<p class="lead">Left-click the tray icon to open it. One window shows both stores &mdash; the switch at
+the top-left chooses which.</p>
+
+<h2>The two views</h2>
+
+<p>The combo box on the left switches between <b>Clips</b> and <b>History</b>. Both use the same columns,
+which is the point: seeing them side by side is what makes the difference legible rather than something
+to be explained. See <a href="stores.html">Clips and history</a> for what each one is.</p>
+
+<p>Clips view adds a <b>Pin</b> button and renames <b>Clear History</b> to <b>Clear Clips</b>, so the
+button always names what it will actually empty.</p>
+
+<h2>The buttons</h2>
+
+<table>
+<tr><th>Button</th><th>What it does</th></tr>
+
+<tr><td class="name">Pin <i>(Clips only)</i></td>
+<td>Pins or unpins the selected clips. Pinned clips sort first and survive Delete All.</td></tr>
+
+<tr><td class="name">Copy</td>
+<td>Puts the selected entry back on the clipboard <b>and</b> adds it to the stack as the newest clip, so
+<code>Ctrl</code>+<code>V</code> offers it first. <code>Enter</code>, or a double-click, does the same.</td></tr>
+
+<tr><td class="name">Delete</td>
+<td>Removes the selected rows from whichever store is shown. The <code>Delete</code> key does the same.</td></tr>
+
+<tr><td class="name">Remove Duplicates</td>
+<td>Collapses entries that are an exact duplicate of another, keeping one of each. Acts on the store
+being shown. See below.</td></tr>
+
+<tr><td class="name">Clear History / Clear Clips</td>
+<td>Empties the store being shown. Asks first, and says plainly that the other store is not affected.</td></tr>
+</table>
+
+<h2>Searching</h2>
+
+<p>The box on the right filters the list as you type. <code>Ctrl</code>+<code>K</code>,
+<code>Ctrl</code>+<code>E</code> or <code>Ctrl</code>+<code>F</code> jumps to it; <code>Esc</code> clears
+it. History search is full-text and matches on word prefixes, so <code>conn</code> finds
+<code>connection</code>.</p>
+
+<p>The status line at the bottom says how many rows are shown against how many exist, and says so
+explicitly when it is showing a subset rather than leaving two numbers to be compared. How many rows are
+loaded at once is under <b>Settings, History</b>.</p>
+
+<h2>The preview pane</h2>
+
+<p>Selecting a row shows it on the right: the text, the image, or the list of copied files. When the
+selected entry is a copy of an image <i>file</i>, the pane shows the picture below the path, with its
+resolution on the left and its size on the right.</p>
+
+<h2>Removing duplicates</h2>
+
+<p>Importing from Clipjump was not idempotent before this version: the dialog said entries already
+imported were skipped, and nothing checked. Anyone who ran the import more than once has a copy of every
+entry per run &mdash; four runs meant four of everything.</p>
+
+<p><b>Remove Duplicates</b> repairs that. It asks first, and it is precise about what counts as a
+duplicate:</p>
+
+<table>
+<tr><td class="name">In History</td>
+<td>An entry is judged by its timestamp, its kind, its text <i>and</i> its image. Two screenshots taken
+in the same second are therefore not mistaken for one another, even though both preview as
+<code>[image]</code>. The oldest of each set is kept, because a history entry is a record of when
+something was copied.</td></tr>
+
+<tr><td class="name">In Clips</td>
+<td>A clip is judged by its content, which is the same test the gesture uses to recognise a re-copy. The
+newest of each set is kept, and a pinned clip always wins &mdash; its position in the stack is what you
+navigate by, and a pin is a deliberate act.</td></tr>
+</table>
+
+<p>Imports from this version onwards cannot create duplicates in the first place, so this is a repair
+tool rather than routine maintenance. Running it on a healthy store reports that it found nothing.</p>
+
+<h2>Row density</h2>
+
+<p>The <b>Density</b> control sets row spacing: Compact fits the most rows, Roomy is the easiest to hit
+with a mouse. It is the same setting as the one under <b>Settings, Appearance</b> &mdash; it is repeated
+here because this is the window whose appearance it changes, and each place follows the other while both
+are open.</p>
+
+</body>
+</html>

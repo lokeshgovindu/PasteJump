@@ -1,0 +1,87 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Clips and history</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>Clips and history</h1>
+<p class="lead">PasteJump keeps what you copy in two places. They are cleared separately, bounded
+differently, and hold different amounts of each copy &mdash; and confusing them is the easiest mistake to
+make here.</p>
+
+<table>
+<tr><th>&nbsp;</th><th>Clips (the stack)</th><th>History (the archive)</th></tr>
+
+<tr><td class="name">What it is</td>
+<td>The clipboards the gesture pastes from.</td>
+<td>A log of everything you have copied.</td></tr>
+
+<tr><td class="name">Reached by</td>
+<td><code>Ctrl</code>+<code>V</code>, held.</td>
+<td>The history window, from the tray icon or the optional global shortcut.</td></tr>
+
+<tr><td class="name">Holds</td>
+<td><b>Every clipboard format</b> of each copy.</td>
+<td>One preview, plus at most one image or one block of archived text.</td></tr>
+
+<tr><td class="name">Bounded by</td>
+<td>A clip count: <b>Maximum clips kept</b>.</td>
+<td>A period: <b>Days of history to keep</b>.</td></tr>
+
+<tr><td class="name">Searchable</td>
+<td>By content and tags, during the gesture.</td>
+<td>Full-text, in the history window.</td></tr>
+
+<tr><td class="name">Pinning</td><td>Yes.</td><td>No.</td></tr>
+
+<tr><td class="name">Cleared by</td>
+<td><code>X</code> three times, then release, during the gesture. Or <b>Clear Clips</b> in the history
+window's Clips view.</td>
+<td><b>Clear History</b> in the history window.</td></tr>
+</table>
+
+<h2>Why there are two</h2>
+
+<p>A clip in the stack is the <i>complete</i> clipboard. Copy a range of cells from Excel and that is
+around 25 formats and 90 KB &mdash; <code>Biff12</code>, <code>XML Spreadsheet</code>, HTML, RTF, a
+bitmap, and twenty more. Replaying all of it is what makes a PasteJump paste indistinguishable from the
+original <code>Ctrl</code>+<code>V</code>, and it is why the stack is capped by count rather than kept
+for ever.</p>
+
+<p>History stores a flattened record of the same copy &mdash; the text, or one image &mdash; which is
+cheap enough to keep tens of thousands of and to index for search.</p>
+
+<h2>What follows from that</h2>
+
+<ul>
+<li>Deleting a clip during the gesture does <b>not</b> remove its history entry.</li>
+<li>Clearing history does <b>not</b> shorten what <code>Ctrl</code>+<code>V</code> offers.</li>
+<li>A clip pushed out of the stack by the count limit is still in history. You can find it and copy it
+back, but what comes back is the flattened version.</li>
+<li><b>Copy</b> in the history window puts the entry on the clipboard <i>and</i> adds it to the stack as
+the newest clip, so <code>Ctrl</code>+<code>V</code> offers it first. That is what makes an archive worth
+having rather than merely searchable. Formatting survives only while a clip is still in the stack.</li>
+<li><b>Copy</b> in the Clips view replays every format and moves that clip to the front &mdash; the same
+thing <code>Q</code> does during the gesture.</li>
+</ul>
+
+<div class="note">
+<p><b>Long text is archived in full.</b> The preview column is capped &mdash; 4096 characters by default,
+adjustable under <b>Settings, History</b> &mdash; and anything longer is stored whole alongside it, so
+copying a long entry back out of history returns the complete text rather than the first few thousand
+characters. Note that full-text search still only reaches as far as the preview.</p>
+</div>
+
+<h2>Where they are on disk</h2>
+
+<p>Both live in one SQLite database, <code>data\pastejump.db</code>, beside the executable by default, as
+the <code>clip</code> and <code>history</code> tables. Payloads too large to sit in a row go to
+<code>data\blobs</code>, content-addressed and compressed &mdash; so copying the same screenshot five
+times costs one file.</p>
+
+<p>The two locations are configurable and independent; see <a href="settings.html">Settings, System</a>.</p>
+
+</body>
+</html>

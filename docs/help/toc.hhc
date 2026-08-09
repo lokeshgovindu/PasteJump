@@ -1,0 +1,48 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<meta name="GENERATOR" content="Microsoft&reg; HTML Help Workshop 4.1">
+</HEAD><BODY>
+<OBJECT type="text/site properties">
+    <param name="Window Styles" value="0x800025">
+    <param name="ImageType" value="Folder">
+</OBJECT>
+<UL>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="PasteJump">
+        <param name="Local" value="overview.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="The gesture">
+        <param name="Local" value="gesture.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Clips and history">
+        <param name="Local" value="stores.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="The history window">
+        <param name="Local" value="history-window.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Settings">
+        <param name="Local" value="settings.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Importing from Clipjump">
+        <param name="Local" value="importing.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Another clipboard manager">
+        <param name="Local" value="coexisting.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Troubleshooting">
+        <param name="Local" value="troubleshooting.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Limits and omissions">
+        <param name="Local" value="limitations.html">
+        </OBJECT>
+</UL>
+</BODY></HTML>

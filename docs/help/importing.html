@@ -1,0 +1,76 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Importing from Clipjump</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>Importing from Clipjump</h1>
+<p class="lead">PasteJump can bring an existing Clipjump 12.x installation across: both its history
+archive and its clip stack.</p>
+
+<p>On first run PasteJump looks for a Clipjump installation and offers to import. You can also start it
+later from <b>Settings, History, Import Clipjump History</b>, and browse to the folder if the guess is
+wrong.</p>
+
+<h2>What comes across</h2>
+
+<table>
+<tr><td class="name">History</td>
+<td>Every entry, with its original timestamp, and images with their picture. Imported rows are tagged
+<code>clipjump-12.5</code> so they can be told apart from your own later.</td></tr>
+
+<tr><td class="name">Clips</td>
+<td>The clip files, newest first and capped at your <b>Clips Kept in the Stack</b> setting, so imported
+clips can actually be pasted with the gesture rather than only searched.</td></tr>
+</table>
+
+<div class="note">
+<p><b>Nothing in the Clipjump folder is modified.</b> The database is read through a temporary copy, and
+the clip files are only read. A failed or cancelled import leaves your Clipjump installation exactly as it
+was, and whatever had already been imported is kept.</p>
+</div>
+
+<h2>Running it more than once is safe</h2>
+
+<p>An entry already imported is recognised and left alone, so a second run adds nothing and the summary
+reports those as <i>already present</i> rather than as failures. That also makes a cancelled import
+resumable: run it again and it picks up where it stopped.</p>
+
+<div class="warn">
+<p><b>This was not true before this version.</b> The dialog claimed it while nothing actually checked, so
+each run inserted a fresh copy of everything &mdash; four runs meant four of every entry. If your history
+looks four times too long, use <b>Remove Duplicates</b> in the
+<a href="history-window.html">history window</a>; it is there for exactly this.</p>
+</div>
+
+<h2>What cannot be recovered</h2>
+
+<p>Imported clips keep their text, their images and their file lists. Rich formatting does not survive,
+and this is a limit of the source rather than a shortcut: Clipjump recorded each clipboard format by a
+number, and those numbers are only meaningful inside the Windows session that wrote them. Replaying one
+tomorrow would attach the bytes to an unrelated format, so formats that cannot be identified by name are
+dropped instead of guessed at.</p>
+
+<p>A clip file holding nothing replayable is counted as skipped, and the summary says how many &mdash;
+"995 of 1004" is a materially different outcome from "all of them".</p>
+
+<h2>Retention will delete what you just imported</h2>
+
+<p>This is the one thing to watch. <b>Days of History to Keep</b> means "do not keep history older than
+N days" and runs at every start-up. Importing a Clipjump history means "keep this", and a real one spans
+years.</p>
+
+<p>Left alone, retention wins silently: the import reports success and thousands of entries are gone by
+the next launch. PasteJump therefore checks the age of the oldest entry it imported and offers to switch
+retention off. Accept it, or set <b>Days of History to Keep</b> to <code>0</code> yourself.</p>
+
+<h2>If the folder is in OneDrive</h2>
+
+<p>Nothing breaks, but it may be slow. Files in a cloud-backed folder can be placeholders until something
+opens them, so each image row may have to be downloaded. The import runs behind a progress dialog with a
+Cancel button for that reason.</p>
+
+</body>
+</html>
