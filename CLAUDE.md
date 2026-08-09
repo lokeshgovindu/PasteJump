@@ -14,7 +14,12 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 
 ## Current status
 
-**In user testing.** Version `2026.2.0.0` (set in `Directory.Build.props`).
+**In user testing.** Version `2026.1.0.0` (set in `Directory.Build.props`).
+
+**Bump the revision — the last part — and nothing else.** `2026.1.0.0` has not been released, so the
+major and minor stay put; a minor bump to `2026.2.0.0` was made here and reverted for that reason. One
+line in `Directory.Build.props` drives the assembly version, the installer, the package file names and
+the About window, so there is nothing else to edit but the status line above.
 
 | | |
 |---|---|

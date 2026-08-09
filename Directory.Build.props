@@ -79,9 +79,15 @@
 
     Version itself is deliberately NOT set: it defaults from these and setting it as well is how the
     three drift apart.
+
+    HOW TO BUMP IT: increment the REVISION - the last part - and nothing else. 2026.1.0.0 has not been
+    released, so the major and minor stay where they are; a minor bump was tried here and reverted for
+    exactly that reason. Nothing else in the repository needs editing: the packaging script reads this
+    property, so the .zip and setup.exe file names, the installer's version and the About window all
+    follow from this one line. CLAUDE.md's status line is the only prose copy, and it is prose.
   -->
   <PropertyGroup Label="Versioning">
-    <PasteJumpVersion>2026.2.0.0</PasteJumpVersion>
+    <PasteJumpVersion>2026.1.0.0</PasteJumpVersion>
     <AssemblyVersion>$(PasteJumpVersion)</AssemblyVersion>
     <FileVersion>$(PasteJumpVersion)</FileVersion>
     <InformationalVersion>$(PasteJumpVersion)</InformationalVersion>
