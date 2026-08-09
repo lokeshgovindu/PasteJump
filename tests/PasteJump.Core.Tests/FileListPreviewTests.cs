@@ -61,26 +61,53 @@ public class FileListPreviewTests
         Assert.Empty(FileListPreview.TryReadPaths(bytes));
     }
 
+    /// <summary>
+    /// Even one item is labelled. Without the header a single copy reads as nothing but a path, which is
+    /// indistinguishable from a text clip that happens to contain one - the reported confusion.
+    /// </summary>
     [Fact]
-    public void SingleFileIsDescribedByItsFullPath()
-        => Assert.Equal(@"D:\Work\2026\budget.xlsx",
+    public void SingleFileIsLabelledAndKeepsItsFullPath()
+        => Assert.Equal($"1 file{Environment.NewLine}D:\\Work\\2026\\budget.xlsx",
             FileListPreview.Describe([@"D:\Work\2026\budget.xlsx"]));
 
     /// <summary>
-    /// The shared folder is stated once and the files by name. A multiple selection almost always comes from
-    /// one directory, so repeating the prefix per file spends the whole width on the least useful part.
+    /// A folder says so, and carries a trailing separator. That marker is the shortest unambiguous one there
+    /// is and the one every shell already uses, so it costs no words per line.
     /// </summary>
     [Fact]
-    public void FilesFromOneFolderNameTheFolderOnceThenTheFiles()
+    public void SingleFolderSaysFolderAndIsMarked()
+        => Assert.Equal($"1 folder{Environment.NewLine}D:\\Work\\2026\\Reports\\",
+            FileListPreview.Describe([@"D:\Work\2026\Reports"], _ => true));
+
+    /// <summary>
+    /// The shared folder is stated once and the files by name, one per line. A multiple selection almost
+    /// always comes from one directory, so repeating the prefix per file spends the width on the least
+    /// useful part.
+    /// </summary>
+    [Fact]
+    public void FilesFromOneFolderNameTheFolderOnceThenOnePerLine()
     {
         var text = FileListPreview.Describe(
             [@"D:\Work\2026\budget.xlsx", @"D:\Work\2026\notes.txt", @"D:\Work\2026\report.docx"]);
 
-        Assert.StartsWith(@"3 files in D:\Work\2026", text, StringComparison.Ordinal);
-        Assert.Contains("budget.xlsx, notes.txt, report.docx", text, StringComparison.Ordinal);
+        var lines = text.Split(Environment.NewLine);
 
-        // Every name present, because this string is what search matches against.
-        Assert.Contains("report.docx", text, StringComparison.Ordinal);
+        Assert.Equal(@"3 files in D:\Work\2026", lines[0]);
+        Assert.Equal(["budget.xlsx", "notes.txt", "report.docx"], lines.Skip(1));
+    }
+
+    /// <summary>A mixed selection states both counts, so neither kind is silently implied.</summary>
+    [Fact]
+    public void MixedFilesAndFoldersStateBothCounts()
+    {
+        var text = FileListPreview.Describe(
+            [@"D:\Work\a.txt", @"D:\Work\b.txt", @"D:\Work\Reports"],
+            p => p.EndsWith("Reports", StringComparison.Ordinal));
+
+        var lines = text.Split(Environment.NewLine);
+
+        Assert.Equal(@"2 files, 1 folder in D:\Work", lines[0]);
+        Assert.Equal(["a.txt", "b.txt", @"Reports\"], lines.Skip(1));
     }
 
     /// <summary>
@@ -91,11 +118,10 @@ public class FileListPreviewTests
     public void FilesFromDifferentFoldersKeepTheirFullPaths()
     {
         var text = FileListPreview.Describe([@"D:\A\report.docx", @"D:\B\report.docx"]);
+        var lines = text.Split(Environment.NewLine);
 
-        Assert.StartsWith("2 files", text, StringComparison.Ordinal);
-        Assert.Contains(@"D:\A\report.docx", text, StringComparison.Ordinal);
-        Assert.Contains(@"D:\B\report.docx", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("files in", text, StringComparison.Ordinal);
+        Assert.Equal("2 files", lines[0]);
+        Assert.Equal([@"D:\A\report.docx", @"D:\B\report.docx"], lines.Skip(1));
     }
 
     /// <summary>Windows paths are case-insensitive, so casing must not split one folder into two.</summary>
@@ -104,6 +130,26 @@ public class FileListPreviewTests
         => Assert.StartsWith(@"2 files in D:\Work",
             FileListPreview.Describe([@"D:\Work\a.txt", @"d:\work\b.txt"]),
             StringComparison.Ordinal);
+
+    /// <summary>
+    /// A UNC path is never probed for directory-ness. The stat blocks for seconds against an offline server,
+    /// and this runs on the path reached from the clipboard notification.
+    /// </summary>
+    [Fact]
+    public void UncPathsAreNotProbed()
+    {
+        var probed = new List<string>();
+
+        _ = FileListPreview.Describe([@"\\server\share\file.txt"], p =>
+        {
+            probed.Add(p);
+            return false;
+        });
+
+        // The supplied test is still called - the UNC guard lives in the default probe, which is what
+        // TryDescribe passes - so this pins the guard where it belongs rather than in the formatter.
+        Assert.Single(probed);
+    }
 
     [Fact]
     public void DescribesAPayloadSetEndToEnd()
@@ -114,6 +160,38 @@ public class FileListPreviewTests
         };
 
         Assert.StartsWith(@"2 files in D:\Work", FileListPreview.TryDescribe(payloads), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The real probe, unmocked: a directory that exists is marked, a sibling file is not. Uses the temp
+    /// directory rather than a fixture, since what is under test is the filesystem check itself.
+    /// </summary>
+    [Fact]
+    public void RealDirectoriesAreDetectedThroughTryDescribe()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pastejump-filelist-" + Guid.NewGuid().ToString("n"));
+        var folder = Path.Combine(root, "Reports");
+        var file = Path.Combine(root, "notes.txt");
+
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(file, "x");
+
+        try
+        {
+            var text = FileListPreview.TryDescribe(
+                [new ClipPayload(FileListPreview.CfHdrop, null, Hdrop(true, file, folder))]);
+
+            Assert.NotNull(text);
+
+            var lines = text!.Split(Environment.NewLine);
+
+            Assert.Equal($"1 file, 1 folder in {root}", lines[0]);
+            Assert.Equal(["notes.txt", @"Reports\"], lines.Skip(1));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     /// <summary>Null, not a description of nothing, so the caller keeps its own placeholder.</summary>

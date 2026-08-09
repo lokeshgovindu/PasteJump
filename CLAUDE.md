@@ -218,6 +218,16 @@ that immediately caught two real bugs. Expect to do the same again.
   Match those formats by **name**, never by id — `RegisterClipboardFormat` ids last only the session. Keep
   the list short: a false entry silently discards a real copy, which is why `Embed Source` and `Link Source`
   are deliberately absent. `ClipStore.PurgeContentlessClips` clears ones captured before the gate existed.
+- **A file copy is described by name, and that is what makes it searchable.** `history_fts` indexes the
+  `preview` column, so while a file copy was stored as the literal `[files]`, searching history for a file
+  name could never match one. `FileListPreview` names every file — all of them, because abbreviation belongs
+  to the display, which truncates anyway, not to the record search runs against. The shared folder is stated
+  once; a folder is marked with a trailing separator and counted separately ("2 files, 1 folder"), because a
+  lone directory path is otherwise indistinguishable from a text clip containing one. **Never probe a UNC
+  path with `Directory.Exists` here** — this is reached from the clipboard notification, where a stat against
+  an offline server is a hang rather than a pause, and being wrong about a network folder costs one trailing
+  backslash. Probes are capped at 64 for the same reason. Note names past `PreviewMaxChars` are still not
+  searchable: a file list stores no full-text blob the way long text does.
 - **One logical copy can raise two clipboard notifications with *different* sequence numbers.**
   Anything using OLE does `OleSetClipboard` + `OleFlushClipboard`. `ClipStore.Add` reports
   insert-vs-promote so history does not double-log; the sequence number alone cannot collapse these.

@@ -446,12 +446,17 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The toast's second line. Text is flattened; a file list keeps its single line break.
+    /// The toast's second line. Text is flattened; a file list keeps its header on its own line and has its
+    /// names joined back onto one.
     /// <para>
-    /// That break is the one piece of structure <see cref="FileListPreview"/> puts in deliberately - the count
-    /// and folder above, the names below - so flattening it here would undo the point of naming them. Text
-    /// clips get no such consideration: their line breaks are the author's, arbitrary in number, and a toast
-    /// is not the place to honour them.
+    /// The stored preview puts one name per line, which is right for the history preview pane where there is
+    /// room to scan a list. The toast has about two lines, so one name per line would show two of them and
+    /// clip the rest - commas fit far more in the same space. Same principle as the length clamp: the record
+    /// is complete, the display abbreviates.
+    /// </para>
+    /// <para>
+    /// Text clips are flattened entirely: their line breaks are the author's, arbitrary in number, and a
+    /// toast is not the place to honour them.
     /// </para>
     /// </summary>
     private static string ToastDetail(Clip clip)
@@ -461,12 +466,17 @@ public partial class App : Application
             return SingleLine(clip.Preview);
         }
 
-        var lines = clip.Preview.ReplaceLineEndings("\n").Split('\n', 2);
+        var lines = clip.Preview.ReplaceLineEndings("\n").Split('\n');
+
+        if (lines.Length < 2)
+        {
+            return SingleLine(clip.Preview);
+        }
 
         // Only the names are clamped. The header is one short line and is the part worth guaranteeing.
-        return lines.Length == 2
-            ? lines[0] + Environment.NewLine + SingleLine(lines[1])
-            : SingleLine(clip.Preview);
+        var names = string.Join(", ", lines.Skip(1).Where(static l => l.Length > 0));
+
+        return lines[0] + Environment.NewLine + SingleLine(names);
     }
 
     /// <summary>

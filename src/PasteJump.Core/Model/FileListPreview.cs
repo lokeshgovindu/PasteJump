@@ -34,6 +34,14 @@ public static class FileListPreview
     /// <c>CF_HDROP</c> - in which case the caller should fall back to its own placeholder rather than
     /// inventing a description of nothing.
     /// </summary>
+    /// <summary>
+    /// How many paths are probed to see whether they are directories. Probing is a filesystem stat, and this
+    /// runs on the capture path, so the count is bounded: a copy of several hundred files should not turn one
+    /// clipboard notification into hundreds of disk touches. Anything past this is described as a file, which
+    /// is what the overwhelming majority of a large selection is.
+    /// </summary>
+    private const int MaxDirectoryProbes = 64;
+
     public static string? TryDescribe(IReadOnlyList<ClipPayload> payloads)
     {
         ArgumentNullException.ThrowIfNull(payloads);
@@ -47,11 +55,51 @@ public static class FileListPreview
 
         var paths = TryReadPaths(hdrop.Data);
 
-        return paths.Count == 0 ? null : Describe(paths);
+        if (paths.Count == 0)
+        {
+            return null;
+        }
+
+        var probes = 0;
+
+        return Describe(paths, path => probes++ < MaxDirectoryProbes && LooksLikeDirectory(path));
     }
 
-    /// <summary>Formats an already-parsed list. Separate so the wording can be tested without a payload.</summary>
-    public static string Describe(IReadOnlyList<string> paths)
+    /// <summary>
+    /// Whether a path is a directory, decided conservatively.
+    /// <para>
+    /// UNC paths are never probed. A stat against an offline server blocks for seconds, and this is reached
+    /// from the clipboard notification - the one place in the app where a slow call is a hang rather than a
+    /// pause. Being wrong about a network folder costs a trailing backslash; being slow costs the copy.
+    /// </para>
+    /// </summary>
+    private static bool LooksLikeDirectory(string path)
+    {
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            return Directory.Exists(path);
+        }
+        catch (Exception)
+        {
+            // Any of the several exceptions a bad path can raise. Not a directory as far as we can tell.
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Formats an already-parsed list. Separate from <see cref="TryDescribe"/> so the wording can be tested
+    /// without a payload, and so the directory test can be supplied rather than hitting the disk.
+    /// </summary>
+    /// <param name="isDirectory">
+    /// Decides whether a path names a folder. Folders are marked with a trailing separator, which is the
+    /// shortest unambiguous marker there is and the one Explorer and every shell already use.
+    /// </param>
+    public static string Describe(IReadOnlyList<string> paths, Func<string, bool>? isDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
@@ -60,25 +108,58 @@ public static class FileListPreview
             return string.Empty;
         }
 
-        // A single file gets its full path: it fits, and the folder is as useful as the name.
+        isDirectory ??= static _ => false;
+
+        // Evaluated once per path: the caller's test may touch the disk, and the answer is needed both for
+        // the header counts and for the trailing marker.
+        var directories = paths.Select(p => isDirectory(p)).ToArray();
+        var folderCount = directories.Count(static d => d);
+        var header = CountHeader(paths.Count - folderCount, folderCount);
+
+        // Even one item gets the header. Without it a single folder copy reads as nothing but a path, which
+        // is indistinguishable from a text clip that happens to contain one - the confusion this fixes.
         if (paths.Count == 1)
         {
-            return paths[0];
+            return $"{header}{Environment.NewLine}{Mark(paths[0], directories[0])}";
         }
 
-        var count = paths.Count.ToString(CultureInfo.CurrentCulture);
         var shared = SharedDirectory(paths);
 
+        // One per line rather than comma-separated: a file list is a list, and at four or more names a run of
+        // commas is markedly harder to scan. The toast joins them back for its two lines of room.
         if (shared is null)
         {
             // Mixed folders, so a name alone would be ambiguous - two files called report.docx from
             // different directories must not read as the same file twice.
-            return $"{count} files{Environment.NewLine}{string.Join(", ", paths)}";
+            var full = paths.Select((p, i) => Mark(p, directories[i]));
+            return $"{header}{Environment.NewLine}{string.Join(Environment.NewLine, full)}";
         }
 
-        var names = paths.Select(static p => Path.GetFileName(p) is { Length: > 0 } n ? n : p);
+        var names = paths.Select((p, i) =>
+            Mark(Path.GetFileName(p) is { Length: > 0 } n ? n : p, directories[i]));
 
-        return $"{count} files in {shared}{Environment.NewLine}{string.Join(", ", names)}";
+        return $"{header} in {shared}{Environment.NewLine}{string.Join(Environment.NewLine, names)}";
+    }
+
+    private static string Mark(string path, bool isDirectory)
+        => isDirectory && !path.EndsWith(Path.DirectorySeparatorChar) ? path + Path.DirectorySeparatorChar : path;
+
+    /// <summary>"3 files", "1 folder", "2 files, 1 folder" - so the kind is stated, not inferred.</summary>
+    private static string CountHeader(int files, int folders)
+    {
+        var parts = new List<string>(2);
+
+        if (files > 0)
+        {
+            parts.Add($"{files.ToString(CultureInfo.CurrentCulture)} {(files == 1 ? "file" : "files")}");
+        }
+
+        if (folders > 0)
+        {
+            parts.Add($"{folders.ToString(CultureInfo.CurrentCulture)} {(folders == 1 ? "folder" : "folders")}");
+        }
+
+        return string.Join(", ", parts);
     }
 
     /// <summary>
