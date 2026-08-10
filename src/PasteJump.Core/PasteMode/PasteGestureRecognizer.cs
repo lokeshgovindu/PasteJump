@@ -39,6 +39,17 @@ public sealed class PasteGestureRecognizer
     /// <inheritdoc cref="AltHeld"/>
     public bool WinHeld { get; set; }
 
+    /// <summary>
+    /// Whether Shift is held, also from the live keyboard state.
+    /// <para>
+    /// It was tracked from Shift's own key transitions, and moving it here fixes a latent bug as well as making
+    /// the three modifiers consistent: Shift arms paste popping, so a key-up we never saw left pop armed and
+    /// would quietly delete a clip on every later paste. A missed key-up is not hypothetical - it is what
+    /// happens when focus changes while the key is down.
+    /// </para>
+    /// </summary>
+    public bool ShiftHeld { get; set; }
+
     public bool IsSessionActive => _controller.IsActive;
 
     /// <summary>Raised after every state change, so the overlay can be repositioned or redrawn.</summary>
@@ -49,6 +60,11 @@ public sealed class PasteGestureRecognizer
     /// </summary>
     public bool Handle(GestureKey key, bool isDown)
     {
+        // Mirrored on every event, so whatever reads it - the commit that decides whether to pop, and the
+        // overlay's POP chip - sees the state as of this keystroke. The host keeps ShiftHeld current from the
+        // live keyboard; this is the one place it reaches the controller.
+        _controller.ShiftHeld = ShiftHeld;
+
         switch (key)
         {
             case GestureKey.Control:
@@ -56,6 +72,13 @@ public sealed class PasteGestureRecognizer
 
             case GestureKey.Shift:
                 // Never swallowed: Shift has meaning to the app underneath, and we only observe it.
+                //
+                // Still tracked from the transition as well as read live by the host, which sounds like two
+                // sources of truth and is not: the host refreshes ShiftHeld from the keyboard immediately before
+                // this call, so the two can only ever agree - including for this very keystroke. Keeping it
+                // means a caller that drives the recogniser purely through key transitions still works, and the
+                // live read is what stops a missed key-up leaving pop armed.
+                ShiftHeld = isDown;
                 _controller.ShiftHeld = isDown;
                 return false;
 
@@ -139,6 +162,7 @@ public sealed class PasteGestureRecognizer
         IsControlDown = false;
         AltHeld = false;
         WinHeld = false;
+        ShiftHeld = false;
 
         if (_controller.IsActive)
         {
@@ -176,12 +200,19 @@ public sealed class PasteGestureRecognizer
         //
         // Placed here rather than repeated per branch so a new paste-mode key cannot miss it. Note what is
         // deliberately NOT gated, both above this method in Handle: the modifiers themselves, and the Ctrl
-        // release that commits. That release must always commit, or holding Alt while letting go of Ctrl would
-        // leave a session open with no way to close it - the dead-keyboard failure.
+        // release that commits. That release must always commit, or holding a modifier while letting go of Ctrl
+        // would leave a session open with no way to close it - the dead-keyboard failure.
         //
-        // Shift is not here because it is entry-specific: Ctrl+Shift+V belongs to terminals, but Shift pressed
-        // after the overlay is up is how paste popping works, so it has to keep its meaning in-session.
-        if (AltHeld || WinHeld)
+        // Shift is in here too, which needs saying because it is the one modifier that means something to paste
+        // mode. It does NOT mean anything when combined with a paste-mode KEY though: popping is armed by
+        // holding Shift and releasing Ctrl, which never comes through this method, so refusing Shift+key here
+        // leaves popping working exactly as documented. What it stops is Ctrl+Shift+V acting once a session is
+        // open - the terminals' own chord, refused at entry and then honoured ever after, which is the same
+        // half-fix Alt and Win had.
+        //
+        // Capitals typed into search are unaffected: a letter reaches HandleCharacter, which this does not sit
+        // in front of.
+        if (AltHeld || WinHeld || ShiftHeld)
         {
             return false;
         }
@@ -209,11 +240,8 @@ public sealed class PasteGestureRecognizer
             //     about second-hand. Some editors also bind it.
             //   Ctrl+Win+V - Win belongs to the shell. Win+V is Windows' own clipboard history, and chords
             //     built on it are not ours to take.
-            if (_controller.ShiftHeld)
-            {
-                return false;
-            }
-
+            //
+            // No Shift test remains here: the gate at the top of this method covers all three, in every state.
             var kind = _controller.Begin();
 
             if (kind == PasteCommitKind.PassedThrough)

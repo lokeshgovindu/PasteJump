@@ -187,6 +187,16 @@ that immediately caught two real bugs. Expect to do the same again.
   rather than by tracking transitions** — a missed key-up (focus changing while a modifier is down) would
   otherwise leave a flag stuck, and a stuck Alt refuses to open the gesture at all until Alt is pressed and
   released again.
+  **Shift is in the same gate, and that was the third report.** It had exactly the half-fix Alt and Win had:
+  refused at entry, honoured ever after, so with the overlay up `Ctrl+Shift+V` stepped through clips. It is
+  now refused in every state. What that does **not** break is paste popping, and the reason is worth keeping:
+  popping is armed by holding Shift and *releasing Ctrl*, which never reaches `HandleKeyDown` — so refusing
+  Shift+key leaves it working exactly as documented. Note the two states differ in what happens to the chord:
+  with no session open it **passes through** (the terminal gets it, which is the whole point), and mid-session
+  it is **swallowed** by `ShouldSwallowUnhandled` like `Ctrl+S` or `Ctrl+W` — the gesture owns the keyboard
+  until Ctrl is released. `ShiftHeld` is also read live now, which fixes a latent bug of its own: it was
+  tracked from transitions, so a missed Shift key-up left pop armed and would have quietly deleted a clip on
+  every later paste.
   **Gating entry alone was not enough, and that was the first attempt.** With a session already open the
   trigger falls through to the step action, so `Ctrl+Win+V` still walked the stack and releasing Ctrl still
   pasted — the first chord refused, every one after it honoured, which is exactly how it was reported the

@@ -24,7 +24,7 @@ internal static class FileThumbnailCache
     /// during decode rather than after, so asking for less genuinely costs less - and asking for less than the
     /// overlay will draw would stretch the result, which is the one outcome worth avoiding here.
     /// </summary>
-    private static int _maxWidth = 520;
+    private static int _maxWidth = 600;
 
     /// <summary>
     /// Follows the preview-size setting. Cached thumbnails are dropped, because they were decoded for the old

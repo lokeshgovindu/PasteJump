@@ -49,8 +49,9 @@ Sentence case, Unindent.</td></tr>
 modifier is left entirely alone, because each one belongs to somebody:</p>
 <ul>
 <li><code>Ctrl</code>+<code>Shift</code>+<code>V</code> is how every terminal pastes, and how browsers and
-editors paste as plain text. That is why paste popping is reached by adding <code>Shift</code> once the
-overlay is already up, rather than by starting the gesture with it.</li>
+editors paste as plain text. With no overlay open it passes straight through, so the terminal still gets it.
+Paste popping is unaffected, because it is armed by holding <code>Shift</code> and <em>releasing</em>
+<code>Ctrl</code> &mdash; not by pressing a key while <code>Shift</code> is down.</li>
 <li><code>Ctrl</code>+<code>Alt</code>+<code>V</code> is <code>AltGr</code>+<code>V</code> on many keyboard
 layouts, which is how people type a character.</li>
 <li><code>Ctrl</code>+<code>Win</code>+<code>V</code> belongs to the shell, which uses

@@ -57,6 +57,16 @@ public static class VirtualKeyTranslator
     /// <summary>Whether Alt is down right now, from the live keyboard state.</summary>
     public static bool IsAltDown() => IsDown(NativeConstants.VK_MENU);
 
+    /// <summary>
+    /// Whether Shift is down right now.
+    /// <para>
+    /// Read live rather than tracked from transitions, and that is a fix rather than a preference: paste
+    /// popping is armed by holding Shift, so a Shift key-up we never saw - which is what happens when focus
+    /// changes mid-chord - used to leave pop armed and quietly delete a clip on every subsequent paste.
+    /// </para>
+    /// </summary>
+    public static bool IsShiftDown() => IsDown(NativeConstants.VK_SHIFT);
+
     /// <summary>Whether either Windows key is down right now.</summary>
     public static bool IsWinDown()
         => IsDown(NativeConstants.VK_LWIN) || IsDown(NativeConstants.VK_RWIN);

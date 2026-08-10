@@ -75,17 +75,69 @@ public sealed class TriggerChordOwnershipTests
         Assert.False(controller.IsActive);
     }
 
-    /// <summary>Already covered elsewhere, restated here so the whole rule reads in one place.</summary>
     [Fact]
     public void Ctrl_Shift_and_the_trigger_is_left_alone()
     {
         var (recognizer, controller) = Build();
 
         recognizer.Handle(GestureKey.Control, isDown: true);
-        recognizer.Handle(GestureKey.Shift, isDown: true);
+        recognizer.ShiftHeld = true;
 
         Assert.False(recognizer.Handle(GestureKey.Paste, isDown: true), "the trigger must not be swallowed");
         Assert.False(controller.IsActive);
+    }
+
+    /// <summary>
+    /// Shift had the same half-fix Alt and Win did: refused at entry, honoured ever after. With a session open
+    /// it stepped through clips, so the terminals' own chord kept working as a PasteJump key.
+    /// </summary>
+    [Fact]
+    public void Ctrl_Shift_and_the_trigger_is_refused_inside_an_open_session()
+    {
+        var (recognizer, controller) = Build2();
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        var startedOn = controller.CursorIndex;
+        recognizer.ShiftHeld = true;
+
+        Assert.False(recognizer.Handle(GestureKey.Paste, isDown: true), "the trigger must not be swallowed");
+        Assert.Equal(startedOn, controller.CursorIndex);
+    }
+
+    /// <summary>
+    /// And the thing that must NOT break. Popping is armed by holding Shift and releasing Ctrl - it never
+    /// involves pressing a paste-mode key while Shift is down - so refusing Shift+key leaves it working.
+    /// </summary>
+    [Fact]
+    public void Paste_popping_still_works()
+    {
+        var catalog = new FakeClipCatalog();
+        catalog.Add("older clip");
+        catalog.Add("newer clip");
+
+        var host = new RecordingPasteModeHost();
+
+        var controller = new PasteModeController(
+            catalog,
+            host,
+            new FormatterRegistry(),
+            new PasteModeOptions { PreserveClipPosition = false });
+
+        var recognizer = new PasteGestureRecognizer(controller);
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        // Shift pressed after the overlay is up, which is what the key list has always described.
+        recognizer.ShiftHeld = true;
+        recognizer.Handle(GestureKey.Shift, isDown: true);
+
+        recognizer.Handle(GestureKey.Control, isDown: false);
+
+        Assert.False(controller.IsActive);
+        Assert.Equal(1, catalog.DeleteCallCount);
     }
 
     [Theory]

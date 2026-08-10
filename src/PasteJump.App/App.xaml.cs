@@ -476,6 +476,7 @@ public partial class App : Application
         // the hook's budget is LowLevelHooksTimeout, which this is nowhere near.
         _recognizer.AltHeld = VirtualKeyTranslator.IsAltDown();
         _recognizer.WinHeld = VirtualKeyTranslator.IsWinDown();
+        _recognizer.ShiftHeld = VirtualKeyTranslator.IsShiftDown();
 
         var key = VirtualKeyTranslator.ToGestureKey(e.VirtualKey, _triggerVirtualKey);
 

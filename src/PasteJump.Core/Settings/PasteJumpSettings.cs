@@ -184,10 +184,10 @@ public sealed class PasteJumpSettings
     /// constant.
     /// </para>
     /// </summary>
-    public int OverlayPreviewMaxWidth { get; set; } = 520;
+    public int OverlayPreviewMaxWidth { get; set; } = 600;
 
     /// <inheritdoc cref="OverlayPreviewMaxWidth"/>
-    public int OverlayPreviewMaxHeight { get; set; } = 220;
+    public int OverlayPreviewMaxHeight { get; set; } = 400;
 
     /// <summary>
     /// Characters of a text clip shown in the paste overlay before it is elided.

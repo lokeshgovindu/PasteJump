@@ -26,8 +26,8 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
     private OverlayWindow? _overlay;
 
-    private int _previewMaxWidth = 520;
-    private int _previewMaxHeight = 220;
+    private int _previewMaxWidth = 600;
+    private int _previewMaxHeight = 400;
 
     private int? _overlayX;
     private int? _overlayY;
@@ -64,7 +64,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     /// <summary>
     /// Sets the overlay's image-preview ceiling, applying it now if the overlay already exists and remembering
     /// it for when it is next created. Also the width thumbnails are decoded at, so a larger preview is a
-    /// larger decode rather than a 520px one stretched.
+    /// larger decode rather than a smaller one stretched.
     /// </summary>
     public void SetPreviewSize(int maxWidth, int maxHeight)
     {

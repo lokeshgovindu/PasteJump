@@ -185,13 +185,13 @@
                            FontFamily="Consolas"
                            FontSize="12"
                            TextWrapping="Wrap"
-                           MaxHeight="220"
+                           MaxHeight="400"
                            LineHeight="16" />
 
                 <Image x:Name="PreviewImage"
                        Grid.Row="1"
-                       MaxHeight="220"
-                       MaxWidth="520"
+                       MaxHeight="400"
+                       MaxWidth="600"
                        Stretch="Uniform"
                        StretchDirection="DownOnly"
                        HorizontalAlignment="Left"
