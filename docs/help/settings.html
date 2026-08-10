@@ -95,6 +95,13 @@ case or Unindent.</td></tr>
 <p>Processes whose copies are never recorded. Browse to one, or pick it from the running windows.</p>
 </div>
 
+<div class="shot">
+<img src="images/running-app-picker.png" alt="The picker listing programs that currently have a window">
+<p><b>Add from running programs…</b> lists everything with a window open, so you can pick a program without
+knowing where it is installed. Only the file name is added, so the exclusion applies whenever that program
+runs &mdash; not just to the copy running now.</p>
+</div>
+
 <p>Processes listed here are ignored: while one of them is in the foreground, nothing it copies is
 recorded. Password managers are the obvious case. Add one by browsing to it, by picking from the list of
 running windows, or by typing the executable name.</p>
@@ -124,6 +131,11 @@ amount stored.</td></tr>
 the overlay appear beside the text caret, or beside the pointer where an application does not report one.
 Fill in both to pin it to one place on screen. One without the other is not accepted, because it would
 track the caret in one axis and not the other.</td></tr>
+<tr><td class="name">Show a Key Reminder Along the Bottom</td><td>One muted line across the foot of the
+overlay naming the keys worth knowing when you have lost your place: <code>A</code> back to the newest clip,
+stepping, <code>X</code> to delete, <code>Esc</code> to cancel, and <code>F1</code> for the full list. On by
+default, because a gesture with no window and no menu has nowhere else to advertise itself. Turn it off once
+it is in your fingers.</td></tr>
 <tr><td class="name">Show a Brief Notification</td><td>A small popup near the cursor confirming a copy was
 recorded, with its duration below. It never takes focus, and it is suppressed while the paste overlay is
 open.</td></tr>
@@ -152,9 +164,10 @@ settings, because Notepad opening a bitmap is useless.</td></tr>
 <tr><td class="name">Store Clips In</td><td>Where the database and the image blobs live. Three choices: the
 PasteJump folder (the default, and what keeps a portable copy self-contained), your user profile &mdash; move
 it there when the program folder is not writable, which unzipping under <code>C:\Program Files</code> is the
-usual way to discover &mdash; or <b>a folder you choose</b>, for a second drive or somewhere with room for
-years of images. Choosing your own folder shows a box and a Browse button; the folder is created and tested
-for writing before the change is accepted.</td></tr>
+usual way to discover &mdash; or <b>A folder I choose…</b>, for a second drive or somewhere with room for
+years of images. That last one reveals a box and a Browse button; the folder is created and tested for writing
+before the change is accepted, so a path that cannot be used is refused rather than leaving PasteJump unable
+to open its database after the restart.</td></tr>
 <tr><td class="name">Store Settings In</td><td>Where <code>PasteJump.json</code> lives. Rarely worth
 moving: keeping it beside the program is what lets a portable copy carry its own configuration.</td></tr>
 </table>
@@ -164,6 +177,12 @@ moving: keeping it beside the program is what lets a portable copy carry its own
 copies that half across, and leaves the old copy in place for you to delete. They cannot live in the
 settings file, because one of them decides where that file is &mdash; they are in
 <code>data-location.json</code> beside the executable, along with the folder you chose if you chose one.</p>
+</div>
+
+<div class="shot">
+<img src="images/settings-custom-folder.png" alt="The System tab with both halves set to a folder of your own">
+<p>Choosing <b>A folder I choose…</b> reveals the path and a Browse button. Each half is independent, so the
+clips can live on another drive while the settings stay beside the program.</p>
 </div>
 
 <div class="warn">

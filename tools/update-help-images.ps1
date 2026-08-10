@@ -46,6 +46,13 @@ $wanted = [ordered]@{
     'SettingsWindow-4-Appearance' = 'settings-appearance.png'
     'SettingsWindow-5-System'   = 'settings-system.png'
     'SettingsWindow-6-Advanced' = 'settings-advanced.png'
+
+    # The System tab again with both halves on a custom folder, which is the only state that shows the path box
+    # and its Browse button - a collapsed row is not rendered, so the shot above cannot document it.
+    'SettingsWindow-CustomFolder-5-System' = 'settings-custom-folder.png'
+
+    # Reached from Excluded Apps, and worth a picture because what it lists is not obvious from the button.
+    'RunningAppPicker'          = 'running-app-picker.png'
     'OverlayWindow'             = 'overlay.png'
     'OverlayWindow-Search'      = 'overlay-search.png'
     'OverlayWindow-DeleteAll'   = 'overlay-delete-all.png'
