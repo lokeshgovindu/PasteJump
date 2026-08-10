@@ -449,6 +449,16 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   UI smoke harness. Put shared resources in `Themes/Shared.xaml`.
 - **`DataGridCell.HorizontalContentAlignment` defaults to `Left`**, which makes the content presenter
   shrink to its content — so a column's right-aligned `ElementStyle` silently does nothing.
+- **Every window belongs in the taskbar except the overlay and the toast**, and the UI smoke harness now
+  fails the run if that stops being true. It matters more here than in most applications: PasteJump has no
+  main window, so a window that slips behind another has nothing to return to it. `AboutWindow`,
+  `MessageDialog`, `ImportDialog`, `ImportProgressDialog` and `RunningAppPicker` all carried
+  `ShowInTaskbar="False"` and were reported as untrackable — worst for `MessageDialog`, whose `owner` is
+  optional, so the start-up prompts had no taskbar button *and* no parent to fall back to. The two
+  exceptions are transient and never activate; the overlay is `WS_EX_TOOLWINDOW` for focus reasons anyway.
+  The harness reads the **live HWND** rather than `Window.ShowInTaskbar`, which would only prove the property
+  was set: in-taskbar is `WS_EX_APPWINDOW` set and `WS_EX_TOOLWINDOW` clear (`ex=0x00040100` against
+  `0x080000A8`). Verified the check can fail by reintroducing the defect — exit 2, not a green run.
 - **A bad `ControlTemplate` compiles.** Templates apply only on instantiation, and `TabControl` realises
   only the selected tab. Run the UI smoke harness after touching XAML.
 

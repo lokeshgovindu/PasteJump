@@ -275,6 +275,59 @@ internal static class Program
         SourceExecutable = "notepad.exe",
     };
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_APPWINDOW = 0x00040000;
+
+    /// <summary>
+    /// Checks that a window gets a taskbar button, or deliberately does not, and fails the run when it has the
+    /// wrong one.
+    /// <para>
+    /// Every window must be reachable from the taskbar so it cannot be lost behind another with no way back -
+    /// which matters more here than in most applications, because PasteJump has no main window to return to.
+    /// The overlay and the toast are the only exceptions: both live for seconds and neither is something anyone
+    /// tracks. This was a real defect - About, and every dialog, carried <c>ShowInTaskbar="False"</c>.
+    /// </para>
+    /// <para>
+    /// Read from the live HWND rather than from <c>Window.ShowInTaskbar</c>, which would only prove the
+    /// property was set. Measured behaviour: a taskbar window has <c>WS_EX_APPWINDOW</c> and not
+    /// <c>WS_EX_TOOLWINDOW</c> (<c>ex=0x00040100</c>); the excluded two are the other way round
+    /// (<c>ex=0x080000A8</c>).
+    /// </para>
+    /// </summary>
+    private static string DescribeTaskbarPresence(string name, Window window)
+    {
+        var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+
+        if (handle == IntPtr.Zero)
+        {
+            _failures++;
+            return "FAIL: no hwnd to check";
+        }
+
+        var exStyle = (long)GetWindowLongPtr(handle, GWL_EXSTYLE);
+
+        var inTaskbar = (exStyle & WS_EX_APPWINDOW) != 0 && (exStyle & WS_EX_TOOLWINDOW) == 0;
+
+        // The transient pair, by name prefix - the overlay has three frames and the toast two shapes.
+        var shouldBeExcluded = name.StartsWith("OverlayWindow", StringComparison.Ordinal)
+            || name.StartsWith("ToastWindow", StringComparison.Ordinal);
+
+        if (inTaskbar == !shouldBeExcluded)
+        {
+            return inTaskbar ? "taskbar" : "no taskbar (by design)";
+        }
+
+        _failures++;
+
+        return shouldBeExcluded
+            ? $"FAIL: should be kept OUT of the taskbar, ex=0x{exStyle:X8}"
+            : $"FAIL: should appear in the taskbar, ex=0x{exStyle:X8}";
+    }
+
     private static ResourceDictionary Load(string relative) => new()
     {
         Source = new Uri($"pack://application:,,,/PasteJump;component/{relative}", UriKind.Absolute),
@@ -360,6 +413,7 @@ internal static class Program
             Drain();
 
             var size = $"{window.ActualWidth:0}x{window.ActualHeight:0}";
+            var taskbar = DescribeTaskbarPresence(name, window);
 
             if (_shotDirectory is not null)
             {
@@ -370,7 +424,7 @@ internal static class Program
 
             window.Close();
 
-            Console.WriteLine($"  ok    {name,-20} {size}");
+            Console.WriteLine($"  ok    {name,-20} {size,-10} {taskbar}");
         }
         catch (Exception ex)
         {

@@ -6,7 +6,6 @@
         Height="520"
         MinWidth="620"
         MinHeight="320"
-        ShowInTaskbar="False"
         Background="{DynamicResource SurfaceBrush}"
         WindowStartupLocation="CenterOwner"
         TextOptions.TextFormattingMode="Display">

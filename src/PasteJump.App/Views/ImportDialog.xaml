@@ -5,7 +5,6 @@
         Width="560"
         SizeToContent="Height"
         ResizeMode="NoResize"
-        ShowInTaskbar="False"
         Background="{DynamicResource SurfaceBrush}"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display">

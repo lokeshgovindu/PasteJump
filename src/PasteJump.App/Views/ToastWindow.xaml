@@ -15,6 +15,14 @@
         TextOptions.TextRenderingMode="ClearType">
 
     <!--
+        On ShowInTaskbar="False" above. This and the paste overlay are the only two windows kept out of the
+        taskbar; everything else PasteJump shows appears there, so a window cannot be lost behind another with
+        no way back. A notification is not something anyone tracks - it dismisses itself after a few seconds,
+        and a taskbar button flickering in and out on every copy would be noise. Do not align this with the
+        other windows.
+    -->
+
+    <!--
         Two things make this text legible, and it took both.
 
         TextFormattingMode=Display: WPF's default is Ideal, which preserves exact glyph advances for faithful

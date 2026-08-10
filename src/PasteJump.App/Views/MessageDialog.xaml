@@ -6,7 +6,6 @@
         MinWidth="380"
         MaxWidth="560"
         ResizeMode="NoResize"
-        ShowInTaskbar="False"
         Background="{DynamicResource SurfaceBrush}"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display">

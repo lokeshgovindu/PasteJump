@@ -15,6 +15,15 @@
         TextOptions.TextRenderingMode="ClearType">
 
     <!--
+        On ShowInTaskbar="False" above. Every window PasteJump shows appears in the taskbar EXCEPT this one
+        and the toast, so that a window can never be lost behind another with no way back to it. These two
+        are the exception because they are not windows anyone tracks: this one lives for the length of a
+        keypress, and a taskbar button appearing and vanishing on every gesture would be worse than useless.
+        WindowInterop.MakeNonActivating also applies WS_EX_TOOLWINDOW here, which keeps it out of Alt+Tab and
+        is load-bearing for focus - so do not "fix" this to match the other windows.
+    -->
+
+    <!--
         Two things make this text legible, and the second one is the larger half.
 
         TextFormattingMode=Display: WPF's default Ideal mode is tuned for large text and renders 11-12px UI
