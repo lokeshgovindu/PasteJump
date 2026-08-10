@@ -140,14 +140,21 @@ that immediately caught two real bugs. Expect to do the same again.
   mismatch stops setup detecting a running copy and it fails on a locked exe instead of offering to close
   it. The surviving `UnauthorizedAccessException` catch now means "another copy in this session we cannot
   open", which in practice is an elevated one.
-  The second instance signals the first through `SingleInstanceSignal`, and three details are load-bearing:
+  The second launch is answered with a **toast in the bottom-right corner**, not by opening a window: a
+  window nobody asked for, on top of what they were doing, was the first attempt and it overreached. It is
+  our own `ToastWindow` rather than a tray balloon because Focus Assist can suppress a balloon silently, and
+  silence is the whole failure being fixed. `ToastPlacement.BottomRight` puts it where Windows puts its own,
+  on the monitor **under the cursor** rather than the primary, and `detailIsProse` swaps the detail line off
+  Consolas — that font is right for a clip preview and reads as a code listing for a sentence.
+  The second instance signals the first through `SingleInstanceSignal`, and two details are load-bearing:
   **`HWND_BROADCAST` cannot reach a message-only window**, so the target is found with `FindWindowEx` rooted
-  at `HWND_MESSAGE`; the search is **by window title**, because `MessageOnlyWindow` deliberately makes its
-  *class* name unique per instance (`RegisterClassEx` fails on a duplicate, which would break restart-in-place);
-  and **`AllowSetForegroundWindow` is required**, because Windows grants `SetForegroundWindow` only to a
-  process that already has the foreground — without it the history window opens *behind* everything, which
-  looks exactly like nothing happening. `PostMessage`, not `SendMessage`: the other instance's UI thread may
-  be mid-gesture.
+  at `HWND_MESSAGE`; and the search is **by window title**, because `MessageOnlyWindow` deliberately makes its
+  *class* name unique per instance (`RegisterClassEx` fails on a duplicate, which would break restart-in-place).
+  `PostMessage`, not `SendMessage`: the other instance's UI thread may be mid-gesture holding the hook.
+  There is deliberately **no `AllowSetForegroundWindow`** — a toast is topmost and never activates, so it needs
+  no foreground rights. It would be needed the moment the answer became a real window, since Windows grants
+  `SetForegroundWindow` only to a process that already has it, and the target would open *behind* everything.
+  The P/Invoke is kept, unused, with that note on it.
 - **While a session is open, a key nothing claimed is still swallowed — and the exceptions are what keep
   that safe.** The user is holding Ctrl, so almost every unclaimed chord is a command somewhere: `Ctrl+0`
   and `Ctrl+=` zoom VS Code, `Ctrl+W` closes a tab, `Ctrl+S` saves. Passing them through meant browsing

@@ -158,6 +158,24 @@ internal static class Program
                     return toast;
                 });
 
+                // The other shape the toast takes: a message about the application rather than about a clip,
+                // which is what a second launch answers with. Worth its own case because it exercises the two
+                // things that differ - corner placement and a proportional detail line. The monospace default
+                // is right for clip text and reads as a code listing for a sentence.
+                Check("ToastWindow-Message", () =>
+                {
+                    var toast = new ToastWindow();
+
+                    toast.Notify(
+                        "PasteJump is already running",
+                        "Hold Ctrl and tap V to paste. The icon is in the notification area, by the clock.",
+                        TimeSpan.FromSeconds(30),
+                        ToastPlacement.BottomRight,
+                        detailIsProse: true);
+
+                    return toast;
+                });
+
                 // Three real frames rather than one empty window. The empty overlay renders none of
                 // RenderBody's interesting paths - no preview, no chips, no banner - so it proved almost
                 // nothing, and it made a useless picture for the help file. These are also the shots

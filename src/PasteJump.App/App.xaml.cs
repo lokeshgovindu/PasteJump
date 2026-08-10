@@ -841,11 +841,37 @@ public partial class App : Application
             return null;
         }
 
-        // Queued rather than shown inline. This runs inside the window procedure, and opening a window from
+        // Queued rather than shown inline. This runs inside the window procedure, and showing a window from
         // there re-enters WPF's message pumping while Windows is still waiting for DefWindowProc.
-        Dispatcher.BeginInvoke(ShowHistory);
+        Dispatcher.BeginInvoke(ShowAlreadyRunningToast);
 
         return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Answers a second launch with a notification in the corner rather than by opening the history window.
+    /// <para>
+    /// Opening a window was the first attempt and it overreached: someone who double-clicked the shortcut by
+    /// habit got a window they had not asked for, on top of whatever they were doing. A toast says the same
+    /// thing - it is running, here is how to reach it - and then goes away on its own.
+    /// </para>
+    /// <para>
+    /// Bottom-right rather than near the cursor, unlike the copy notification: this is a message about the
+    /// application, and the corner is where Windows puts those, so it is where people look. Deliberately our
+    /// own toast rather than a tray balloon, which Focus Assist can suppress silently - and being silent is
+    /// the entire failure this replaces.
+    /// </para>
+    /// </summary>
+    private void ShowAlreadyRunningToast()
+    {
+        var trigger = TriggerKey.Normalise(_settings.PasteModeTriggerKey);
+
+        Toast().Notify(
+            "PasteJump is already running",
+            $"Hold Ctrl and tap {trigger} to paste. The icon is in the notification area, by the clock.",
+            TimeSpan.FromMilliseconds(Math.Max(4000, _settings.CopyNotificationMs)),
+            ToastPlacement.BottomRight,
+            detailIsProse: true);
     }
 
     private void ShowShortcutHelp()

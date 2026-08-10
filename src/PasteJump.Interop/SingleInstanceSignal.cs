@@ -66,14 +66,13 @@ public static class SingleInstanceSignal
             return false;
         }
 
-        // Hand over the foreground right before posting. Windows grants SetForegroundWindow only to a process
-        // that already has the foreground, and this process does - the user just launched it. Without this the
-        // other instance's window opens behind everything, which reads as nothing having happened.
-        if (NativeMethods.GetWindowThreadProcessId(target, out var processId) != 0 && processId != 0)
-        {
-            NativeMethods.AllowSetForegroundWindow(processId);
-        }
-
+        // No AllowSetForegroundWindow here, and that is worth a note rather than silence. The running instance
+        // answers this with a toast, which is topmost and never activates, so it needs no foreground rights.
+        // It WOULD need them if the answer ever became a real window: Windows grants SetForegroundWindow only
+        // to a process that already has it, so the other instance could not raise its own window and it would
+        // open behind everything - looking exactly like nothing happened. This process has the foreground (the
+        // user just launched it) and would have to hand that right over first.
+        //
         // Posted, not sent: SendMessage would block this process until the other one's UI thread got round to
         // it, and that thread may be mid-gesture with the keyboard hook held.
         return NativeMethods.PostMessage(target, ShowRequest, IntPtr.Zero, IntPtr.Zero);

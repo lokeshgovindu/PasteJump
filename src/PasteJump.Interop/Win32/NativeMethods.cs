@@ -205,10 +205,11 @@ internal static class NativeMethods
     /// <summary>
     /// Lets the named process take the foreground next time it asks.
     /// <para>
-    /// Required, not cosmetic. Windows only grants <c>SetForegroundWindow</c> to a process that already has
-    /// it, so the instance being asked to show its window cannot raise it by itself - the caller, which does
-    /// have the foreground, has to hand that right over first. Without this the history window opens behind
-    /// whatever is in front, which looks exactly like nothing happening.
+    /// Currently unused, and kept because it is the missing piece the moment anything here needs to raise
+    /// another process's window: Windows grants <c>SetForegroundWindow</c> only to a process that already has
+    /// the foreground, so the target cannot raise itself - the process the user just launched has to hand the
+    /// right over first. <c>SingleInstanceSignal</c> does not need it because a toast is topmost and never
+    /// activates; a window would.
     /// </para>
     /// </summary>
     [DllImport(User32, SetLastError = true)]

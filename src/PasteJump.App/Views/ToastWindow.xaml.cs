@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 using PasteJump.App.Services;
 
@@ -63,8 +64,52 @@ public partial class ToastWindow : Window
     /// </summary>
     /// <param name="headline">Short first line, e.g. "Copied - 12 clips".</param>
     /// <param name="detail">Optional preview line. Collapsed when null or empty.</param>
+    /// <summary>The detail line's normal font, for clip text. Cached because the toast fires on every copy.</summary>
+    private static readonly FontFamily MonospaceFont = new("Consolas");
+
     public void Notify(string headline, string? detail, TimeSpan duration)
+        => Notify(headline, detail, duration, ToastPlacement.NearCursor);
+
+    /// <summary>
+    /// As <see cref="Notify(string, string?, TimeSpan)"/>, choosing where it appears.
+    /// <para>
+    /// Near the cursor is right for a copy: it confirms something that just happened where the user was
+    /// looking. The bottom corner is right for a message about the application itself, which is where Windows
+    /// puts its own notifications and therefore where people already look for one.
+    /// </para>
+    /// </summary>
+    public void Notify(string headline, string? detail, TimeSpan duration, ToastPlacement placement)
+        => Notify(headline, detail, duration, placement, detailIsProse: false);
+
+    /// <summary>
+    /// As above, with control over how the detail line is set.
+    /// <para>
+    /// <paramref name="detailIsProse"/> switches it from Consolas to the UI font. The monospace default is
+    /// right for what the detail line normally holds - a clip's text, where alignment and character identity
+    /// matter - and wrong for a sentence about the application, which reads as a code listing.
+    /// </para>
+    /// </summary>
+    public void Notify(
+        string headline,
+        string? detail,
+        TimeSpan duration,
+        ToastPlacement placement,
+        bool detailIsProse)
     {
+        // Set on every call, not just when prose is asked for: this window is reused for every notification,
+        // so a font left behind by the previous one would follow the next clip preview.
+        //
+        // ClearValue rather than naming a font, which lets the UI font arrive by inheritance from the theme -
+        // the XAML's FontFamily="Consolas" is itself a local value, so clearing it is what reveals the default.
+        if (detailIsProse)
+        {
+            DetailText.ClearValue(FontFamilyProperty);
+        }
+        else
+        {
+            DetailText.FontFamily = MonospaceFont;
+        }
+
         HeadlineText.Text = headline;
 
         if (string.IsNullOrWhiteSpace(detail))
@@ -94,7 +139,15 @@ public partial class ToastWindow : Window
         // Measure before positioning: SizeToContent leaves ActualWidth stale until layout has run,
         // and clamping against a stale size puts the window partly off-screen.
         UpdateLayout();
-        PositionNearCursor();
+
+        if (placement == ToastPlacement.BottomRight)
+        {
+            PositionInBottomCorner();
+        }
+        else
+        {
+            PositionNearCursor();
+        }
 
         if (!_stylesApplied)
         {
@@ -197,4 +250,48 @@ public partial class ToastWindow : Window
         Left = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Left, left), scale);
         Top = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Top, top), scale);
     }
+
+    /// <summary>
+    /// Places the toast in the bottom-right corner, where Windows shows its own notifications.
+    /// <para>
+    /// On the monitor the cursor is on rather than the primary: the user has just launched something, so that
+    /// is the screen they are looking at, and a message about it appearing on another monitor is a message
+    /// nobody reads. The work area is used rather than the screen bounds, so it sits above the taskbar - and
+    /// it is the taskbar of <em>that</em> monitor, at <em>that</em> monitor's DPI.
+    /// </para>
+    /// </summary>
+    private void PositionInBottomCorner()
+    {
+        var (cursorX, cursorY) = PasteJump.Interop.ForegroundWindowInfo.GetCursorPosition();
+
+        var scale = WindowInterop.GetScaleForPoint(cursorX, cursorY);
+        var bounds = WindowInterop.GetWorkAreaForPoint(cursorX, cursorY, scale);
+
+        var width = ActualWidth > 0 ? ActualWidth : 260;
+        var height = ActualHeight > 0 ? ActualHeight : 60;
+
+        const double Margin = 12;
+
+        var left = bounds.Right - width - Margin;
+        var top = bounds.Bottom - height - Margin;
+
+        // Same device-pixel snapping as the cursor placement, and for the same reason: these coordinates are
+        // physical pixels divided by a possibly fractional scale, and landing on a half pixel renders the
+        // whole window - text included - soft.
+        Left = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Left, left), scale);
+        Top = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Top, top), scale);
+    }
+}
+
+/// <summary>Where a toast should appear.</summary>
+public enum ToastPlacement
+{
+    /// <summary>Beside the mouse pointer. For confirming something the user just did there.</summary>
+    NearCursor,
+
+    /// <summary>
+    /// The bottom-right of the work area, where Windows shows its own notifications. For messages about the
+    /// application rather than about a clip.
+    /// </summary>
+    BottomRight,
 }
