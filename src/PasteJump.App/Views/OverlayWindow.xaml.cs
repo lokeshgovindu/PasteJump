@@ -36,6 +36,22 @@ public partial class OverlayWindow : Window
         WindowInterop.ApplyRoundedCorners(this);
     }
 
+    /// <summary>
+    /// Sets the key hint, or hides it. The trigger letter is passed in rather than assumed, because it is
+    /// configurable and a hint naming a key that does nothing would be worse than no hint.
+    /// </summary>
+    public void ApplyKeyHint(bool show, char triggerKey)
+    {
+        if (!show)
+        {
+            KeyHintText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        KeyHintText.Visibility = Visibility.Visible;
+        KeyHintText.Text = $"A  newest    {triggerKey} / C  step    X  delete    Esc  cancel    F1  all keys";
+    }
+
     /// <summary>Applies a frame and positions the window at the anchor, clamped to the work area.</summary>
     public void Render(PasteOverlayModel model, int anchorX, int anchorY)
     {

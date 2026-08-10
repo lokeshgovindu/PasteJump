@@ -196,6 +196,7 @@ public partial class App : Application
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
+        _pasteHost.SetKeyHint(_settings.ShowOverlayKeyHint, TriggerKey.Normalise(_settings.PasteModeTriggerKey));
 
         _controller = new PasteModeController(
             new ClipStoreCatalog(_store),
@@ -768,6 +769,16 @@ public partial class App : Application
             headline: "Hotkey unavailable");
     }
 
+    /// <summary>
+    /// Shows the paste-mode key list. Reachable from the tray menu and from <c>F1</c> during the gesture.
+    /// <para>
+    /// It must not take focus, which is why the window sets <c>ShowActivated="False"</c> and why this does not
+    /// call <c>Activate</c>. <c>F1</c> is pressed <em>mid-gesture</em>, with Ctrl still held and the target
+    /// application still expecting the paste - activating a window there moves focus off that application, so
+    /// the paste would land in the help window instead of the document. The user can still click it to focus
+    /// it; nothing here refuses that.
+    /// </para>
+    /// </summary>
     private void ShowShortcutHelp()
     {
         if (_helpWindow is null)
@@ -776,11 +787,13 @@ public partial class App : Application
                 TriggerKey.Normalise(_settings.PasteModeTriggerKey)));
             _helpWindow.Closed += (_, _) => _helpWindow = null;
             _helpWindow.Show();
+            return;
         }
-        else
-        {
-            _helpWindow.Activate();
-        }
+
+        // Already open. Brought to the front without activating, for the reason above - Activate() was what
+        // this used to do, and during a gesture that is the bug.
+        _helpWindow.Topmost = true;
+        _helpWindow.Topmost = false;
     }
 
     private void OnSettingsApplied(PasteJumpSettings updated)
@@ -793,6 +806,7 @@ public partial class App : Application
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
+        _pasteHost.SetKeyHint(_settings.ShowOverlayKeyHint, TriggerKey.Normalise(_settings.PasteModeTriggerKey));
 
         _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
         ApplyHistoryHotkey(announceFailure: true);

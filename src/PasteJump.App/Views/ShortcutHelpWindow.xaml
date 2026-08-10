@@ -9,7 +9,8 @@
         MinHeight="300"
         ResizeMode="CanResize"
         Background="{DynamicResource SurfaceBrush}"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        ShowActivated="False">
 
     <Window.Resources>
         <Style x:Key="KeyStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">

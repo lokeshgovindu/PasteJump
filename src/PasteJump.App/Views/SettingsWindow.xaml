@@ -536,6 +536,10 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="Leave both empty — the default — to have the overlay appear beside the text caret, or beside the pointer where an application does not report one. Fill in both to pin it to one place on screen instead, in physical pixels from the top-left of the primary monitor. One without the other is not accepted: it would track the caret in one axis and not the other." />
 
+                        <CheckBox x:Name="ShowKeyHintCheck" Content="Show a Key Reminder Along the Bottom" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="One muted line naming the keys worth knowing when you have lost your place: A returns to the newest clip, X deletes, Esc cancels, and F1 opens the full list. Turn it off once the gesture is in your fingers." />
+
                         <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="After Each Copy" />
 
                         <CheckBox x:Name="ShowCopyNotificationCheck"

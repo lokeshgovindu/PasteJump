@@ -307,6 +307,8 @@ public partial class SettingsWindow : Window
         OverlayXBox.Text = source.OverlayX?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
         OverlayYBox.Text = source.OverlayY?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
 
+        ShowKeyHintCheck.IsChecked = source.ShowOverlayKeyHint;
+
         // Deliberately just the setting. Load reconciles it with the Startup folder afterwards, which is right
         // for opening the dialog and wrong for a reset: resetting means "go back to not starting at logon", and
         // a box that stayed ticked because the shortcut is still there would read as the reset being ignored.
@@ -1107,6 +1109,7 @@ public partial class SettingsWindow : Window
         settings.OverlayPreviewMaxWidth = previewWidth;
         settings.OverlayPreviewMaxHeight = previewHeight;
         settings.OverlayPreviewChars = overlayChars;
+        settings.ShowOverlayKeyHint = ShowKeyHintCheck.IsChecked == true;
         settings.BeepDurationMs = beepMs;
         settings.PreviewMaxChars = previewChars;
         settings.HistoryLoadLimit = historyLimit;

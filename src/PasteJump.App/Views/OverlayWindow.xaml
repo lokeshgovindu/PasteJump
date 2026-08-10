@@ -207,6 +207,19 @@
                            Text="No clips" />
             </Grid>
 
+            <!--
+                The key hint. It exists because two features were reported as missing while both already
+                worked: jumping back to the newest clip, and reading the key list mid-gesture. Nothing on
+                screen said so, and a gesture nobody sees a menu for has to carry its own signposts.
+
+                Deliberately the four that matter when you are lost rather than the whole list: get back,
+                get out, and where to find the rest. 10px and muted so it reads as a footnote.
+            -->
+            <TextBlock x:Name="KeyHintText"
+                       Margin="10,0,10,8"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       FontSize="10" />
+
         </StackPanel>
     </Border>
 </Window>

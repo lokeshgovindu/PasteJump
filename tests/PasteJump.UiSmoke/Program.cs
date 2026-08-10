@@ -190,7 +190,12 @@ internal static class Program
     {
         var overlay = new OverlayWindow();
 
-        overlay.Loaded += (_, _) => overlay.Render(frame, anchorX: 200, anchorY: 200);
+        overlay.Loaded += (_, _) =>
+        {
+            // On, as it is by default, so the help screenshots show what a user sees.
+            overlay.ApplyKeyHint(show: true, triggerKey: 'V');
+            overlay.Render(frame, anchorX: 200, anchorY: 200);
+        };
 
         return overlay;
     }

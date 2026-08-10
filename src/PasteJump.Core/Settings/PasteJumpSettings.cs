@@ -199,6 +199,16 @@ public sealed class PasteJumpSettings
     /// </summary>
     public int OverlayPreviewChars { get; set; } = 400;
 
+    /// <summary>
+    /// Show a one-line key reminder along the bottom of the paste overlay.
+    /// <para>
+    /// On by default, and it earns that: two features were reported as missing while both already worked -
+    /// jumping back to the newest clip with <c>A</c>, and reading the whole key list with <c>F1</c>. A gesture
+    /// with no menu and no window has nowhere else to advertise itself, so it has to carry its own signposts.
+    /// </para>
+    /// </summary>
+    public bool ShowOverlayKeyHint { get; set; } = true;
+
     /// <summary>Show a brief notification near the cursor after each copy, as Clipjump did.</summary>
     public bool ShowCopyNotification { get; set; } = true;
 

@@ -32,6 +32,21 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     private int? _overlayX;
     private int? _overlayY;
 
+    private bool _showKeyHint = true;
+    private char _triggerKey = 'V';
+
+    /// <summary>
+    /// Sets the overlay's key reminder and the trigger letter it names. Both together, because the hint has to
+    /// name the key that is actually configured.
+    /// </summary>
+    public void SetKeyHint(bool show, char triggerKey)
+    {
+        _showKeyHint = show;
+        _triggerKey = triggerKey;
+
+        _overlay?.ApplyKeyHint(show, triggerKey);
+    }
+
     /// <summary>
     /// Pins the overlay to a fixed screen position, or restores "follow the caret" when either is null.
     /// <para>
@@ -164,6 +179,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
             // Applied on creation as well as on change, because the overlay is created lazily on the first
             // gesture - which is usually long after the settings were loaded.
             _overlay.ApplyPreviewSize(_previewMaxWidth, _previewMaxHeight);
+            _overlay.ApplyKeyHint(_showKeyHint, _triggerKey);
         }
 
         // A configured position wins over the caret. Both halves have to be set for it to mean anything, which
