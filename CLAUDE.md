@@ -622,6 +622,16 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   executable shows *that* exe's icon, so the UI smoke harness shows its own. That is the fallback working,
   not a defect. Corollary for `AppIconLarge`, which remains and is still right: it is *displayed* at a chosen
   size rather than handed to Windows, so one large frame is exactly what it wants.
+- **The program picker's icons are extracted at 48 px, not at the "small" size.** Same family of bug as the
+  two below, third occurrence: `ProgramIcons` asked `ExtractIconEx` for the *small* array and
+  `SHGetFileInfo` for `SHGFI_SMALLICON` — both 16 px — and the picker draws them at 24, so every icon was
+  enlarged 1.5× and the list was reported as blurry. Measured: `ExtractIconEx` can only return the two system
+  sizes, 32 and 16, so it cannot reach a 48 px frame even when the exe ships one. **`PrivateExtractIcons`
+  takes an explicit size** and is the only one of these that does — verified returning 48×48 for every
+  executable tried, against 32 from `ExtractIconEx` large and 16 from small. The order is
+  `PrivateExtractIcons` → `ExtractIconEx` large → shell `SHGFI_LARGEICON`, and the last is not redundant: a
+  packaged application (Terminal, Settings, the input host) has no icon in its exe at all, so only the shell
+  can resolve it. Judge a change here by printing `PixelWidth`, never by eye.
 - **Never bind an `Image` to the `.ico`.** A multi-frame icon is the wrong source for a chosen render size:
   WPF's icon decoder picks the frame itself, and with no requested decode size it can pick a small one and
   scale it *up*. That is what made the About window's logo look soft — a 32px frame enlarged to 48. Use

@@ -52,10 +52,26 @@ internal static class ProgramIcons
     }
 
     /// <summary>
-    /// The executable's small icon as a frozen <see cref="BitmapSource"/>, or null.
+    /// Size asked of the extractors, in pixels.
+    /// <para>
+    /// The picker draws these at 24 device-independent pixels, so 48 is a down-scale at 100% and still a
+    /// down-scale at 200%. That direction is the whole point: this used to request the <em>small</em> 16x16
+    /// icon and draw it at 24, and enlarging an icon by 1.5x is what made the list look blurry - the same
+    /// mistake, in a different place, as binding a small <c>.ico</c> frame to a large <c>Image</c>.
+    /// </para>
+    /// </summary>
+    private const int RequestedIconSize = 48;
+
+    /// <summary>
+    /// The executable's icon as a frozen <see cref="BitmapSource"/>, or null.
     /// <para>
     /// Frozen because these are built on one thread and then handed to a grid: an unfrozen
     /// <c>BitmapSource</c> has thread affinity, and freezing also lets WPF skip its change-tracking.
+    /// </para>
+    /// <para>
+    /// Three sources, best first. Each falls back rather than failing, because they know different things: the
+    /// executable's own resources are the highest quality when present, the system large icon always exists,
+    /// and only the shell can resolve a packaged application whose icon is not in the exe at all.
     /// </para>
     /// </summary>
     public static BitmapSource? TryGetIcon(string? executablePath)
@@ -65,20 +81,54 @@ internal static class ProgramIcons
             return null;
         }
 
-        return FromExtractIconEx(executablePath) ?? FromShell(executablePath);
+        return FromPrivateExtract(executablePath)
+            ?? FromExtractIconEx(executablePath)
+            ?? FromShell(executablePath);
     }
 
-    /// <summary>The icon embedded in the executable itself.</summary>
+    /// <summary>
+    /// Asks for an icon at an explicit size, which is the only one of these APIs that lets us.
+    /// <para>
+    /// <c>ExtractIconEx</c> below can only return the system large and small sizes - 32 and 16 - so it cannot
+    /// reach a 48px frame even when the executable ships one. <c>PrivateExtractIcons</c> takes the size and
+    /// picks the best available frame, scaling only if it has to.
+    /// </para>
+    /// </summary>
+    private static BitmapSource? FromPrivateExtract(string executablePath)
+    {
+        var icons = new IntPtr[1];
+        var ids = new uint[1];
+
+        var extracted = PrivateExtractIcons(
+            executablePath,
+            0,
+            RequestedIconSize,
+            RequestedIconSize,
+            icons,
+            ids,
+            1,
+            0);
+
+        return extracted <= 0 || icons[0] == IntPtr.Zero ? null : Convert(icons[0]);
+    }
+
+    /// <summary>
+    /// The icon embedded in the executable, at the system large size.
+    /// <para>
+    /// The <c>large</c> array, not <c>small</c>: large is 32x32 and small is 16x16, and 16 was what made this
+    /// blurry when drawn at 24.
+    /// </para>
+    /// </summary>
     private static BitmapSource? FromExtractIconEx(string executablePath)
     {
-        var small = new IntPtr[1];
+        var large = new IntPtr[1];
 
-        if (ExtractIconEx(executablePath, 0, null, small, 1) <= 0 || small[0] == IntPtr.Zero)
+        if (ExtractIconEx(executablePath, 0, large, null, 1) <= 0 || large[0] == IntPtr.Zero)
         {
             return null;
         }
 
-        return Convert(small[0]);
+        return Convert(large[0]);
     }
 
     /// <summary>
@@ -93,12 +143,14 @@ internal static class ProgramIcons
     {
         var info = default(SHFILEINFO);
 
+        // LARGEICON, not SMALLICON: 32x32 rather than 16x16. Drawn at 24 the small one had to be enlarged,
+        // which is what this whole change is undoing.
         if (SHGetFileInfo(
                 executablePath,
                 0,
                 ref info,
                 (uint)Marshal.SizeOf<SHFILEINFO>(),
-                SHGFI_ICON | SHGFI_SMALLICON) == IntPtr.Zero
+                SHGFI_ICON | SHGFI_LARGEICON) == IntPtr.Zero
             || info.hIcon == IntPtr.Zero)
         {
             return null;
@@ -156,7 +208,22 @@ internal static class ProgramIcons
     private static extern int ExtractIconEx(string file, int index, IntPtr[]? large, IntPtr[]? small, int icons);
 
     private const uint SHGFI_ICON = 0x000000100;
-    private const uint SHGFI_SMALLICON = 0x000000001;
+    private const uint SHGFI_LARGEICON = 0x000000000;
+
+    /// <summary>
+    /// Extracts icons at a caller-chosen size. Documented despite the name, and stable since XP - it is the
+    /// only one of these that takes a size rather than returning the two system ones.
+    /// </summary>
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int PrivateExtractIcons(
+        string file,
+        int iconIndex,
+        int cx,
+        int cy,
+        IntPtr[] icons,
+        uint[] iconIds,
+        int iconCount,
+        uint flags);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEINFO
