@@ -123,6 +123,20 @@ internal static class Program
                         ((SettingsWindow)window).ExerciseResetsForSmokeTest();
                         Drain();
                     });
+                // The same dialog with both halves on a custom folder, which is the only way the path box and
+                // its Browse button are realised at all - a collapsed row's template is never applied, so the
+                // ordinary case above proves nothing about it.
+                Check(
+                    "SettingsWindow-CustomFolder",
+                    () => new SettingsWindow(
+                        settings,
+                        formatters,
+                        DataLocation.CustomFolder,
+                        DataLocation.CustomFolder,
+                        @"D:\PasteJumpData",
+                        @"D:\PasteJumpData"),
+                    CycleTabs);
+
                 Check("ShortcutHelpWindow", () => new ShortcutHelpWindow());
                 Check("AboutWindow", () => new AboutWindow());
 

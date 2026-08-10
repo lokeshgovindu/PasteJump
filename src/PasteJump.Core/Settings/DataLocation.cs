@@ -20,4 +20,17 @@ public enum DataLocation
     /// </para>
     /// </summary>
     UserProfile,
+
+    /// <summary>
+    /// A folder the user names. The path itself lives in <c>data-location.json</c> alongside this choice,
+    /// because an enum cannot carry it.
+    /// <para>
+    /// For the cases neither of the other two covers: a synced folder, a second drive, a network share, or
+    /// simply somewhere with room for years of images. Note what the app does <em>not</em> do with it - the
+    /// database is SQLite, so a path on a share that goes offline mid-session fails like any other
+    /// disconnected file, and two machines pointed at one share will corrupt it. That is the user's call to
+    /// make, and the settings dialog says so rather than refusing.
+    /// </para>
+    /// </summary>
+    CustomFolder,
 }

@@ -61,6 +61,20 @@ public sealed class DataLocationPointer
     [JsonPropertyName("location")]
     public DataLocation? LegacyLocation { get; set; }
 
+    /// <summary>
+    /// The folder named by the user, when <see cref="ClipsLocation"/> is
+    /// <see cref="DataLocation.CustomFolder"/>. Ignored otherwise.
+    /// <para>
+    /// Here rather than in the enum because an enum cannot carry a path, and here rather than in
+    /// <c>PasteJump.json</c> for the same reason the locations are: one of these two decides where that file
+    /// lives, so neither can be stored in it.
+    /// </para>
+    /// </summary>
+    public string? ClipsPath { get; set; }
+
+    /// <inheritdoc cref="ClipsPath"/>
+    public string? SettingsPath { get; set; }
+
     /// <summary>Root whose clips should be adopted on the next start, then cleared.</summary>
     public string? MigrateClipsFrom { get; set; }
 
@@ -71,13 +85,28 @@ public sealed class DataLocationPointer
     [JsonPropertyName("migrateFrom")]
     public string? LegacyMigrateFrom { get; set; }
 
-    /// <summary>Resolved clips location, falling back through the legacy field to the default.</summary>
+    /// <summary>
+    /// Resolved clips location, falling back through the legacy field to the default.
+    /// <para>
+    /// <see cref="DataLocation.CustomFolder"/> with no usable path degrades to the default rather than being
+    /// honoured. A custom location whose path is missing or nonsense has nowhere to point, and defaulting is
+    /// the recoverable outcome - the alternative is a start-up that cannot open a database and looks like
+    /// every clip has gone.
+    /// </para>
+    /// </summary>
     [JsonIgnore]
-    public DataLocation Clips => ClipsLocation ?? LegacyLocation ?? DataLocation.ApplicationFolder;
+    public DataLocation Clips => Resolve(ClipsLocation ?? LegacyLocation, ClipsPath);
 
-    /// <summary>Resolved settings location, falling back through the legacy field to the default.</summary>
+    /// <inheritdoc cref="Clips"/>
     [JsonIgnore]
-    public DataLocation Settings => SettingsLocation ?? LegacyLocation ?? DataLocation.ApplicationFolder;
+    public DataLocation Settings => Resolve(SettingsLocation ?? LegacyLocation, SettingsPath);
+
+    private static DataLocation Resolve(DataLocation? stated, string? path) => stated switch
+    {
+        DataLocation.CustomFolder when string.IsNullOrWhiteSpace(path) => DataLocation.ApplicationFolder,
+        { } value => value,
+        _ => DataLocation.ApplicationFolder,
+    };
 
     /// <summary>Resolved pending clips move.</summary>
     [JsonIgnore]
@@ -149,6 +178,14 @@ public sealed class DataLocationPointer
         MigrateSettingsFrom = Trimmed(MigrateSettingsFrom);
         LegacyMigrateFrom = Trimmed(LegacyMigrateFrom);
 
+        // Only kept when the matching half actually asked for a custom folder, so a stale path left behind by
+        // switching back cannot be resurrected by a later hand edit of the location alone.
+        ClipsPath = KeptFor(ClipsLocation ?? LegacyLocation, ClipsPath);
+        SettingsPath = KeptFor(SettingsLocation ?? LegacyLocation, SettingsPath);
+
+        static string? KeptFor(DataLocation? location, string? path)
+            => location == DataLocation.CustomFolder ? Trimmed(path) : null;
+
         static DataLocation? Defined(DataLocation? value)
             => value is { } v && Enum.IsDefined(v) ? v : null;
 
@@ -187,6 +224,8 @@ public sealed class DataLocationPointer
             {
                 ClipsLocation = Clips,
                 SettingsLocation = Settings,
+                ClipsPath = Clips == DataLocation.CustomFolder ? ClipsPath : null,
+                SettingsPath = Settings == DataLocation.CustomFolder ? SettingsPath : null,
                 MigrateClipsFrom = PendingClipsMove,
                 MigrateSettingsFrom = PendingSettingsMove,
             };

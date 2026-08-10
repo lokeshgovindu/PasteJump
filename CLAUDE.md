@@ -24,7 +24,7 @@ the About window, so there is nothing else to edit but the status line above.
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 555 passing (`dotnet test`) |
+| Tests | 581 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -74,7 +74,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      555 tests.
+tests/PasteJump.Core.Tests      581 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -221,6 +221,20 @@ that immediately caught two real bugs. Expect to do the same again.
   a folder that belongs only to us — under the user profile it shares a tree with other software.
   `AppPaths.SettingsFileName` is the single definition; `TryMigrateLegacySettings` renames an old file on
   start-up, without which the rename would look like every setting reverting to its default.
+- **A custom data folder is a location *plus* a path, and they must travel together.** `DataLocation` gained
+  `CustomFolder`, which means nothing without the path that sits beside it in `data-location.json` —
+  `clipsPath`/`settingsPath`, one per half. Four rules keep it safe, and each exists for a failure:
+  `CustomFolder` with no usable path **degrades to the application folder** rather than being honoured, because
+  this resolves during start-up before there is a window to report in and running from the default is
+  recoverable while failing to open a database is not; a path is **dropped when its half is not custom**, so
+  hand-editing the location alone cannot resurrect an abandoned folder; the folder is **created and
+  write-tested** by `CustomDataFolder.Validate` before OK is accepted, because on Windows "can I write here"
+  cannot be answered by inspecting a path; and everything compares **resolved roots, not choices**, since one
+  custom folder swapped for another is the same choice and a different destination.
+  `CustomDataFolder.TryCanonicalise` is the single canonicalisation and **trims the trailing separator** —
+  `Path.GetFullPath` keeps it, so `D:\Clips\` and `D:\Clips` would compare as different folders and offer to
+  copy a database onto itself. A test caught exactly that. It uses `Path.TrimEndingDirectorySeparator`, which
+  leaves a root alone: `D:\` must not become `D:`, which means "the current directory on D:".
 - **The data locations cannot live in the settings file,** because one of them decides where that file
   is. They live in `data-location.json` beside the exe, read before anything else. Clips
   and settings are located **independently** — `AppPaths` therefore has two roots, `ClipsRoot` and
@@ -646,7 +660,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 555 tests
+dotnet test                                         # 581 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

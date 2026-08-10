@@ -35,11 +35,6 @@ internal static class TrayMenuBuilder
         // is what a left-click on the tray icon opens. The emphasis here is presentational only; the
         // tray's own activation behaviour is unchanged.
         menu.Items.Add(MenuItemFor("_About PasteJump…", onAbout, emphasised: true));
-
-        // Beside About, where people look for it, and phrased with an ellipsis because it opens a dialog rather
-        // than doing something silently. It only ever runs when clicked - see UpdateChecker for why there is no
-        // check at start-up.
-        menu.Items.Add(MenuItemFor("Check for _Updates…", onCheckForUpdates));
         menu.Items.Add(new Separator());
         menu.Items.Add(MenuItemFor("Clipboard _History…", onHistory));
         menu.Items.Add(new Separator());
@@ -65,6 +60,12 @@ internal static class TrayMenuBuilder
         // releases the keyboard hook, handing Ctrl+V back to Windows untouched - which is what you want in
         // order to use another clipboard manager, or to rule PasteJump out when something else misbehaves.
         // Both labels name their effect on Ctrl+V, because that is the only difference between them.
+        // Fourth item from the bottom, in the group with Restart and Exit rather than beside About. It belongs
+        // here: what an update leads to is replacing the program and restarting it, and the ellipsis says it
+        // opens a dialog rather than acting silently. It only ever runs when clicked - see UpdateChecker for
+        // why nothing checks at start-up.
+        menu.Items.Add(MenuItemFor("Check for _Updates…", onCheckForUpdates));
+
         menu.Items.Add(MenuItemFor(
             isDisabled ? "_Enable PasteJump" : "_Disable PasteJump (Ctrl+V passes through)",
             onDisableToggle));

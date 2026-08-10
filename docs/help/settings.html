@@ -149,9 +149,12 @@ Electron shells and remote-desktop clients cache the clipboard, and a keystroke 
 served from that stale cache.</td></tr>
 <tr><td class="name">Editor for Text Clips / Image Clips</td><td>What the <code>H</code> key opens. Two
 settings, because Notepad opening a bitmap is useless.</td></tr>
-<tr><td class="name">Store Clips In</td><td>Where the database and the image blobs live. Move it when the
-program folder is not writable &mdash; unzipping under <code>C:\Program Files</code> is the usual way to
-discover that &mdash; or to share one history between several copies.</td></tr>
+<tr><td class="name">Store Clips In</td><td>Where the database and the image blobs live. Three choices: the
+PasteJump folder (the default, and what keeps a portable copy self-contained), your user profile &mdash; move
+it there when the program folder is not writable, which unzipping under <code>C:\Program Files</code> is the
+usual way to discover &mdash; or <b>a folder you choose</b>, for a second drive or somewhere with room for
+years of images. Choosing your own folder shows a box and a Browse button; the folder is created and tested
+for writing before the change is accepted.</td></tr>
 <tr><td class="name">Store Settings In</td><td>Where <code>PasteJump.json</code> lives. Rarely worth
 moving: keeping it beside the program is what lets a portable copy carry its own configuration.</td></tr>
 </table>
@@ -160,7 +163,14 @@ moving: keeping it beside the program is what lets a portable copy carry its own
 <p><b>The two locations are independent, and moving either needs a restart.</b> PasteJump restarts,
 copies that half across, and leaves the old copy in place for you to delete. They cannot live in the
 settings file, because one of them decides where that file is &mdash; they are in
-<code>data-location.json</code> beside the executable.</p>
+<code>data-location.json</code> beside the executable, along with the folder you chose if you chose one.</p>
+</div>
+
+<div class="warn">
+<p><b>A network share is a bad choice for clips.</b> The clip store is a SQLite database: a share that goes
+offline mid-session fails like any other disconnected file, and two computers pointed at the same folder
+will corrupt it. PasteJump does not refuse a share &mdash; it is your folder &mdash; but it cannot make that
+safe either.</p>
 </div>
 
 <h2>Advanced</h2>

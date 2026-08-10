@@ -666,6 +666,21 @@
                                       Grid.Column="1"
                                       SelectionChanged="OnDataLocationChanged" />
                         </Grid>
+                        <!-- Only meaningful for the custom choice, so it is hidden for the other two rather
+                             than sitting there greyed out and inviting a click. -->
+                        <Grid x:Name="ClipsCustomRow" Style="{StaticResource SettingRow}" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="ClipsCustomPathBox" Grid.Column="0" TextChanged="OnDataLocationPathChanged" />
+                            <Button Grid.Column="1"
+                                    Click="OnBrowseClipsFolder"
+                                    Content="B_rowse…"
+                                    Margin="8,0,0,0"
+                                    MinWidth="88" />
+                        </Grid>
+
                         <TextBlock x:Name="ClipsLocationPathText"
                                    Style="{StaticResource PathLink}"
                                    FontFamily="Consolas"
@@ -673,7 +688,7 @@
                                    MouseLeftButtonUp="OnOpenClipsFolder"
                                    ToolTip="Open this folder in File Explorer" />
                         <TextBlock Style="{StaticResource SettingHelp}"
-                                   Text="The clip database and the stored images. Choose your user profile if the PasteJump folder is not writable, or to share one history between several copies of PasteJump." />
+                                   Text="The clip database and the stored images. Choose your user profile if the PasteJump folder is not writable, or to share one history between several copies of PasteJump. Choose a folder of your own for a second drive or somewhere with room for years of images — but not a network share, since two machines writing one database will corrupt it." />
 
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
@@ -685,6 +700,19 @@
                                       Grid.Column="1"
                                       SelectionChanged="OnDataLocationChanged" />
                         </Grid>
+                        <Grid x:Name="SettingsCustomRow" Style="{StaticResource SettingRow}" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="SettingsCustomPathBox" Grid.Column="0" TextChanged="OnDataLocationPathChanged" />
+                            <Button Grid.Column="1"
+                                    Click="OnBrowseSettingsFolder"
+                                    Content="Br_owse…"
+                                    Margin="8,0,0,0"
+                                    MinWidth="88" />
+                        </Grid>
+
                         <TextBlock x:Name="SettingsLocationPathText"
                                    Style="{StaticResource PathLink}"
                                    FontFamily="Consolas"

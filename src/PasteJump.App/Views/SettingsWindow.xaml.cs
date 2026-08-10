@@ -56,6 +56,7 @@ public partial class SettingsWindow : Window
     [
         (DataLocation.ApplicationFolder, "The PasteJump folder"),
         (DataLocation.UserProfile, "My user profile"),
+        (DataLocation.CustomFolder, "A folder I choose…"),
     ];
 
     private readonly FormatterRegistry _formatters;
@@ -74,6 +75,12 @@ public partial class SettingsWindow : Window
     private DataLocation _baselineClipsLocation;
     private DataLocation _baselineSettingsLocation;
 
+    private string? _baselineClipsPath;
+    private string? _baselineSettingsPath;
+
+    private string _baselineClipsRoot;
+    private string _baselineSettingsRoot;
+
     /// <summary>
     /// The excluded-application list as the user is editing it.
     /// <para>
@@ -84,16 +91,27 @@ public partial class SettingsWindow : Window
     /// </summary>
     private readonly ObservableCollection<string> _excluded = [];
 
+    /// <param name="clipsPath">The custom folder in force, when <paramref name="clipsLocation"/> is one.</param>
+    /// <param name="settingsPath">As <paramref name="clipsPath"/>, for the settings half.</param>
     public SettingsWindow(
         PasteJumpSettings settings,
         FormatterRegistry formatters,
         DataLocation clipsLocation = DataLocation.ApplicationFolder,
-        DataLocation settingsLocation = DataLocation.ApplicationFolder)
+        DataLocation settingsLocation = DataLocation.ApplicationFolder,
+        string? clipsPath = null,
+        string? settingsPath = null)
     {
         _baseline = settings;
         _formatters = formatters;
         _baselineClipsLocation = clipsLocation;
         _baselineSettingsLocation = settingsLocation;
+        _baselineClipsPath = clipsPath;
+        _baselineSettingsPath = settingsPath;
+
+        // Kept as resolved roots as well as as choices, because "has anything moved" can only be answered by
+        // comparing the roots - two different custom folders are the same choice.
+        _baselineClipsRoot = AppPaths.RootFor(clipsLocation, clipsPath);
+        _baselineSettingsRoot = AppPaths.RootFor(settingsLocation, settingsPath);
 
         InitializeComponent();
         Load();
@@ -135,8 +153,10 @@ public partial class SettingsWindow : Window
     {
         // Locations first: they live outside the settings object entirely, so no amount of comparing
         // PasteJumpSettings would notice them.
-        if (SelectedClipsLocation != _baselineClipsLocation
-            || SelectedSettingsLocation != _baselineSettingsLocation)
+        // Compared as resolved roots rather than as choices: swapping one custom folder for another leaves the
+        // choice identical and the destination different.
+        if (!string.Equals(SelectedClipsRoot, _baselineClipsRoot, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(SelectedSettingsRoot, _baselineSettingsRoot, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -179,7 +199,7 @@ public partial class SettingsWindow : Window
     /// value in memory.
     /// </para>
     /// </summary>
-    public event Action<DataLocation, DataLocation>? DataLocationChangeRequested;
+    public event Action<DataLocationChoice, DataLocationChoice>? DataLocationChangeRequested;
 
     /// <summary>
     /// Raised when the user asks to import Clipjump's history.
@@ -316,11 +336,20 @@ public partial class SettingsWindow : Window
         TextEditorBox.Text = source.TextEditor;
         ImageEditorBox.Text = source.ImageEditor;
 
+        // Paths first, so the SelectionChanged this triggers finds the box already filled and computes the
+        // right hint straight away rather than one showing the application folder for a frame.
+        ClipsCustomPathBox.Text = _baselineClipsPath ?? string.Empty;
+        SettingsCustomPathBox.Text = _baselineSettingsPath ?? string.Empty;
+
         ClipsLocationCombo.SelectedItem = DataLocationChoices
             .First(c => c.Location == clipsLocation).Label;
 
         SettingsLocationCombo.SelectedItem = DataLocationChoices
             .First(c => c.Location == settingsLocation).Label;
+
+        // Explicitly, because Reset writes the same selection back and SelectionChanged does not fire when the
+        // value has not changed - which would leave the path box visible after resetting to a non-custom choice.
+        RefreshLocationHints();
     }
 
     /// <summary>Clips location currently picked, which may differ from the one in force.</summary>
@@ -328,6 +357,26 @@ public partial class SettingsWindow : Window
 
     /// <summary>Settings location currently picked, which may differ from the one in force.</summary>
     private DataLocation SelectedSettingsLocation => LocationIn(SettingsLocationCombo);
+
+    /// <summary>The typed folder, or null when this half is not using a custom one.</summary>
+    private string? SelectedClipsPath => SelectedClipsLocation == DataLocation.CustomFolder
+        ? ClipsCustomPathBox.Text
+        : null;
+
+    /// <inheritdoc cref="SelectedClipsPath"/>
+    private string? SelectedSettingsPath => SelectedSettingsLocation == DataLocation.CustomFolder
+        ? SettingsCustomPathBox.Text
+        : null;
+
+    /// <summary>
+    /// The root each half would actually use. Compared against the roots in force to decide whether anything
+    /// moved - which is the only test that catches one custom folder being swapped for another, where the
+    /// location is unchanged and the path is not.
+    /// </summary>
+    private string SelectedClipsRoot => AppPaths.RootFor(SelectedClipsLocation, SelectedClipsPath);
+
+    /// <inheritdoc cref="SelectedClipsRoot"/>
+    private string SelectedSettingsRoot => AppPaths.RootFor(SelectedSettingsLocation, SelectedSettingsPath);
 
     private static DataLocation LocationIn(ComboBox combo) => DataLocationChoices
         .FirstOrDefault(c => string.Equals(c.Label, combo.SelectedItem as string, StringComparison.Ordinal))
@@ -338,6 +387,42 @@ public partial class SettingsWindow : Window
     /// which keeps it correct regardless of which control raised the event.
     /// </summary>
     private void OnDataLocationChanged(object sender, SelectionChangedEventArgs e) => RefreshLocationHints();
+
+    /// <summary>Typing a path changes the resolved folder, so the hints have to follow it.</summary>
+    private void OnDataLocationPathChanged(object sender, TextChangedEventArgs e) => RefreshLocationHints();
+
+    private void OnBrowseClipsFolder(object sender, RoutedEventArgs e)
+        => BrowseForDataFolder(ClipsCustomPathBox, "Choose where to store clips");
+
+    private void OnBrowseSettingsFolder(object sender, RoutedEventArgs e)
+        => BrowseForDataFolder(SettingsCustomPathBox, "Choose where to store settings");
+
+    /// <summary>
+    /// Picks a folder with the standard dialog, starting from whatever is already in the box.
+    /// <para>
+    /// <see cref="OpenFolderDialog"/> rather than the old shell folder browser: it is the modern picker, so it
+    /// has a path bar, favourites and the ability to type a path - which matters here, because the folder
+    /// someone wants for this is often one they can name faster than they can navigate to.
+    /// </para>
+    /// </summary>
+    private void BrowseForDataFolder(TextBox target, string title)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = title,
+            Multiselect = false,
+        };
+
+        if (!string.IsNullOrWhiteSpace(target.Text) && Directory.Exists(target.Text))
+        {
+            dialog.InitialDirectory = target.Text;
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            target.Text = dialog.FolderName;
+        }
+    }
 
     /// <summary>
     /// Spells out the chord and warns when it is no longer the original's. Worth saying out loud: changing
@@ -353,18 +438,69 @@ public partial class SettingsWindow : Window
             : $"{TriggerKey.Describe(key)} opens paste mode. Ctrl+V goes back to being an ordinary paste.";
     }
 
+    /// <summary>
+    /// Checks each half that asked for a custom folder, naming the half in the message so the user knows which
+    /// box to fix when both are set.
+    /// </summary>
+    private bool TryValidateCustomFolders(out string error)
+    {
+        error = string.Empty;
+
+        if (SelectedClipsLocation == DataLocation.CustomFolder)
+        {
+            var problem = CustomDataFolder.Validate(ClipsCustomPathBox.Text, out var resolved);
+
+            if (problem != CustomFolderProblem.Ok)
+            {
+                error = "Clips folder: " + CustomDataFolder.Describe(problem, ClipsCustomPathBox.Text);
+                return false;
+            }
+
+            // Written back in canonical form, so the pointer file records "D:\PasteJump" rather than
+            // "d:/pastejump/" and the comparisons above stop depending on how it was typed.
+            ClipsCustomPathBox.Text = resolved;
+        }
+
+        if (SelectedSettingsLocation == DataLocation.CustomFolder)
+        {
+            var problem = CustomDataFolder.Validate(SettingsCustomPathBox.Text, out var resolved);
+
+            if (problem != CustomFolderProblem.Ok)
+            {
+                error = "Settings folder: " + CustomDataFolder.Describe(problem, SettingsCustomPathBox.Text);
+                return false;
+            }
+
+            SettingsCustomPathBox.Text = resolved;
+        }
+
+        return true;
+    }
+
     private void RefreshLocationHints()
     {
-        ClipsLocationPathText.Text = Describe(SelectedClipsLocation, _baselineClipsLocation);
-        SettingsLocationPathText.Text = Describe(SelectedSettingsLocation, _baselineSettingsLocation);
+        // The path box only applies to the custom choice, so it appears with it and goes away again.
+        ClipsCustomRow.Visibility = SelectedClipsLocation == DataLocation.CustomFolder
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        SettingsCustomRow.Visibility = SelectedSettingsLocation == DataLocation.CustomFolder
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        ClipsLocationPathText.Text = Describe(SelectedClipsRoot, _baselineClipsRoot);
+        SettingsLocationPathText.Text = Describe(SelectedSettingsRoot, _baselineSettingsRoot);
 
         // Says so up front rather than only in the confirmation prompt, so the restart is not a surprise
-        // discovered after clicking OK.
-        static string Describe(DataLocation selected, DataLocation baseline)
+        // discovered after clicking OK. Compared by resolved root rather than by location, so swapping one
+        // custom folder for another is recognised as a move.
+        static string Describe(string selectedRoot, string baselineRoot)
         {
-            var path = Path.Combine(AppPaths.RootFor(selected), "data");
+            var path = Path.Combine(selectedRoot, "data");
 
-            return selected == baseline ? path : path + "   (restart required)";
+            return string.Equals(selectedRoot, baselineRoot, StringComparison.OrdinalIgnoreCase)
+                ? path
+                : path + "   (restart required)";
         }
     }
 
@@ -382,16 +518,30 @@ public partial class SettingsWindow : Window
             return false;
         }
 
+        // Both custom folders are checked before anything is saved, and a bad one stops the whole Apply. The
+        // failure being prevented is the worst this application has: accept a folder that cannot be written,
+        // restart onto it, and the database cannot be opened - so it looks as though every clip has gone.
+        if (!TryValidateCustomFolders(out var locationError))
+        {
+            ValidationText.Text = locationError;
+            ValidationText.Visibility = Visibility.Visible;
+            AppliedText.Visibility = Visibility.Collapsed;
+            return false;
+        }
+
         ValidationText.Visibility = Visibility.Collapsed;
 
         SettingsApplied?.Invoke(updated);
 
-        var clips = SelectedClipsLocation;
-        var settings = SelectedSettingsLocation;
+        var clips = new DataLocationChoice(SelectedClipsLocation, SelectedClipsPath);
+        var settings = new DataLocationChoice(SelectedSettingsLocation, SelectedSettingsPath);
 
         // Raised after SettingsApplied, so the settings are saved to their current location before
         // anything starts moving them. The handler may restart the process, which ends this method.
-        if (clips != _baselineClipsLocation || settings != _baselineSettingsLocation)
+        //
+        // Compared by resolved root, so one custom folder swapped for another counts as a move even though
+        // the choice did not change.
+        if (!clips.SameRootAs(_baselineClipsRoot) || !settings.SameRootAs(_baselineSettingsRoot))
         {
             DataLocationChangeRequested?.Invoke(clips, settings);
         }
@@ -399,8 +549,12 @@ public partial class SettingsWindow : Window
         // The baseline moves to what is now in force. Without this, a second Apply would re-raise the
         // location change and prompt to move data that has already been moved.
         _baseline = updated;
-        _baselineClipsLocation = clips;
-        _baselineSettingsLocation = settings;
+        _baselineClipsLocation = clips.Location;
+        _baselineSettingsLocation = settings.Location;
+        _baselineClipsPath = clips.Path;
+        _baselineSettingsPath = settings.Path;
+        _baselineClipsRoot = clips.Root;
+        _baselineSettingsRoot = settings.Root;
 
         RefreshLocationHints();
         RefreshAdvanced();
@@ -533,10 +687,10 @@ public partial class SettingsWindow : Window
     }
 
     private void OnOpenClipsFolder(object sender, MouseButtonEventArgs e)
-        => OpenDataFolder(SelectedClipsLocation);
+        => OpenDataFolder(SelectedClipsRoot);
 
     private void OnOpenSettingsFolder(object sender, MouseButtonEventArgs e)
-        => OpenDataFolder(SelectedSettingsLocation);
+        => OpenDataFolder(SelectedSettingsRoot);
 
     /// <summary>
     /// Opens a data folder in Explorer.
@@ -548,9 +702,9 @@ public partial class SettingsWindow : Window
     /// user where it is going to be rather than reporting an error about a folder they have just chosen.
     /// </para>
     /// </summary>
-    private void OpenDataFolder(DataLocation location)
+    private void OpenDataFolder(string root)
     {
-        var path = Path.Combine(AppPaths.RootFor(location), "data");
+        var path = Path.Combine(root, "data");
 
         var target = Directory.Exists(path)
             ? path

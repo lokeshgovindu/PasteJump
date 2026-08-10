@@ -109,10 +109,24 @@ public sealed class AppPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "PasteJump");
 
-    /// <summary>Root directory for a location, without reading or writing anything.</summary>
-    public static string RootFor(DataLocation location) => location switch
+    /// <summary>
+    /// Root directory for a location, without reading or writing anything.
+    /// <para>
+    /// <paramref name="customPath"/> is required for <see cref="DataLocation.CustomFolder"/> and ignored
+    /// otherwise. A custom location with nothing usable in it falls back to the application folder rather than
+    /// throwing: this is called during start-up before there is a window to report anything in, and the
+    /// recoverable outcome is running from the default, not failing to start.
+    /// </para>
+    /// </summary>
+    public static string RootFor(DataLocation location, string? customPath = null) => location switch
     {
         DataLocation.UserProfile => UserProfileDirectory,
+
+        // One canonicalisation for the whole application - see CustomDataFolder.TryCanonicalise for why the
+        // trailing separator matters. Two implementations of this would eventually disagree about whether
+        // D:\Clips and D:\Clips\ are the same folder, and that decides whether a database gets copied.
+        DataLocation.CustomFolder when CustomDataFolder.TryCanonicalise(customPath, out var full) => full,
+
         _ => ApplicationDirectory,
     };
 
@@ -125,8 +139,8 @@ public sealed class AppPaths
         var pointer = DataLocationPointer.Read(ApplicationDirectory);
 
         return new AppPaths(
-            RootFor(pointer.Clips),
-            RootFor(pointer.Settings),
+            RootFor(pointer.Clips, pointer.ClipsPath),
+            RootFor(pointer.Settings, pointer.SettingsPath),
             pointer.Clips,
             pointer.Settings);
     }

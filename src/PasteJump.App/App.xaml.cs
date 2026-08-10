@@ -769,8 +769,15 @@ public partial class App : Application
     {
         if (_settingsWindow is null)
         {
+            // The custom folders are passed as the roots already in force rather than re-read from the pointer:
+            // AppPaths has resolved them once, and reading the file again is a second answer that could differ.
             _settingsWindow = Themed(new SettingsWindow(
-                _settings, _formatters, _paths.ClipsLocation, _paths.SettingsLocation));
+                _settings,
+                _formatters,
+                _paths.ClipsLocation,
+                _paths.SettingsLocation,
+                _paths.ClipsLocation == DataLocation.CustomFolder ? _paths.ClipsRoot : null,
+                _paths.SettingsLocation == DataLocation.CustomFolder ? _paths.SettingsRoot : null));
             _settingsWindow.SettingsApplied += OnSettingsApplied;
             _settingsWindow.DataLocationChangeRequested += OnDataLocationChangeRequested;
             _settingsWindow.LegacyImportRequested += OnLegacyImportRequested;
@@ -1070,21 +1077,23 @@ public partial class App : Application
     /// startup path that is already exercised on every launch.
     /// </para>
     /// </summary>
-    private void OnDataLocationChangeRequested(DataLocation clips, DataLocation settings)
+    private void OnDataLocationChangeRequested(DataLocationChoice clips, DataLocationChoice settings)
     {
-        var clipsChanged = clips != _paths.ClipsLocation;
-        var settingsChanged = settings != _paths.SettingsLocation;
+        // By resolved root rather than by choice: moving from one custom folder to another leaves the choice
+        // unchanged and still has to copy the data.
+        var clipsChanged = !clips.SameRootAs(_paths.ClipsRoot);
+        var settingsChanged = !settings.SameRootAs(_paths.SettingsRoot);
 
         var moves = new List<string>();
 
         if (clipsChanged)
         {
-            moves.Add($"Clips  →  {Path.Combine(AppPaths.RootFor(clips), "data")}");
+            moves.Add($"Clips  →  {Path.Combine(clips.Root, "data")}");
         }
 
         if (settingsChanged)
         {
-            moves.Add($"Settings  →  {Path.Combine(AppPaths.RootFor(settings), "data")}");
+            moves.Add($"Settings  →  {Path.Combine(settings.Root, "data")}");
         }
 
         var accepted = MessageDialog.Show(
@@ -1105,8 +1114,10 @@ public partial class App : Application
 
         var pointer = new DataLocationPointer
         {
-            ClipsLocation = clips,
-            SettingsLocation = settings,
+            ClipsLocation = clips.Location,
+            SettingsLocation = settings.Location,
+            ClipsPath = clips.Path,
+            SettingsPath = settings.Path,
 
             // Recorded now, while we still know where each half currently is. After the restart the app
             // resolves the new roots and has no other way to find the old ones. Only the half that
