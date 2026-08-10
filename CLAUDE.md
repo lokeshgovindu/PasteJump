@@ -432,7 +432,24 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ## Constraints, already decided
 
-- **Publish is a single self-contained `PasteJump.exe`, ~65 MB, with nothing beside it.**
+- **The two packages deploy different shapes on purpose, and the installer's is the fast one.**
+  `tools/pack-release.ps1` publishes twice: single-file for the portable ZIP, and a **folder** build for
+  `setup.exe`. Single-file spends about a second per launch before our first line runs, and it buys nothing
+  once an installer is putting files in a directory for you. Measured warm, same store, D: drive:
+
+  | | pre-`Compose` | `Compose` | total |
+  |---|---|---|---|
+  | single-file | 1,100–1,145 ms | 138–140 ms | ~1,260 ms |
+  | folder | 171–176 ms | 112–114 ms | **~286 ms** |
+
+  4.4× faster warm, for ~135 MB installed against 65 MB. **The cold case reverses**, and honestly so: a
+  first launch after installing is ~6.6 s against single-file's ~4.5 s, because Defender scans 255 new
+  files instead of one. For a logon-resident app that starts once and runs all day, warm is the case that
+  matters — but do not quote the warm figure alone. Note also that `setup.exe` came out *smaller* (45 MB
+  against 60 MB): solid LZMA2 over raw files beats recompressing a bundle that is already compressed. The
+  folder publish turns the single-file properties **off** on the command line rather than the csproj
+  turning them on for it, so a plain `dotnet publish` still produces the portable exe the README describes.
+- **Publish is a single self-contained `PasteJump.exe`, ~65 MB, with nothing beside it — for the ZIP.**
   `PublishSingleFile` plus `IncludeNativeLibrariesForSelfExtract` (WPF's native libraries cannot load from
   inside the bundle) plus `EnableCompressionInSingleFile`.
 - **Compression wins outright — it is not a trade.** Instrumented time from process start to the tray icon,

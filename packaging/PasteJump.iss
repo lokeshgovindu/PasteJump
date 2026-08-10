@@ -96,10 +96,19 @@ Name: "startup"; Description: "Start {#AppName} when I sign in"; GroupDescriptio
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "{#StageDir}\PasteJump.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#StageDir}\PasteJump.chm"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#StageDir}\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#StageDir}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+; The whole staging folder, recursively, because what the installer deploys is a FOLDER publish rather
+; than the single-file executable the portable ZIP carries. That is the point of it: single-file spends
+; about a second on every launch extracting its bundle and decompressing assemblies before any of our code
+; runs - 1,100-1,145 ms measured, against 228 ms for a folder build - and it buys nothing here, since an
+; installer is putting files in a directory anyway. Someone who ran setup does not care that the
+; directory holds 200 files; they do notice a second of nothing after clicking the shortcut.
+;
+; It costs disk: about 143 MB installed against 65 MB. Deliberate.
+;
+; One Source line rather than a list, so a file the build starts or stops producing cannot be missed. The
+; staging folder is assembled by tools/pack-release.ps1 and holds the publish output plus the manual, the
+; README and the licence.
+Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\PasteJump.exe"

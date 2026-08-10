@@ -59,38 +59,88 @@ Write-Host "PasteJump $version" -ForegroundColor Cyan
 
 $stageName = "PasteJump-$version-win-x64"
 $stageDirectory = Join-Path $OutputDirectory "stage\$stageName"
+$installerStageDirectory = Join-Path $OutputDirectory 'stage-installer'
+
 $publishDirectory = Join-Path $repoRoot 'artifacts\publish'
+$folderPublishDirectory = Join-Path $repoRoot 'artifacts\publish-folder'
 
 # --------------------------------------------------------------- 2. publish
 
-if ($SkipPublish) {
-    Write-Host "[1/5] Publish skipped; reusing artifacts\publish"
-}
-else {
-    Write-Host "[1/5] Publishing Release, self-contained, single file..."
+# TWO publishes, deliberately, because the two packages want opposite things.
+#
+#   Single file, for the ZIP. Portability is the whole point of that download: one executable that can be
+#     dropped on a USB stick, with data\ appearing beside it.
+#
+#   A folder, for the installer. Single-file costs about a second on every launch before a line of our
+#     code runs - measured 1,100-1,145 ms pre-Compose against 228 ms for a folder build - and it buys
+#     nothing once an installer is putting files in a directory for you. Someone who ran a setup program
+#     does not care that the directory has 200 files in it; they do notice a second of nothing happening
+#     after they press the shortcut.
+#
+# The cost is disk: roughly 143 MB installed against 65 MB. That is the trade being made on purpose.
 
-    $project = Join-Path $repoRoot 'src\PasteJump.App\PasteJump.App.csproj'
-    $publishLog = & dotnet publish $project -c Release -o $publishDirectory --nologo -v q
+$project = Join-Path $repoRoot 'src\PasteJump.App\PasteJump.App.csproj'
+
+function Invoke-Publish([string] $label, [string] $destination, [string[]] $extra) {
+    Write-Host "  $label"
+
+    $log = & dotnet publish $project -c Release -o $destination --nologo -v q @extra
 
     if ($LASTEXITCODE -ne 0) {
-        $publishLog | ForEach-Object { Write-Host "  $_" }
-        throw "dotnet publish failed (exit $LASTEXITCODE)."
+        $log | ForEach-Object { Write-Host "    $_" }
+        throw "dotnet publish failed for $label (exit $LASTEXITCODE)."
     }
 }
 
-$exe = Join-Path $publishDirectory 'PasteJump.exe'
+if ($SkipPublish) {
+    Write-Host "[1/5] Publish skipped; reusing artifacts\publish and artifacts\publish-folder"
+}
+else {
+    Write-Host "[1/5] Publishing Release twice..."
 
-if (-not (Test-Path $exe)) {
-    throw "No PasteJump.exe in $publishDirectory."
+    Invoke-Publish 'single file, for the ZIP' $publishDirectory @()
+
+    # The csproj turns single-file on for everyone, so it is turned back off here rather than the other way
+    # round: the default publish - what someone gets from `dotnet publish` by hand - should stay the
+    # portable one described in the README. Compression and native-library extraction only mean anything
+    # inside a bundle, so both go with it.
+    if (Test-Path $folderPublishDirectory) {
+        # A stale folder publish is worse than none: files that a later build stopped producing would stay
+        # behind and be packaged, and a single wrong assembly version is a runtime failure with no clue.
+        Remove-Item $folderPublishDirectory -Recurse -Force
+    }
+
+    Invoke-Publish 'folder, for the installer' $folderPublishDirectory @(
+        '-p:PublishSingleFile=false',
+        '-p:EnableCompressionInSingleFile=false',
+        '-p:IncludeNativeLibrariesForSelfExtract=false'
+    )
 }
 
-# The published binary must be the version this script claims to be packaging. Cheap to check, and it
-# catches -SkipPublish being used against a stale publish, which would otherwise ship the wrong build
-# under the right name.
-$exeVersion = (Get-Item $exe).VersionInfo.FileVersion
+$exe = Join-Path $publishDirectory 'PasteJump.exe'
+$folderExe = Join-Path $folderPublishDirectory 'PasteJump.exe'
 
-if ($exeVersion -ne $version) {
-    throw "artifacts\publish\PasteJump.exe reports $exeVersion but Directory.Build.props says $version. Publish again without -SkipPublish."
+foreach ($candidate in @($exe, $folderExe)) {
+    if (-not (Test-Path $candidate)) {
+        throw "No PasteJump.exe at $candidate."
+    }
+
+    # Both published binaries must be the version this script claims to be packaging. Cheap to check, and
+    # it catches -SkipPublish being used against a stale publish, which would otherwise ship the wrong
+    # build under the right name - in one package and not the other, which is worse than in both.
+    $candidateVersion = (Get-Item $candidate).VersionInfo.FileVersion
+
+    if ($candidateVersion -ne $version) {
+        throw "$candidate reports $candidateVersion but Directory.Build.props says $version. Publish again without -SkipPublish."
+    }
+}
+
+# A folder publish that produced only the exe means the single-file properties did not actually come off,
+# and the installer would ship a single-file build while claiming to be the fast one.
+$folderFileCount = (Get-ChildItem $folderPublishDirectory -Recurse -File).Count
+
+if ($folderFileCount -lt 50) {
+    throw "The folder publish has only $folderFileCount files, so it is still a single-file build. Check the -p: overrides."
 }
 
 # --------------------------------------------------------------- 3. help
@@ -122,21 +172,47 @@ if (-not (Test-Path $chm)) {
 
 # --------------------------------------------------------------- 4. stage
 
-Write-Host "[3/5] Staging $stageName..."
+Write-Host "[3/5] Staging..."
 
+# The documents both packages carry. LICENSE is renamed on the way in: the repository file has no
+# extension, and both Explorer and Inno's licence page want one.
+$documents = @(
+    @{ From = $chm; To = 'PasteJump.chm' },
+    @{ From = Join-Path $repoRoot 'README.md'; To = 'README.md' },
+    @{ From = Join-Path $repoRoot 'LICENSE'; To = 'LICENSE.txt' }
+)
+
+# The ZIP: one executable and the documents.
 if (Test-Path $stageDirectory) {
     Remove-Item $stageDirectory -Recurse -Force
 }
 
 New-Item -ItemType Directory -Force -Path $stageDirectory | Out-Null
-
 Copy-Item $exe (Join-Path $stageDirectory 'PasteJump.exe')
-Copy-Item $chm (Join-Path $stageDirectory 'PasteJump.chm')
-Copy-Item (Join-Path $repoRoot 'README.md') (Join-Path $stageDirectory 'README.md')
 
-# Renamed on the way in: the repository file has no extension, and both Explorer and Inno's licence page
-# want one.
-Copy-Item (Join-Path $repoRoot 'LICENSE') (Join-Path $stageDirectory 'LICENSE.txt')
+foreach ($document in $documents) {
+    Copy-Item $document.From (Join-Path $stageDirectory $document.To)
+}
+
+# The installer: the whole folder publish, plus the same documents. Staged rather than pointing the
+# installer at artifacts\publish-folder directly, so both packages are assembled from a directory this
+# script controls and the .iss needs one Source line rather than a list that can fall behind the build.
+if (Test-Path $installerStageDirectory) {
+    Remove-Item $installerStageDirectory -Recurse -Force
+}
+
+New-Item -ItemType Directory -Force -Path $installerStageDirectory | Out-Null
+Copy-Item "$folderPublishDirectory\*" $installerStageDirectory -Recurse -Force
+
+foreach ($document in $documents) {
+    Copy-Item $document.From (Join-Path $installerStageDirectory $document.To)
+}
+
+$installerBytes = (Get-ChildItem $installerStageDirectory -Recurse -File | Measure-Object -Property Length -Sum).Sum
+
+Write-Host ("  ZIP payload:       1 exe + {0} documents" -f $documents.Count)
+Write-Host ("  installer payload: {0} files, {1:N0} MB on disk once installed" -f
+    (Get-ChildItem $installerStageDirectory -Recurse -File).Count, ($installerBytes / 1MB))
 
 # --------------------------------------------------------------- 5. zip
 
@@ -190,9 +266,11 @@ if (-not $iscc) {
 else {
     $script = Join-Path $repoRoot 'packaging\PasteJump.iss'
 
+    # The installer staging folder, not the ZIP's: this is what makes setup.exe deploy the fast folder
+    # build while the ZIP stays one file.
     $isccLog = & $iscc `
         "/DAppVersion=$version" `
-        "/DStageDir=$stageDirectory" `
+        "/DStageDir=$installerStageDirectory" `
         "/DOutputDir=$OutputDirectory" `
         "/DRepoRoot=$repoRoot" `
         $script

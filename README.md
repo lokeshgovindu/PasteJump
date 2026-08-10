@@ -81,6 +81,32 @@ both are **disabled in the UI** pending more work — greyed out under **Setting
 - **Hold Ctrl and tap this key** → any free letter would change what PasteJump *listens for*, so the two stop
   competing for <kbd>Ctrl</kbd>+<kbd>V</kbd> at all. The more promising of the two.
 
+### Two ways to get it
+
+```
+powershell -ExecutionPolicy Bypass -File tools/pack-release.ps1
+```
+
+That produces both packages in `artifacts/release`, each with a SHA256 and each carrying the exe, the CHM
+manual, this README and the licence:
+
+| | Contents | Start-up, warm | On disk |
+|---|---|---|---|
+| **`PasteJump-<ver>-win-x64.zip`** | one `PasteJump.exe` | ~1.26 s | 65 MB |
+| **`PasteJump-<ver>-setup.exe`** | a folder build, installed per-user | **~0.29 s** | 135 MB |
+
+The difference is not the app — it is the deployment shape. A single-file build spends about a second on
+every launch extracting its bundle and decompressing assemblies *before any of PasteJump's code runs*, which
+is a fine price for something you carry on a USB stick and a pointless one once an installer is putting files
+in a directory anyway. The installer therefore ships the folder build and starts 4.4× faster.
+
+One honest caveat: the *first* launch after installing is slower (~6.6 s against ~4.5 s), because Windows
+Defender scans 255 new files instead of one. Every launch after that is the fast one.
+
+The installer is **per-user**, into `%LOCALAPPDATA%\Programs\PasteJump`, and needs no elevation — which is
+also what keeps `data\` beside the executable writable. Uninstalling leaves your clips, history and settings
+exactly where they are.
+
 ### Build and test
 
 ```
