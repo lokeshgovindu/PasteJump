@@ -14,12 +14,31 @@ release to paste. No window, no mouse. That gesture is the product — protect i
 
 ## Current status
 
-**In user testing.** Version `2026.1.0.0` (set in `Directory.Build.props`).
+**In user testing.** Version `2026.1.0.N` — `2026.1.0` is `PasteJumpVersionBase` in
+`Directory.Build.props`, and **the revision is the commit count**, so it moves on its own with every
+commit and is never written down. `git rev-list --count HEAD` tells you what the next build will say.
 
-**Bump the revision — the last part — and nothing else.** `2026.1.0.0` has not been released, so the
-major and minor stay put; a minor bump to `2026.2.0.0` was made here and reverted for that reason. One
-line in `Directory.Build.props` drives the assembly version, the installer, the package file names and
-the About window, so there is nothing else to edit but the status line above.
+**Nothing here needs bumping by hand, and the revision must not be.** `ResolvePasteJumpRevision` in
+`Directory.Build.targets` runs git and overwrites `AssemblyVersion`, `FileVersion` and
+`InformationalVersion` — all four, because they were already expanded from the fallback at evaluation
+time, so setting `PasteJumpVersion` alone leaves the rest at `.0`. MSBuild cannot run a process during
+evaluation, which is the only reason this is a target and not a property. Three things that are easy to
+get wrong:
+
+- **`2026.1` stays put until there is a release.** A minor bump to `2026.2.0.0` was made once and
+  reverted for that reason. Only `PasteJumpVersionBase` is ever edited.
+- **Uncommitted work carries the last commit's revision.** That is the design — one commit, one version —
+  but it means a build made before committing and one made after are different versions of the same code.
+- **`-p:PasteJumpRevision=123` overrides it, and that took a second attempt to work.** A global property
+  is immutable *except* from inside a target, so the git count silently won. `PasteJumpRevisionWasSpecified`
+  is set in the props before the default is applied — anything already in `PasteJumpRevision` at that point
+  came from outside — and the target declines when it is set. A shallow clone counts only what it fetched,
+  so CI would need `fetch-depth: 0` or the version would go backwards.
+
+`tools/pack-release.ps1` asks MSBuild (`-t:PrintPasteJumpVersion`) instead of grepping the props file,
+because the number is no longer in there. Do not reimplement "base plus commit count" in the script — the
+symptom is a `.zip` whose name disagrees with the exe inside it. It still verifies the published exe's
+`FileVersion` against what it is packaging, which is what catches this going wrong.
 
 | | |
 |---|---|

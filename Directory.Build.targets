@@ -1,0 +1,73 @@
+<Project>
+
+  <!--
+    The version's revision is the commit count, resolved here rather than in Directory.Build.props
+    because MSBuild cannot run a process during evaluation - there is no property function that shells
+    out, by design. So the properties are declared in the .props with a fallback and overwritten here.
+
+    Setting a property inside a target replaces it for every target that runs afterwards, which is why
+    all four are re-stated: AssemblyVersion and the rest were already expanded from the fallback at
+    evaluation time, so changing PasteJumpVersion alone would leave them at .0.
+
+    BeforeTargets covers the two places the numbers are consumed. GetAssemblyVersion is the SDK's own
+    version resolution; CoreGenerateAssemblyInfo writes the generated AssemblyInfo.cs, which is the
+    single funnel for all of it - the Win32 FILEVERSION resource is produced by the compiler from those
+    same attributes, so there is no second place to hook.
+
+    This runs once per project, so a solution build shells out to git five times. That is a few tens of
+    milliseconds against a build measured in seconds, and it is preferred over caching the number in a
+    file: a cache here would be read on the build straight after a commit and be wrong exactly when the
+    version mattered.
+  -->
+  <Target Name="ResolvePasteJumpRevision"
+          Condition="'$(PasteJumpRevisionResolved)' != 'true' And '$(PasteJumpRevisionWasSpecified)' != 'true' And Exists('$(MSBuildThisFileDirectory).git')"
+          BeforeTargets="GetAssemblyVersion;GenerateAssemblyInfo;CoreGenerateAssemblyInfo">
+
+    <!--
+      IgnoreExitCode and the low importances keep a missing git quiet. The build must not fail and must
+      not warn because git is absent - the fallback in Directory.Build.props is the answer for that
+      case, and this project holds dotnet build to zero warnings.
+    -->
+    <Exec Command="git rev-list --count HEAD"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_PasteJumpGitCommitCount" />
+      <Output TaskParameter="ExitCode" PropertyName="_PasteJumpGitExitCode" />
+    </Exec>
+
+    <!--
+      Checked for digits rather than trusted. A failed git prints its complaint on stdout as often as
+      not, and an unparseable revision does not fail the build here - it fails much later, inside the
+      compiler, as an AssemblyVersion that is not four integers.
+    -->
+    <PropertyGroup Condition="'$(_PasteJumpGitExitCode)' == '0' And '$(_PasteJumpGitCommitCount)' != ''">
+      <_PasteJumpGitCommitCount>$(_PasteJumpGitCommitCount.Trim())</_PasteJumpGitCommitCount>
+      <PasteJumpRevision Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(_PasteJumpGitCommitCount)', '^[0-9]+$'))">$(_PasteJumpGitCommitCount)</PasteJumpRevision>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <PasteJumpRevisionResolved>true</PasteJumpRevisionResolved>
+      <PasteJumpVersion>$(PasteJumpVersionBase).$(PasteJumpRevision)</PasteJumpVersion>
+      <AssemblyVersion>$(PasteJumpVersion)</AssemblyVersion>
+      <FileVersion>$(PasteJumpVersion)</FileVersion>
+      <InformationalVersion>$(PasteJumpVersion)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+
+  <!--
+    How tools/pack-release.ps1 learns the version. It exists so the packaging script does not have to
+    reimplement the formula above: a second copy of "base plus commit count" in PowerShell would agree
+    right up until one of them changed, and the symptom would be a .zip whose name disagrees with the
+    exe inside it.
+
+    Message rather than -getProperty on the command line, because -getProperty reports the evaluated
+    value and this one is only correct after a target has run.
+  -->
+  <Target Name="PrintPasteJumpVersion" DependsOnTargets="ResolvePasteJumpRevision">
+    <Message Importance="high" Text="PasteJumpVersion=$(PasteJumpVersion)" />
+  </Target>
+
+</Project>

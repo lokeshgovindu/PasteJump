@@ -9,8 +9,9 @@
 
     Steps, in order, because each depends on the last:
 
-      1. Read the version from Directory.Build.props. Never passed in - a version typed on the command
-         line is a version that can disagree with the binary it names.
+      1. Ask MSBuild for the version. Never passed in - a version typed on the command line is a version
+         that can disagree with the binary it names. It is not read out of Directory.Build.props either,
+         because the revision is not stored there: it is the commit count, resolved by a target.
       2. Publish Release, self-contained, single-file, win-x64.
       3. Compile the help, so the .chm in the package matches this source tree.
       4. Stage exe + chm + README + LICENSE.txt.
@@ -39,7 +40,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$propsFile = Join-Path $repoRoot 'Directory.Build.props'
+$project = Join-Path $repoRoot 'src\PasteJump.App\PasteJump.App.csproj'
 
 if (-not $OutputDirectory) {
     $OutputDirectory = Join-Path $repoRoot 'artifacts\release'
@@ -47,14 +48,26 @@ if (-not $OutputDirectory) {
 
 # --------------------------------------------------------------- 1. version
 
-$props = Get-Content $propsFile -Raw
-$match = [regex]::Match($props, '<PasteJumpVersion>([^<]+)</PasteJumpVersion>')
+# Asked of MSBuild rather than read out of Directory.Build.props with a regex, because the version is no
+# longer written there: the revision is the commit count, resolved by a target. Reimplementing "base plus
+# git rev-list --count" here would work and then quietly stop agreeing the first time either side changed,
+# and the symptom is a .zip whose name disagrees with the exe inside it. Step 5 still verifies the two
+# match, which is what would catch this going wrong anyway.
 
-if (-not $match.Success) {
-    throw "Could not read <PasteJumpVersion> from $propsFile."
+$versionOutput = & dotnet msbuild $project -t:PrintPasteJumpVersion -nologo -v:m
+
+if ($LASTEXITCODE -ne 0) {
+    $versionOutput | ForEach-Object { Write-Host "  $_" }
+    throw "Could not resolve the version (dotnet msbuild -t:PrintPasteJumpVersion exited $LASTEXITCODE)."
 }
 
-$version = $match.Groups[1].Value.Trim()
+$match = [regex]::Match(($versionOutput -join "`n"), 'PasteJumpVersion=([0-9]+(?:\.[0-9]+){3})')
+
+if (-not $match.Success) {
+    throw "Could not read the version from the PrintPasteJumpVersion target's output."
+}
+
+$version = $match.Groups[1].Value
 Write-Host "PasteJump $version" -ForegroundColor Cyan
 
 $stageName = "PasteJump-$version-win-x64"
@@ -78,8 +91,6 @@ $folderPublishDirectory = Join-Path $repoRoot 'artifacts\publish-folder'
 #     after they press the shortcut.
 #
 # The cost is disk: roughly 143 MB installed against 65 MB. That is the trade being made on purpose.
-
-$project = Join-Path $repoRoot 'src\PasteJump.App\PasteJump.App.csproj'
 
 function Invoke-Publish([string] $label, [string] $destination, [string[]] $extra) {
     Write-Host "  $label"
@@ -127,11 +138,12 @@ foreach ($candidate in @($exe, $folderExe)) {
 
     # Both published binaries must be the version this script claims to be packaging. Cheap to check, and
     # it catches -SkipPublish being used against a stale publish, which would otherwise ship the wrong
-    # build under the right name - in one package and not the other, which is worse than in both.
+    # build under the right name - in one package and not the other, which is worse than in both. Now that
+    # the revision comes from the commit count it also catches a publish made before the last commit.
     $candidateVersion = (Get-Item $candidate).VersionInfo.FileVersion
 
     if ($candidateVersion -ne $version) {
-        throw "$candidate reports $candidateVersion but Directory.Build.props says $version. Publish again without -SkipPublish."
+        throw "$candidate reports $candidateVersion but this build resolves to $version. Publish again without -SkipPublish."
     }
 }
 
