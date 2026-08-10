@@ -133,6 +133,28 @@ holding a pop, its tags, and which application it was copied from.</li>
 <li>A banner when <code>X</code> has put you in Cancel, Delete or Delete All.</li>
 </ul>
 
+<h2>Other keys are held back while the overlay is open</h2>
+
+<p>Any key that has no meaning above is <b>swallowed</b> for as long as the overlay is up, rather than
+reaching the application underneath. That is deliberate: you are holding <code>Ctrl</code>, and almost
+every <code>Ctrl</code>+key is a command somewhere &mdash; <code>Ctrl</code>+<code>0</code> and
+<code>Ctrl</code>+<code>=</code> zoom an editor, <code>Ctrl</code>+<code>W</code> closes a tab,
+<code>Ctrl</code>+<code>S</code> saves. Without this, tapping around while choosing a clip would quietly
+zoom, save or close whatever was behind the overlay.</p>
+
+<p>Two things are always let through:</p>
+
+<ul>
+<li><b>The modifiers themselves.</b> The application is tracking them, and eating a release would leave it
+believing <code>Ctrl</code> is still held.</li>
+<li><b>Anything with <code>Alt</code> or the Windows key held</b>, so <code>Alt</code>+<code>Tab</code> and
+the shell's own shortcuts keep working. Switching away abandons the gesture, which also makes this the way
+out if the overlay ever seems stuck.</li>
+</ul>
+
+<p>Releasing <code>Ctrl</code> ends the session, so the keyboard is never held for longer than you hold the
+key yourself.</p>
+
 <p>Along the bottom is a muted reminder of the keys worth knowing when you have lost your place:
 <code>A</code> back to the newest, stepping, delete, cancel, and <code>F1</code> for the full list. Turn it
 off under <b>Settings, Appearance</b> once the gesture is in your fingers.</p>

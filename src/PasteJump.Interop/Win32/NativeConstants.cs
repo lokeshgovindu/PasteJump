@@ -115,6 +115,17 @@ internal static class NativeConstants
     public const int VK_RCONTROL = 0xA3;
     public const int VK_LSHIFT = 0xA0;
     public const int VK_RSHIFT = 0xA1;
+
+    // The remaining modifiers. Needed by VirtualKeyTranslator.IsModifier, which decides what is never
+    // swallowed - the left/right variants matter because a low-level hook reports those rather than the
+    // generic VK_MENU that GetKeyState answers for.
+    public const int VK_LMENU = 0xA4;
+    public const int VK_RMENU = 0xA5;
+    public const int VK_LWIN = 0x5B;
+    public const int VK_RWIN = 0x5C;
+    public const int VK_CAPITAL = 0x14;
+    public const int VK_NUMLOCK = 0x90;
+    public const int VK_SCROLL = 0x91;
     public const int VK_OEM_MINUS = 0xBD;
     public const int VK_SUBTRACT = 0x6D;
 

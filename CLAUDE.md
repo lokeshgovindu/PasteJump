@@ -24,7 +24,7 @@ the About window, so there is nothing else to edit but the status line above.
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 485 passing (`dotnet test`) |
+| Tests | 495 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -74,7 +74,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      485 tests.
+tests/PasteJump.Core.Tests      495 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -131,6 +131,17 @@ that immediately caught two real bugs. Expect to do the same again.
   hook, makes it strictly worse: returning 1 removes the event from the chain **and** from delivery to
   the target window, so nothing pastes anywhere. The only avenue is a chord the rival has not claimed,
   hence the `PasteKeystroke` setting and `Shift+Insert`. Two managers cannot share Ctrl+V.
+- **While a session is open, a key nothing claimed is still swallowed — and the exceptions are what keep
+  that safe.** The user is holding Ctrl, so almost every unclaimed chord is a command somewhere: `Ctrl+0`
+  and `Ctrl+=` zoom VS Code, `Ctrl+W` closes a tab, `Ctrl+S` saves. Passing them through meant browsing
+  clips quietly zoomed or closed whatever sat under the overlay, which is how it was reported. The gate is
+  `PasteGestureRecognizer.ShouldSwallowUnhandled` — in `Core` so it is testable — and it declines twice:
+  **modifiers are never swallowed** (`VirtualKeyTranslator.IsModifier`, including the L/R variants a
+  low-level hook actually reports, because the application tracks them and eating a release leaves it
+  believing Ctrl is still down), and **anything with Alt or Win held is never swallowed**, so `Alt+Tab` still
+  switches away. That second exception is the safety valve: without it, a session that failed to close would
+  present as a dead keyboard with no way out. Note this departs from Clipjump, which binds keys as AHK
+  hotkeys and therefore leaks every key it has no binding for.
 - **`Ctrl+Shift+V` must pass straight through — it is not ours.** Every terminal pastes with it (Visual
   Studio's, VS Code's, Windows Terminal's) and browsers and editors use it for paste-as-plain-text. The
   recognizer therefore declines to open a session when Shift is already held at the trigger, and the guard
@@ -556,7 +567,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 485 tests
+dotnet test                                         # 495 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

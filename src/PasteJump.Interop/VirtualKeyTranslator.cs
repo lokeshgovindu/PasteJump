@@ -35,6 +35,39 @@ public static class VirtualKeyTranslator
     public static GestureKey ToGestureKey(int virtualKey)
         => ToGestureKey(virtualKey, NativeConstants.VK_V);
 
+    /// <summary>
+    /// Whether this virtual key is a modifier rather than a key in its own right.
+    /// <para>
+    /// Modifiers are never swallowed, whatever else is going on. The foreground application tracks them, so
+    /// consuming a Ctrl or Alt transition leaves it believing a modifier is still held after the user let go -
+    /// which turns ordinary typing into a stream of commands. Caps Lock is in the list for the same reason:
+    /// eating it desynchronises a state the whole desktop shares.
+    /// </para>
+    /// </summary>
+    public static bool IsModifier(int virtualKey) => virtualKey switch
+    {
+        NativeConstants.VK_CONTROL or NativeConstants.VK_LCONTROL or NativeConstants.VK_RCONTROL => true,
+        NativeConstants.VK_SHIFT or NativeConstants.VK_LSHIFT or NativeConstants.VK_RSHIFT => true,
+        NativeConstants.VK_MENU or NativeConstants.VK_LMENU or NativeConstants.VK_RMENU => true,
+        NativeConstants.VK_LWIN or NativeConstants.VK_RWIN => true,
+        NativeConstants.VK_CAPITAL or NativeConstants.VK_NUMLOCK or NativeConstants.VK_SCROLL => true,
+        _ => false,
+    };
+
+    /// <summary>Whether Alt is down right now, from the live keyboard state.</summary>
+    public static bool IsAltDown() => IsDown(NativeConstants.VK_MENU);
+
+    /// <summary>Whether either Windows key is down right now.</summary>
+    public static bool IsWinDown()
+        => IsDown(NativeConstants.VK_LWIN) || IsDown(NativeConstants.VK_RWIN);
+
+    /// <summary>
+    /// Asks the OS for one key's state. <c>GetAsyncKeyState</c> rather than <c>GetKeyState</c>: this runs inside
+    /// the low-level hook, which is not processing a message queue of its own, and <c>GetKeyState</c> reports
+    /// the state as of the last message that thread handled.
+    /// </summary>
+    private static bool IsDown(int virtualKey) => (NativeMethods.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+
     private static GestureKey Map(int virtualKey) => virtualKey switch
     {
         NativeConstants.VK_CONTROL or NativeConstants.VK_LCONTROL or NativeConstants.VK_RCONTROL

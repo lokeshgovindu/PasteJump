@@ -93,6 +93,29 @@ public sealed class PasteGestureRecognizer
         return true;
     }
 
+    /// <summary>
+    /// Whether a keystroke that no paste-mode action claimed should nevertheless be swallowed, because a
+    /// session is open.
+    /// <para>
+    /// It must be. While the overlay is up the user is holding Ctrl, and almost every <c>Ctrl</c>+key in every
+    /// application is a command: <c>Ctrl+0</c> and <c>Ctrl+=</c> zoom VS Code, <c>Ctrl+W</c> closes a tab,
+    /// <c>Ctrl+S</c> saves. Letting those through meant tapping around during a gesture quietly reformatted,
+    /// zoomed or closed whatever was underneath - reported as the editor zooming while browsing clips.
+    /// </para>
+    /// <para>
+    /// <paramref name="altHeld"/> and <paramref name="winHeld"/> are the escape hatch, and they are not
+    /// decoration. Swallowing everything would mean <c>Alt+Tab</c> could not switch away while a session is
+    /// open, and - if a session ever failed to close - that the keyboard appeared dead with no way out.
+    /// Chords the shell owns are therefore always let through; losing focus aborts the session anyway.
+    /// </para>
+    /// <para>
+    /// The caller supplies the facts (is a session open is ours; is this a modifier, is Alt down are the
+    /// platform's) so that this decision itself stays here, where it can be tested.
+    /// </para>
+    /// </summary>
+    public bool ShouldSwallowUnhandled(bool altHeld, bool winHeld)
+        => _controller.IsActive && !altHeld && !winHeld;
+
     /// <summary>Cancels any in-flight session. For focus loss and shutdown.</summary>
     public void Reset()
     {

@@ -451,6 +451,20 @@ public partial class App : Application
             }
         }
 
+        // Nothing claimed it. While the overlay is open it still must not reach the application underneath:
+        // the user is holding Ctrl, and almost every Ctrl+key out there is a command - Ctrl+0 and Ctrl+= zoom
+        // VS Code, Ctrl+W closes a tab, Ctrl+S saves. Letting them through meant browsing clips quietly zoomed
+        // or closed whatever was behind the overlay.
+        //
+        // Modifiers are exempt because the application tracks them, and Alt or Win chords are exempt so the
+        // shell keeps working - Alt+Tab must still switch away, which is also the way out if a session ever
+        // failed to close.
+        if (!VirtualKeyTranslator.IsModifier(e.VirtualKey)
+            && _recognizer.ShouldSwallowUnhandled(VirtualKeyTranslator.IsAltDown(), VirtualKeyTranslator.IsWinDown()))
+        {
+            return true;
+        }
+
         return false;
     }
 
