@@ -41,6 +41,13 @@ can be switched off under <b>Settings, Appearance</b>.</p>
 </div>
 
 <div class="note">
+<p><b>Only one copy runs at a time, per signed-in user.</b> Starting PasteJump when it is already running
+opens the history window instead of starting a second copy &mdash; which is also the quickest way to find
+it when the notification-area icon is hidden in the overflow. Two copies would fight over the clipboard and
+install two keyboard hooks. Another user signed in to the same computer is unaffected: they get their own.</p>
+</div>
+
+<div class="note">
 <p><b>Pause and Disable are not the same thing.</b> Pause stops recording and is remembered between
 runs, because it is a preference. Disable also releases <code>Ctrl</code>+<code>V</code> and is
 deliberately <i>not</i> remembered &mdash; a clipboard manager that quietly started up dead weeks later

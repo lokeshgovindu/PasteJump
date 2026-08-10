@@ -179,6 +179,42 @@ internal static class NativeMethods
     [DllImport(User32, SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+    /// <summary>
+    /// Finds a window by title. <c>FindWindowEx</c> rather than <c>FindWindow</c> because the parent must be
+    /// specified: a message-only window's parent is <c>HWND_MESSAGE</c>, and a search rooted at the desktop
+    /// never sees one. <c>HWND_BROADCAST</c> cannot reach them either, which rules out broadcasting.
+    /// </summary>
+    [DllImport(User32, SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindowEx(
+        IntPtr hWndParent,
+        IntPtr hWndChildAfter,
+        string? lpszClass,
+        string? lpszWindow);
+
+    [DllImport(User32, SetLastError = true, CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>
+    /// Interns a message name into an id every process gets the same answer for, so two instances agree on
+    /// what the message means without hard-coding a <c>WM_APP</c> offset.
+    /// </summary>
+    [DllImport(User32, SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern uint RegisterWindowMessage(string lpString);
+
+    /// <summary>
+    /// Lets the named process take the foreground next time it asks.
+    /// <para>
+    /// Required, not cosmetic. Windows only grants <c>SetForegroundWindow</c> to a process that already has
+    /// it, so the instance being asked to show its window cannot raise it by itself - the caller, which does
+    /// have the foreground, has to hand that right over first. Without this the history window opens behind
+    /// whatever is in front, which looks exactly like nothing happening.
+    /// </para>
+    /// </summary>
+    [DllImport(User32, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AllowSetForegroundWindow(uint dwProcessId);
+
     [DllImport(User32, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);

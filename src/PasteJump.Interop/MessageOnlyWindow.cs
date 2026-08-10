@@ -17,7 +17,16 @@ public sealed class MessageOnlyWindow : IDisposable
     /// <summary>Raised for every message. Return a value to handle it, or null to defer to Windows.</summary>
     public event Func<uint, IntPtr, IntPtr, IntPtr?>? MessageReceived;
 
-    public MessageOnlyWindow(string classNameSuffix = "")
+    /// <param name="classNameSuffix">Distinguishes several windows within one process, for debugging.</param>
+    /// <param name="windowName">
+    /// A stable title, so another process can find this window with <c>FindWindowEx</c>.
+    /// <para>
+    /// It has to be the title rather than the class: the class name is deliberately unique per instance
+    /// because <c>RegisterClassEx</c> fails on a duplicate, which would break a second instance and
+    /// restart-in-place. Left null for windows nobody needs to find.
+    /// </para>
+    /// </param>
+    public MessageOnlyWindow(string classNameSuffix = "", string? windowName = null)
     {
         // Unique class name per instance: RegisterClassEx fails on a duplicate, which would
         // otherwise break a second instance or a restart-in-place.
@@ -46,7 +55,7 @@ public sealed class MessageOnlyWindow : IDisposable
         Handle = NativeMethods.CreateWindowEx(
             0,
             _className,
-            null,
+            windowName,
             0,
             0,
             0,

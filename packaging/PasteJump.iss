@@ -14,12 +14,12 @@
 ;     keeps the portable data model working and needs no elevation. It also matches the shape of the
 ;     app: a resident per-user utility that installs a keyboard hook for one logon session.
 ;
-;   AppMutex must match the app's own single-instance mutex. Without it, installing over a running
-;     copy fails on a locked PasteJump.exe with an error about a file in use; with it, Inno recognises
-;     the running instance and offers to close it. Note the consequence for unattended use: with
-;     /SILENT /SUPPRESSMSGBOXES that prompt defaults to Cancel, so setup exits 1 while PasteJump is
-;     running. That is correct - it is refusing to replace a file in use - but it means a deployment
-;     script has to stop the app first.
+;   AppMutex must match the app's own single-instance mutex, name and namespace both. Without it,
+;     installing over a running copy fails on a locked PasteJump.exe with an error about a file in use;
+;     with it, Inno recognises the running instance and offers to close it. Note the consequence for
+;     unattended use: with /SILENT /SUPPRESSMSGBOXES that prompt defaults to Cancel, so setup exits 1
+;     while PasteJump is running. That is correct - it is refusing to replace a file in use - but it
+;     means a deployment script has to stop the app first.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0.0"
@@ -63,7 +63,10 @@ DisableDirPage=no
 
 ; The running app locks its own exe and holds this mutex. Both are needed: CloseApplications finds the
 ; window, AppMutex finds an instance that has no window - which PasteJump never does.
-AppMutex=Global\PasteJump.SingleInstance.9F2C41A6
+; No Global\ prefix, which makes Inno check the session-local namespace - matching the app's own
+; Local\PasteJump.SingleInstance.9F2C41A6. The two must stay in step: a mismatch means setup stops detecting
+; the running copy and fails on a locked PasteJump.exe instead of offering to close it.
+AppMutex=PasteJump.SingleInstance.9F2C41A6
 CloseApplications=yes
 RestartApplications=no
 

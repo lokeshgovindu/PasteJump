@@ -131,6 +131,23 @@ that immediately caught two real bugs. Expect to do the same again.
   hook, makes it strictly worse: returning 1 removes the event from the chain **and** from delivery to
   the target window, so nothing pastes anywhere. The only avenue is a chord the rival has not claimed,
   hence the `PasteKeystroke` setting and `Shift+Insert`. Two managers cannot share Ctrl+V.
+- **The single-instance mutex is `Local\`, not `Global\`, and a second launch surfaces the first rather
+  than exiting silently.** `Global\` is shared across every Terminal Services session, so it made this one
+  instance per *machine*: a second user signing in — by fast user switching, or while the first session is
+  merely disconnected and still running — met a PasteJump that refused to start, permanently and without a
+  word. Nothing here is machine-wide (own clipboard, own hook, own data folder per session). Keep the name
+  in step with `AppMutex` in `packaging/PasteJump.iss`, where a **bare** name means session-local; a
+  mismatch stops setup detecting a running copy and it fails on a locked exe instead of offering to close
+  it. The surviving `UnauthorizedAccessException` catch now means "another copy in this session we cannot
+  open", which in practice is an elevated one.
+  The second instance signals the first through `SingleInstanceSignal`, and three details are load-bearing:
+  **`HWND_BROADCAST` cannot reach a message-only window**, so the target is found with `FindWindowEx` rooted
+  at `HWND_MESSAGE`; the search is **by window title**, because `MessageOnlyWindow` deliberately makes its
+  *class* name unique per instance (`RegisterClassEx` fails on a duplicate, which would break restart-in-place);
+  and **`AllowSetForegroundWindow` is required**, because Windows grants `SetForegroundWindow` only to a
+  process that already has the foreground — without it the history window opens *behind* everything, which
+  looks exactly like nothing happening. `PostMessage`, not `SendMessage`: the other instance's UI thread may
+  be mid-gesture.
 - **While a session is open, a key nothing claimed is still swallowed — and the exceptions are what keep
   that safe.** The user is holding Ctrl, so almost every unclaimed chord is a command somewhere: `Ctrl+0`
   and `Ctrl+=` zoom VS Code, `Ctrl+W` closes a tab, `Ctrl+S` saves. Passing them through meant browsing

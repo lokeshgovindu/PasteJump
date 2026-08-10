@@ -22,7 +22,22 @@ namespace PasteJump.App;
 /// </summary>
 public partial class App : Application
 {
-    private const string SingleInstanceMutexName = @"Global\PasteJump.SingleInstance.9F2C41A6";
+    /// <summary>
+    /// Name of the mutex that makes this a single-instance application.
+    /// <para>
+    /// <c>Local\</c>, which means once per logon session, not once per machine. It was <c>Global\</c>, and that
+    /// was wrong: a global mutex is shared across every Terminal Services session, so a second user signing in
+    /// - by fast user switching, or while the first session is merely disconnected and still running - found
+    /// PasteJump refusing to start with no explanation, permanently. Nothing about the app is machine-wide:
+    /// each session has its own clipboard, its own keyboard hook and its own data folder, so two users' copies
+    /// cannot conflict.
+    /// </para>
+    /// <para>
+    /// Keep this in step with <c>AppMutex</c> in <c>packaging/PasteJump.iss</c>, which is how setup detects a
+    /// running copy instead of failing on a locked executable. A bare name there is session-local, matching.
+    /// </para>
+    /// </summary>
+    private const string SingleInstanceMutexName = @"Local\PasteJump.SingleInstance.9F2C41A6";
 
     private Mutex? _singleInstanceMutex;
 
@@ -76,9 +91,24 @@ public partial class App : Application
 
         if (!TryAcquireSingleInstance())
         {
-            // A second copy would install a second keyboard hook and fight the first over the
-            // clipboard. Exit quietly rather than explaining; the user almost certainly just
-            // double-clicked twice.
+            // A second copy must not keep running: it would install a second keyboard hook and fight the
+            // first over the clipboard and the database. But it should not vanish without a word either -
+            // PasteJump has no window and its tray icon is often hidden in the notification-area overflow,
+            // so a launch that does nothing at all is indistinguishable from a crash.
+            //
+            // So ask the running instance to show its history window, and exit. Only if it cannot be reached
+            // do we say anything - which, now that the mutex is session-local, means the other copy is running
+            // elevated: UIPI blocks a post from a lower integrity level, so it can be found and not spoken to.
+            if (!SingleInstanceSignal.TryNotifyRunningInstance())
+            {
+                MessageDialog.Show(
+                    "PasteJump is already running, but this copy cannot reach it - which usually means the "
+                        + "other one was started as administrator.\n\nLook for the PasteJump icon in the "
+                        + "notification area, next to the clock.",
+                    headline: "PasteJump is already running",
+                    kind: DialogKind.Information);
+            }
+
             Shutdown();
             return;
         }
@@ -175,7 +205,11 @@ public partial class App : Application
         _selfWrites = new SelfWriteGuard();
         _formatters = new FormatterRegistry();
 
-        _messageWindow = new MessageOnlyWindow();
+        // Named, so a second instance can find it with FindWindowEx and ask us to surface ourselves. The name
+        // has to be the window title rather than the class, whose name is unique per instance by design.
+        _messageWindow = new MessageOnlyWindow(windowName: SingleInstanceSignal.WindowName);
+
+        _messageWindow.MessageReceived += OnMessageWindowMessage;
         _clipboardMonitor = new ClipboardMonitor(_messageWindow);
 
         _pasteHost = new PasteJumpPasteHost(
@@ -793,6 +827,27 @@ public partial class App : Application
     /// it; nothing here refuses that.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Watches the message-only window for another instance asking us to show ourselves.
+    /// <para>
+    /// Returns null for everything else, which leaves the message to Windows and to the other subscribers -
+    /// the clipboard listener and the tray icon are on this same window.
+    /// </para>
+    /// </summary>
+    private IntPtr? OnMessageWindowMessage(uint message, IntPtr wParam, IntPtr lParam)
+    {
+        if (!SingleInstanceSignal.IsShowRequest(message))
+        {
+            return null;
+        }
+
+        // Queued rather than shown inline. This runs inside the window procedure, and opening a window from
+        // there re-enters WPF's message pumping while Windows is still waiting for DefWindowProc.
+        Dispatcher.BeginInvoke(ShowHistory);
+
+        return IntPtr.Zero;
+    }
+
     private void ShowShortcutHelp()
     {
         if (_helpWindow is null)
@@ -1353,7 +1408,10 @@ public partial class App : Application
         }
         catch (UnauthorizedAccessException)
         {
-            // The mutex exists but belongs to a session we cannot touch. Treat as "already running".
+            // The mutex exists but we cannot open it. With a session-local name that no longer means another
+            // user - it means another copy in THIS session that we have no access to, which in practice is one
+            // running elevated. Still "already running", so still refuse; and the message the caller shows on
+            // the unreachable path is worded to cover it.
             return false;
         }
     }
