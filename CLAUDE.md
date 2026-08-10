@@ -24,7 +24,7 @@ the About window, so there is nothing else to edit but the status line above.
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 480 passing (`dotnet test`) |
+| Tests | 485 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -74,7 +74,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      480 tests.
+tests/PasteJump.Core.Tests      485 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -440,6 +440,24 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   ~1,690 ms. Reading 143 MB costs more than decompressing 65 MB, cold *and* warm. An earlier note here claimed
   the opposite from a harness that timed CPU going quiet; that harness also could not tell a fast start from a
   process exiting on the single-instance mutex, and its numbers should not be trusted over these.
+- **Measured again 2026-08-10 on a real store, and the data is not the cost.** A Debug build carries
+  `StartupTrace` (phase timings) and `DebugConsole` (a console plus `data\pastejump-debug.log`), both
+  `[Conditional("DEBUG")]` so Release contains neither the calls nor the literals — verified by searching
+  the built assembly for the mark strings: present in `debug_win-x64`, absent in `release_win-x64`. Against
+  743 clips and 7,082 history entries, a 17 MB database and 333 MB of blobs:
+
+  | | pre-`Compose` | `Compose` | total |
+  |---|---|---|---|
+  | folder Debug build | 228 ms | 174 ms | 401 ms |
+  | single-file Release, warm | 1,100–1,145 ms | 138–140 ms | ~1,240–1,282 ms |
+  | single-file Release, exe just replaced | 3,716 ms | 802 ms | 4,517 ms |
+
+  Inside `Compose`, opening the database is 42–78 ms warm and **prune + purge + evict + compact together are
+  under 6 ms**. So a big history is not what anyone is waiting for; ~89% of a warm start is over before our
+  first line runs. Note the third row: replacing the exe invalidates the extraction cache *and* gives
+  Defender a new 65 MB file to scan, so the launch straight after an update is several times worse — which
+  is what a person actually notices. Measuring in `%TEMP%` inflates everything (2–5.5 s pre-managed); use
+  the drive the app really lives on.
 - **Single-file costs about 850 ms per launch, all of it before `Compose` runs.** Pre-`Compose` is 1,030–1,064 ms
   warm for the published build against 171–185 ms for the folder build — bundle extraction, assembly
   decompression, then CLR and WPF init. `Compose` itself is 103–217 ms either way, so app-side start-up work is
@@ -521,12 +539,23 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 480 tests
+dotnet test                                         # 485 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
 dotnet run --project tests/PasteJump.UiSmoke -- --shot out   # ...and save PNGs of each
 ```
+
+**A Debug build talks.** `DebugConsole.Attach` gives it a console — attaching to the parent's when run from
+a terminal, allocating one otherwise — and everything logged also goes to `data\pastejump-debug.log`, which
+is rewritten per launch. The file exists because a console owned by a `WinExe` is awkward to capture: it
+disappears with the process, and redirecting a WinExe's stdout fights `AllocConsole` over the std handles.
+Lines logged before the data directory is known are buffered and flushed by `SetLogDirectory`, which is what
+keeps the earliest — most interesting — phases. `StartupTrace.Mark` records phase timings and
+`StartupTrace.Format` prints them, including the pre-managed span from `Process.StartTime` that no stopwatch
+started in `Main` can see. All of it is `[Conditional("DEBUG")]`, so **Release contains neither the calls nor
+their string literals** — the way to check that is to search the built assembly for a mark name, not to read
+the source.
 
 The user manual is a compiled HTML Help file, built separately from `docs/help`:
 

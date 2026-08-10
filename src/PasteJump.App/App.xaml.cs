@@ -3,6 +3,7 @@ using PasteJump.App.Services;
 using PasteJump.App.Views;
 using PasteJump.Core;
 using PasteJump.Core.Capture;
+using PasteJump.Core.Diagnostics;
 using PasteJump.Core.Formatting;
 using PasteJump.Core.Imaging;
 using PasteJump.Core.Model;
@@ -63,6 +64,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Debug only, and compiled out of Release entirely - see DebugConsole. First thing in start-up, so the
+        // console exists before anything has something to say.
+        DebugConsole.Attach("PasteJump - debug log");
+        DebugConsole.Log($"PasteJump {AppVersion.Current} debug build starting");
+
+        StartupTrace.Mark("WPF startup to OnStartup");
+
         // No main window, so WPF must not decide to exit when a transient window closes.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
@@ -78,6 +86,10 @@ public partial class App : Application
         try
         {
             Compose();
+
+            // Reported after Compose rather than at idle, because the question this answers is "why was there
+            // a delay before the tray icon appeared", and Compose finishing is when it appears.
+            DebugConsole.LogBlock("Start-up timings:", StartupTrace.Format());
         }
         catch (Exception ex)
         {
@@ -109,33 +121,54 @@ public partial class App : Application
 
         WarnIfDataDirectoryIsReadOnly();
 
+        // As soon as there is somewhere to put it. Everything logged before now was buffered, so nothing from
+        // the earliest phases is lost - which matters, because those are the interesting ones.
+        DebugConsole.SetLogDirectory(_paths.ClipsDirectory);
+
+        StartupTrace.Mark("paths and migrations");
+
         _settingsStore = new SettingsStore(_paths);
         _settings = _settingsStore.Load();
+
+        StartupTrace.Mark("settings load");
 
         // Before any window is constructed, so the first one painted is already the right colour
         // rather than flashing light and then re-rendering.
         _theme = new ThemeManager(this);
         _theme.Apply(_settings.Theme);
 
+        StartupTrace.Mark("theme");
+
         _store = new ClipStore(_paths);
 
         // Before the first capture, and before retention runs - it is what new previews are truncated to.
         _store.PreviewMaxChars = _settings.PreviewMaxChars;
 
+        StartupTrace.Mark("open database");
+        DebugConsole.Log($"  store: {_store.Count} clips, {_store.HistoryCount} history entries");
+
         // Retention runs at startup rather than on a timer: this is a logon-resident app, so
         // startup happens at least daily, and a timer would be a wakeup for no user benefit.
-        _store.PruneHistoryOlderThan(_settings.HistoryRetentionDays);
+        var pruned = _store.PruneHistoryOlderThan(_settings.HistoryRetentionDays);
+
+        StartupTrace.Mark($"prune history older than {_settings.HistoryRetentionDays} days (removed {pruned})");
 
         // Before eviction, so junk clips do not occupy slots that push real ones out. A no-op on a store
         // captured after BookkeepingFormats started filtering them; on an older one it clears the 8-byte OLE
         // markers that were being promoted to the front of the stack on every screenshot.
-        _store.PurgeContentlessClips();
+        var purged = _store.PurgeContentlessClips();
 
-        _store.EvictBeyond(_settings.EffectiveMaxClips);
+        StartupTrace.Mark($"purge contentless clips (removed {purged})");
+
+        var evicted = _store.EvictBeyond(_settings.EffectiveMaxClips);
+
+        StartupTrace.Mark($"evict beyond {_settings.EffectiveMaxClips} clips (removed {evicted})");
 
         // After eviction, so blobs that are about to be discarded are not compressed first. Bounded
         // internally, and a no-op once the store has been converted.
-        _store.CompactBlobs();
+        var compacted = _store.CompactBlobs();
+
+        StartupTrace.Mark($"compact blobs (converted {compacted})");
 
         var foreground = new ForegroundWindowInfo();
         _clipboard = new Win32ClipboardAccess(foreground);
@@ -202,6 +235,8 @@ public partial class App : Application
         _clipboardMonitor.ClipboardChanged += _capture.OnClipboardChanged;
         _clipboardMonitor.Start();
 
+        StartupTrace.Mark("services, capture and clipboard monitor");
+
         _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
 
         _keyboardHook = new LowLevelKeyboardHook(OnKeyEvent);
@@ -211,6 +246,8 @@ public partial class App : Application
         _historyHotkey.Pressed += ShowHistory;
         ApplyHistoryHotkey(announceFailure: true);
 
+        StartupTrace.Mark("keyboard hook and hotkey");
+
         _trayIcon = new TrayIcon(BuildTrayTooltip(), _messageWindow);
         _trayIcon.Activated += ShowHistory;
         _trayIcon.ContextMenuRequested += ShowTrayMenu;
@@ -219,6 +256,8 @@ public partial class App : Application
         // fixed 16x16 TrayIcon extracts from the executable as its fallback.
         ApplyTrayIcon();
         _trayIcon.Show();
+
+        StartupTrace.Mark("tray icon visible");
 
         // Both deferred to idle rather than run inline. A modal dialog here would own the UI thread with its
         // own Win32 message loop, which does not drain the Dispatcher - so every side effect PasteJumpPasteHost
