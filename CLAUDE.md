@@ -266,6 +266,21 @@ that immediately caught two real bugs. Expect to do the same again.
 - **`RunAtLogon` is the one control whose displayed value is not just the setting.** `Load` ORs it with
   `StartupShortcut.Exists`, because the user may have deleted the shortcut by hand. `ShowValues` deliberately
   does *not*, or a reset would leave the box ticked because the shortcut is still there.
+- **A tray-only app has no warm window stack, and the first click pays for it.** The tray menu was reported
+  as slow, and it was: **1,435–1,661 ms on the first right-click of every fresh process**, against 74–99 ms
+  after. The breakdown said it was nothing to do with the menu — a single `Window.Show()` was **1,134–1,383 ms**
+  of it, because almost every WPF application shows a window while starting and this one never does, so the
+  framework's window and composition stack stayed cold until the user clicked. Constructing the window cost
+  0.1 ms; it is `Show` that does the work.
+  Two fixes, and the order matters: `WpfWarmUp.Run()` at `ApplicationIdle` after `Compose` shows and hides
+  **the very owner window the menu will reuse** (warming a *different* window still left 365 ms — a fresh HWND
+  is not free), then briefly opens a plain `Popup` to warm the popup and `MenuItem` templates. `TrayMenuBuilder`
+  keeps that owner and hides rather than closes it between shows. Result: **80–96 ms first click, 27–38 ms
+  after** — 15–18× better. Two things not to change: the warm-up **never activates** anything, because it runs
+  moments after launch when the user may be typing, and it warms with a `Popup` rather than a `ContextMenu`
+  because a ContextMenu captures the keyboard and could swallow a keystroke. Getting below ~30 ms would mean
+  replacing the WPF menu with `TrackPopupMenu`, which trades away theming — a Win32 menu cannot follow the
+  palette, which is why `MessageBox` was already abandoned.
 - **`Console.Beep` is synchronous.** It returns only when the tone has finished, so the copy beep goes
   through `CopyBeep.Play`, which hops to the thread pool. Called inline it would freeze the UI for 150 ms
   per copy, and the capture path is reachable from the hook, where that is halfway to `LowLevelHooksTimeout`.

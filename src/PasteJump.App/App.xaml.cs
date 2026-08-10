@@ -305,6 +305,12 @@ public partial class App : Application
             {
                 MaybeOfferLegacyImport();
                 HintAboutRivalManagers();
+
+                // Last, and at idle, so it delays nothing the user can see. A tray-only application shows no
+                // window at startup, which leaves WPF's window stack cold until the first click - and that
+                // first Window.Show() measured 1.1-1.4 SECONDS, most of the delay behind "the tray menu feels
+                // slow". Paying it here costs nobody anything: the tray icon is already up.
+                WpfWarmUp.Run();
             }));
     }
 
@@ -693,6 +699,10 @@ public partial class App : Application
 
     private void ShowTrayMenu(int x, int y)
     {
+        // Timed in Debug because "the menu feels slow" is not something to guess at, and the two halves have
+        // very different costs - see the numbers in CLAUDE.md.
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
         var menu = TrayMenuBuilder.Build(
             onAbout: ShowAbout,
             onHistory: ShowHistory,
@@ -705,7 +715,13 @@ public partial class App : Application
             isPaused: !_settings.MonitorClipboard,
             isDisabled: !_keyboardHook.IsInstalled);
 
+        var built = started.Elapsed.TotalMilliseconds;
+
         TrayMenuBuilder.ShowAt(menu, x, y);
+
+        DebugConsole.Log(
+            $"tray menu: build {built:0.0} ms, show {started.Elapsed.TotalMilliseconds - built:0.0} ms, "
+                + $"total {started.Elapsed.TotalMilliseconds:0.0} ms");
     }
 
     /// <summary>

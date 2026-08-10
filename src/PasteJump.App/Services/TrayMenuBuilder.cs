@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using PasteJump.Interop;
 
 namespace PasteJump.App.Services;
 
@@ -71,11 +72,34 @@ internal static class TrayMenuBuilder
         return menu;
     }
 
-    public static void ShowAt(ContextMenu menu, int physicalX, int physicalY)
-    {
-        var scale = WindowInterop.GetScaleForPoint(physicalX, physicalY);
+    /// <summary>
+    /// The invisible window the menu is anchored to, created once and reused.
+    /// <para>
+    /// Reused rather than created per click because creating it is free (0.1 ms) and <c>Show</c> is not: a
+    /// fresh transparent window cost 36-73 ms to show even once WPF was warm. Hidden between uses rather than
+    /// closed, so the second and later clicks re-show a window that already has its HWND.
+    /// </para>
+    /// </summary>
+    private static Window? _owner;
 
-        var owner = new Window
+    /// <summary>
+    /// Creates and shows the shared owner once, off-screen and unactivated, so the first real right-click
+    /// reuses it instead of paying for it.
+    /// <para>
+    /// This is the single most valuable part of the warm-up. Showing this window cost 365 ms on the first
+    /// click even after WPF's general window stack had been warmed by another window - a new HWND is not free -
+    /// and reusing it afterwards costs 0.1 ms. Never activated here: at idle after launch the user may be
+    /// typing, and taking the foreground to warm a cache would be a worse bug than the slowness.
+    /// </para>
+    /// </summary>
+    public static void PrewarmOwner()
+    {
+        if (_owner is not null)
+        {
+            return;
+        }
+
+        _owner = new Window
         {
             Width = 1,
             Height = 1,
@@ -84,12 +108,45 @@ internal static class TrayMenuBuilder
             AllowsTransparency = true,
             Background = null,
             Opacity = 0,
-            Left = physicalX / scale,
-            Top = physicalY / scale,
+            Left = -32000,
+            Top = -32000,
         };
 
+        _owner.Show();
+        _owner.Hide();
+    }
+
+    public static void ShowAt(ContextMenu menu, int physicalX, int physicalY)
+    {
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        var scale = WindowInterop.GetScaleForPoint(physicalX, physicalY);
+
+        // Captured before the null-coalescing assignment below, or the log claims every owner was created.
+        var reused = _owner is not null;
+
+        var owner = _owner ??= new Window
+        {
+            Width = 1,
+            Height = 1,
+            WindowStyle = WindowStyle.None,
+            ShowInTaskbar = false,
+            AllowsTransparency = true,
+            Background = null,
+            Opacity = 0,
+        };
+
+        var constructed = timer.Elapsed.TotalMilliseconds;
+
+        owner.Left = physicalX / scale;
+        owner.Top = physicalY / scale;
+
         owner.Show();
+
+        // Activated on purpose, unlike every other window here: this one exists to hold keyboard focus so the
+        // menu dismisses when the user clicks elsewhere. Without it the menu opens and refuses to close.
         owner.Activate();
+
+        var shown = timer.Elapsed.TotalMilliseconds;
 
         menu.PlacementTarget = owner;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.AbsolutePoint;
@@ -97,14 +154,32 @@ internal static class TrayMenuBuilder
         menu.VerticalOffset = physicalY / scale;
         menu.StaysOpen = false;
 
-        menu.Closed += (_, _) =>
-        {
-            // Deferred: closing the owner synchronously from the Closed handler tears down the
-            // visual tree the menu is still finishing with.
-            owner.Dispatcher.BeginInvoke(owner.Close);
-        };
+        menu.Closed += OnMenuClosed;
 
         menu.IsOpen = true;
+
+        DebugConsole.Log(
+            $"  ShowAt: owner {(reused ? "reused" : "created")}, "
+                + $"Show+Activate {shown - constructed:0.0} ms, IsOpen {timer.Elapsed.TotalMilliseconds - shown:0.0} ms");
+    }
+
+    /// <summary>
+    /// Hides the shared owner once the menu has closed.
+    /// <para>
+    /// Hide, not Close, because the window is reused - closing it would throw away the HWND this exists to
+    /// keep. Deferred for the original reason: doing it synchronously from <c>Closed</c> tears down the visual
+    /// tree the menu is still finishing with. Unsubscribed here because <c>ShowAt</c> subscribes per show, and
+    /// a menu shown repeatedly would otherwise accumulate handlers.
+    /// </para>
+    /// </summary>
+    private static void OnMenuClosed(object? sender, RoutedEventArgs e)
+    {
+        if (sender is ContextMenu menu)
+        {
+            menu.Closed -= OnMenuClosed;
+        }
+
+        _owner?.Dispatcher.BeginInvoke(() => _owner?.Hide());
     }
 
     private static MenuItem MenuItemFor(string header, Action action, bool emphasised = false)
