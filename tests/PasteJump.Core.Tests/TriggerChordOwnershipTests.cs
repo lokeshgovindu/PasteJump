@@ -161,4 +161,105 @@ public sealed class TriggerChordOwnershipTests
         Assert.True(controller.IsActive);
         Assert.False(recognizer.ShouldSwallowUnhandled());
     }
+
+    /// <summary>
+    /// The reported follow-up, and the case gating entry alone missed entirely: with a session already open,
+    /// the trigger fell through to the step action, so <c>Ctrl+Win+V</c> walked the stack and releasing Ctrl
+    /// pasted. The first chord was refused and every one after it honoured.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void An_extra_modifier_is_refused_inside_an_open_session(bool alt, bool win)
+    {
+        var (recognizer, controller) = Build2();
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        var startedOn = controller.CursorIndex;
+
+        recognizer.AltHeld = alt;
+        recognizer.WinHeld = win;
+
+        Assert.False(recognizer.Handle(GestureKey.Paste, isDown: true), "the trigger must not be swallowed");
+        Assert.Equal(startedOn, controller.CursorIndex);
+    }
+
+    /// <summary>And no other paste-mode key acts either, since the gate covers all of them rather than one.</summary>
+    [Fact]
+    public void No_paste_mode_key_acts_while_Win_is_held()
+    {
+        var (recognizer, controller) = Build2();
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+        recognizer.WinHeld = true;
+
+        foreach (var key in new[] { GestureKey.Back, GestureKey.JumpToNewest, GestureKey.CycleCommitMode })
+        {
+            Assert.False(recognizer.Handle(key, isDown: true), $"{key} must not be swallowed");
+        }
+
+        Assert.Equal(PasteCommitMode.Paste, controller.CommitMode);
+    }
+
+    /// <summary>
+    /// Releasing the extra modifier hands the keys back. Worth pinning down because the state is queried
+    /// rather than tracked - the whole point being that it cannot get stuck.
+    /// </summary>
+    [Fact]
+    public void Releasing_the_modifier_hands_the_keys_back_mid_session()
+    {
+        var (recognizer, controller) = Build2();
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        recognizer.WinHeld = true;
+        Assert.False(recognizer.Handle(GestureKey.Paste, isDown: true));
+
+        recognizer.WinHeld = false;
+
+        Assert.True(recognizer.Handle(GestureKey.Paste, isDown: true));
+        Assert.Equal(1, controller.CursorIndex);
+    }
+
+    /// <summary>
+    /// The risk the gate introduces, and the reason the Ctrl release is deliberately outside it: letting go of
+    /// Ctrl while Alt happens to be held must still commit. If it did not, the session would stay open with no
+    /// way to close it - a live keyboard hook swallowing keys for ever.
+    /// </summary>
+    [Fact]
+    public void Releasing_Ctrl_still_commits_even_with_Alt_held()
+    {
+        var (recognizer, controller) = Build2();
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        Assert.True(controller.IsActive);
+
+        recognizer.AltHeld = true;
+        recognizer.Handle(GestureKey.Control, isDown: false);
+
+        Assert.False(controller.IsActive);
+        Assert.False(recognizer.ShouldSwallowUnhandled());
+    }
+
+    /// <summary>Two clips, so stepping has somewhere to go and a refused step is visible as a cursor that did not move.</summary>
+    private static (PasteGestureRecognizer Recognizer, PasteModeController Controller) Build2()
+    {
+        var catalog = new FakeClipCatalog();
+        catalog.Add("older clip");
+        catalog.Add("newer clip");
+
+        var controller = new PasteModeController(
+            catalog,
+            new RecordingPasteModeHost(),
+            new FormatterRegistry(),
+            new PasteModeOptions { PreserveClipPosition = false });
+
+        return (new PasteGestureRecognizer(controller), controller);
+    }
 }

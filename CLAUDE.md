@@ -24,7 +24,7 @@ the About window, so there is nothing else to edit but the status line above.
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 506 passing (`dotnet test`) |
+| Tests | 511 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -74,7 +74,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      506 tests.
+tests/PasteJump.Core.Tests      511 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -187,6 +187,14 @@ that immediately caught two real bugs. Expect to do the same again.
   rather than by tracking transitions** — a missed key-up (focus changing while a modifier is down) would
   otherwise leave a flag stuck, and a stuck Alt refuses to open the gesture at all until Alt is pressed and
   released again.
+  **Gating entry alone was not enough, and that was the first attempt.** With a session already open the
+  trigger falls through to the step action, so `Ctrl+Win+V` still walked the stack and releasing Ctrl still
+  pasted — the first chord refused, every one after it honoured, which is exactly how it was reported the
+  second time. The gate is now the first thing `HandleKeyDown` does, so no paste-mode key can miss it and a
+  newly added one inherits it. Two things are deliberately **outside** it, both in `Handle`: the modifiers
+  themselves, and **the Ctrl release that commits** — that must fire whatever else is held, or letting go of
+  Ctrl while Alt happens to be down would leave a session open with a live hook swallowing keys and no way to
+  close it. There is a test for exactly that.
 - **The trigger key is configurable, so nothing may hard-code `V` or "Ctrl+V".** `TriggerKey` in `Core`
   owns the rules; `VirtualKeyTranslator.ToGestureKey` takes the trigger VK and checks it *first*, and `V` is
   deliberately absent from the binding table so it falls through to search input when it is not the
@@ -628,7 +636,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 506 tests
+dotnet test                                         # 511 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

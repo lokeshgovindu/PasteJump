@@ -169,6 +169,23 @@ public sealed class PasteGestureRecognizer
 
     private bool HandleKeyDown(GestureKey key)
     {
+        // Alt and Win disqualify a keystroke from meaning anything to paste mode - ALWAYS, not only when
+        // opening a session. Gating entry alone was not enough and was reported as such: once a session was
+        // open the trigger fell through to the action path below, so Ctrl+Win+V stepped through clips and
+        // releasing Ctrl pasted. The first chord was refused and every one after it was honoured.
+        //
+        // Placed here rather than repeated per branch so a new paste-mode key cannot miss it. Note what is
+        // deliberately NOT gated, both above this method in Handle: the modifiers themselves, and the Ctrl
+        // release that commits. That release must always commit, or holding Alt while letting go of Ctrl would
+        // leave a session open with no way to close it - the dead-keyboard failure.
+        //
+        // Shift is not here because it is entry-specific: Ctrl+Shift+V belongs to terminals, but Shift pressed
+        // after the overlay is up is how paste popping works, so it has to keep its meaning in-session.
+        if (AltHeld || WinHeld)
+        {
+            return false;
+        }
+
         var searching = _controller.State == PasteSessionState.Searching;
 
         // ---- entry
@@ -183,8 +200,8 @@ public sealed class PasteGestureRecognizer
             // Paste popping still exists: press Shift AFTER the gesture is open, which is what the key list
             // has always described. This only declines to claim the chord as an entry point.
             //
-            // Alt and Win are refused for the same reason, and refusing them is the whole point of this being
-            // an exact test rather than "Ctrl is somewhere in the mix":
+            // Alt and Win are refused too, by the gate at the top of this method rather than here, because they
+            // are refused in every state and not only at entry:
             //
             //   Ctrl+Alt+V - on a great many keyboard layouts AltGr IS Ctrl+Alt, so this chord is how people
             //     type a character. Claiming it would swallow the keystroke and paste a clip instead of typing
@@ -192,11 +209,7 @@ public sealed class PasteGestureRecognizer
             //     about second-hand. Some editors also bind it.
             //   Ctrl+Win+V - Win belongs to the shell. Win+V is Windows' own clipboard history, and chords
             //     built on it are not ours to take.
-            //
-            // Note this now agrees with ShouldSwallowUnhandled, which has always let Alt and Win chords through
-            // once a session is open. Entry was the half that did not check, so the gesture could be started by
-            // a chord it would then decline to act on.
-            if (_controller.ShiftHeld || AltHeld || WinHeld)
+            if (_controller.ShiftHeld)
             {
                 return false;
             }
