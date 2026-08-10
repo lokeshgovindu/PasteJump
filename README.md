@@ -163,9 +163,11 @@ While Ctrl is down:
 | <kbd>Shift</kbd> pressed *after* the overlay opens | Paste, then delete the clip ("paste popping") |
 | <kbd>Esc</kbd> | Cancel and restore the previous clipboard |
 
-<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is **not** PasteJump's — it passes straight through to the
-application, because every terminal pastes with it and browsers use it for paste-as-plain-text. Paste popping
-is reached by adding <kbd>Shift</kbd> once the overlay is already up.
+**Only <kbd>Ctrl</kbd>+<kbd>V</kbd> starts the gesture.** Any extra modifier passes straight through, because
+each one belongs to somebody else: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is how terminals paste and how
+browsers paste as plain text, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> is <kbd>AltGr</kbd>+<kbd>V</kbd> on
+many layouts, and Win chords belong to the shell. Paste popping is reached by adding <kbd>Shift</kbd> once the
+overlay is already up.
 
 In search mode you can let go of Ctrl and just type; it filters on clip content **and** tags.
 <kbd>Enter</kbd> pastes the match, <kbd>Esc</kbd> cancels.

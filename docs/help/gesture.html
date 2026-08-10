@@ -45,10 +45,17 @@ Sentence case, Unindent.</td></tr>
 </table>
 
 <div class="warn">
-<p><b><code>Ctrl</code>+<code>Shift</code>+<code>V</code> is not PasteJump's.</b> It passes straight
-through to the application, because every terminal pastes with it and browsers and editors use it for
-paste-as-plain-text. That is why paste popping is reached by adding <code>Shift</code> once the overlay
-is up, rather than by starting the gesture with it.</p>
+<p><b>Only <code>Ctrl</code>+<code>V</code> starts the gesture &mdash; nothing else.</b> Any additional
+modifier is left entirely alone, because each one belongs to somebody:</p>
+<ul>
+<li><code>Ctrl</code>+<code>Shift</code>+<code>V</code> is how every terminal pastes, and how browsers and
+editors paste as plain text. That is why paste popping is reached by adding <code>Shift</code> once the
+overlay is already up, rather than by starting the gesture with it.</li>
+<li><code>Ctrl</code>+<code>Alt</code>+<code>V</code> is <code>AltGr</code>+<code>V</code> on many keyboard
+layouts, which is how people type a character.</li>
+<li><code>Ctrl</code>+<code>Win</code>+<code>V</code> belongs to the shell, which uses
+<code>Win</code>+<code>V</code> for Windows' own clipboard history.</li>
+</ul>
 </div>
 
 <h2>Organising</h2>

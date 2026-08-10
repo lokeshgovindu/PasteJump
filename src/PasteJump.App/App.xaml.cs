@@ -471,6 +471,12 @@ public partial class App : Application
             return false;
         }
 
+        // Read live rather than tracked from transitions, because a missed key-up leaves a tracked flag stuck -
+        // and a stuck Alt would refuse to open the gesture at all. Three cheap user-mode reads per keystroke;
+        // the hook's budget is LowLevelHooksTimeout, which this is nowhere near.
+        _recognizer.AltHeld = VirtualKeyTranslator.IsAltDown();
+        _recognizer.WinHeld = VirtualKeyTranslator.IsWinDown();
+
         var key = VirtualKeyTranslator.ToGestureKey(e.VirtualKey, _triggerVirtualKey);
 
         if (key != GestureKey.None && _recognizer.Handle(key, e.IsKeyDown))
@@ -499,8 +505,7 @@ public partial class App : Application
         // Modifiers are exempt because the application tracks them, and Alt or Win chords are exempt so the
         // shell keeps working - Alt+Tab must still switch away, which is also the way out if a session ever
         // failed to close.
-        if (!VirtualKeyTranslator.IsModifier(e.VirtualKey)
-            && _recognizer.ShouldSwallowUnhandled(VirtualKeyTranslator.IsAltDown(), VirtualKeyTranslator.IsWinDown()))
+        if (!VirtualKeyTranslator.IsModifier(e.VirtualKey) && _recognizer.ShouldSwallowUnhandled())
         {
             return true;
         }

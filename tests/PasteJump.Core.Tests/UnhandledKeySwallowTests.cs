@@ -43,7 +43,7 @@ public sealed class UnhandledKeySwallowTests
     {
         var (recognizer, _) = Build();
 
-        Assert.False(recognizer.ShouldSwallowUnhandled(altHeld: false, winHeld: false));
+        Assert.False(recognizer.ShouldSwallowUnhandled());
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class UnhandledKeySwallowTests
         recognizer.Handle(GestureKey.Paste, isDown: true);
 
         Assert.True(controller.IsActive);
-        Assert.True(recognizer.ShouldSwallowUnhandled(altHeld: false, winHeld: false));
+        Assert.True(recognizer.ShouldSwallowUnhandled());
     }
 
     /// <summary>
@@ -74,7 +74,13 @@ public sealed class UnhandledKeySwallowTests
         recognizer.Handle(GestureKey.Paste, isDown: true);
 
         Assert.True(controller.IsActive);
-        Assert.False(recognizer.ShouldSwallowUnhandled(alt, win));
+
+        // Pressed after the session opened, which is the only order that can happen now: holding either at the
+        // trigger refuses to open one at all.
+        recognizer.AltHeld = alt;
+        recognizer.WinHeld = win;
+
+        Assert.False(recognizer.ShouldSwallowUnhandled());
     }
 
     /// <summary>
@@ -91,7 +97,7 @@ public sealed class UnhandledKeySwallowTests
         recognizer.Handle(GestureKey.Control, isDown: false);
 
         Assert.False(controller.IsActive);
-        Assert.False(recognizer.ShouldSwallowUnhandled(altHeld: false, winHeld: false));
+        Assert.False(recognizer.ShouldSwallowUnhandled());
     }
 
     /// <summary>
@@ -110,7 +116,7 @@ public sealed class UnhandledKeySwallowTests
 
         Assert.Equal(PasteSessionState.Searching, controller.State);
         Assert.True(controller.IsActive);
-        Assert.True(recognizer.ShouldSwallowUnhandled(altHeld: false, winHeld: false));
+        Assert.True(recognizer.ShouldSwallowUnhandled());
     }
 
     /// <summary>
@@ -127,7 +133,7 @@ public sealed class UnhandledKeySwallowTests
         recognizer.Handle(GestureKey.Escape, isDown: true);
 
         Assert.False(controller.IsActive);
-        Assert.False(recognizer.ShouldSwallowUnhandled(altHeld: false, winHeld: false));
+        Assert.False(recognizer.ShouldSwallowUnhandled());
     }
 
     [Fact]
@@ -141,7 +147,7 @@ public sealed class UnhandledKeySwallowTests
         recognizer.Reset();
 
         Assert.False(controller.IsActive);
-        Assert.False(recognizer.ShouldSwallowUnhandled(altHeld: false, winHeld: false));
+        Assert.False(recognizer.ShouldSwallowUnhandled());
     }
 
     /// <summary>
@@ -157,6 +163,6 @@ public sealed class UnhandledKeySwallowTests
         recognizer.Handle(GestureKey.Paste, isDown: true);
 
         Assert.False(controller.IsActive);
-        Assert.False(recognizer.ShouldSwallowUnhandled(altHeld: false, winHeld: false));
+        Assert.False(recognizer.ShouldSwallowUnhandled());
     }
 }

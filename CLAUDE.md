@@ -24,7 +24,7 @@ the About window, so there is nothing else to edit but the status line above.
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 495 passing (`dotnet test`) |
+| Tests | 506 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -74,7 +74,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      495 tests.
+tests/PasteJump.Core.Tests      506 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -175,6 +175,18 @@ that immediately caught two real bugs. Expect to do the same again.
   Visual Studio terminal. Paste popping is unaffected: press Shift *after* the gesture is open, which is what
   the key list always said. A modifier that other applications combine with our trigger is a chord we do not
   own, and the same reasoning would apply to `Ctrl+Alt+V`.
+- **That prediction came true: `Ctrl+Alt+V` and `Ctrl+Win+V` opened the gesture too, and now do not.** Entry
+  tested Ctrl and Shift and nothing else, so *any* other modifier alongside the trigger still started a
+  session — reported from a real keyboard. The rule is now exact: Ctrl plus the trigger and **nothing else**.
+  `Ctrl+Alt+V` matters most, because **`AltGr` *is* `Ctrl+Alt` on a great many layouts**, so claiming it
+  swallows a keystroke someone was using to type a character — a bug that only appears on those layouts and
+  therefore only ever arrives second-hand. Win chords belong to the shell (`Win+V` is Windows' own clipboard
+  history). Note the two halves of the recogniser had disagreed: `ShouldSwallowUnhandled` always let Alt and
+  Win chords through, so the gesture could be *opened* by a chord whose keys it would then decline to swallow.
+  Both now read one pair of properties, `AltHeld`/`WinHeld`, which the host sets from **`GetAsyncKeyState`
+  rather than by tracking transitions** — a missed key-up (focus changing while a modifier is down) would
+  otherwise leave a flag stuck, and a stuck Alt refuses to open the gesture at all until Alt is pressed and
+  released again.
 - **The trigger key is configurable, so nothing may hard-code `V` or "Ctrl+V".** `TriggerKey` in `Core`
   owns the rules; `VirtualKeyTranslator.ToGestureKey` takes the trigger VK and checks it *first*, and `V` is
   deliberately absent from the binding table so it falls through to search input when it is not the
@@ -616,7 +628,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 495 tests
+dotnet test                                         # 506 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

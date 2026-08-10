@@ -25,6 +25,20 @@ public sealed class PasteGestureRecognizer
 
     public bool IsControlDown { get; private set; }
 
+    /// <summary>
+    /// Whether Alt is held, as reported by the host on every key event.
+    /// <para>
+    /// Set from the live keyboard state rather than tracked from transitions like <see cref="IsControlDown"/>,
+    /// and deliberately so: a missed key-up - which happens when focus changes while a modifier is down -
+    /// would leave a tracked flag stuck, and a stuck Alt here would refuse to open the gesture at all until the
+    /// user pressed and released Alt again. Querying is immune to that.
+    /// </para>
+    /// </summary>
+    public bool AltHeld { get; set; }
+
+    /// <inheritdoc cref="AltHeld"/>
+    public bool WinHeld { get; set; }
+
     public bool IsSessionActive => _controller.IsActive;
 
     /// <summary>Raised after every state change, so the overlay can be repositioned or redrawn.</summary>
@@ -109,12 +123,13 @@ public sealed class PasteGestureRecognizer
     /// Chords the shell owns are therefore always let through; losing focus aborts the session anyway.
     /// </para>
     /// <para>
-    /// The caller supplies the facts (is a session open is ours; is this a modifier, is Alt down are the
-    /// platform's) so that this decision itself stays here, where it can be tested.
+    /// Reads <see cref="AltHeld"/> and <see cref="WinHeld"/>, which the host keeps current, rather than taking
+    /// them as arguments - the entry test needs the same two facts, and one source for them is what keeps the
+    /// two halves from disagreeing. They did disagree: entry ignored Alt and Win entirely, so Ctrl+Alt+V and
+    /// Ctrl+Win+V could open a session whose keys this method would then decline to swallow.
     /// </para>
     /// </summary>
-    public bool ShouldSwallowUnhandled(bool altHeld, bool winHeld)
-        => _controller.IsActive && !altHeld && !winHeld;
+    public bool ShouldSwallowUnhandled() => _controller.IsActive && !AltHeld && !WinHeld;
 
     /// <summary>Cancels any in-flight session. For focus loss and shutdown.</summary>
     public void Reset()
@@ -122,6 +137,8 @@ public sealed class PasteGestureRecognizer
         _searchBuffer.Clear();
         _swallowedDownKeys.Clear();
         IsControlDown = false;
+        AltHeld = false;
+        WinHeld = false;
 
         if (_controller.IsActive)
         {
@@ -165,7 +182,21 @@ public sealed class PasteGestureRecognizer
             //
             // Paste popping still exists: press Shift AFTER the gesture is open, which is what the key list
             // has always described. This only declines to claim the chord as an entry point.
-            if (_controller.ShiftHeld)
+            //
+            // Alt and Win are refused for the same reason, and refusing them is the whole point of this being
+            // an exact test rather than "Ctrl is somewhere in the mix":
+            //
+            //   Ctrl+Alt+V - on a great many keyboard layouts AltGr IS Ctrl+Alt, so this chord is how people
+            //     type a character. Claiming it would swallow the keystroke and paste a clip instead of typing
+            //     what they asked for, and only on those layouts, which is the worst kind of bug to be told
+            //     about second-hand. Some editors also bind it.
+            //   Ctrl+Win+V - Win belongs to the shell. Win+V is Windows' own clipboard history, and chords
+            //     built on it are not ours to take.
+            //
+            // Note this now agrees with ShouldSwallowUnhandled, which has always let Alt and Win chords through
+            // once a session is open. Entry was the half that did not check, so the gesture could be started by
+            // a chord it would then decline to act on.
+            if (_controller.ShiftHeld || AltHeld || WinHeld)
             {
                 return false;
             }
