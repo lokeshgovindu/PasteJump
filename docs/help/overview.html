@@ -61,6 +61,19 @@ required on the machine. It writes its data to a <code>data</code> folder next t
 copy on a USB stick carries its own history. See <a href="settings.html">Settings</a> if the program
 folder is not writable, which is what unzipping under <code>C:\Program Files</code> means in practice.</p>
 
+<h2>Checking for updates</h2>
+
+<p>Right-click the tray icon and choose <b>Check for Updates…</b>. PasteJump asks GitHub for the latest
+published release and tells you whether the copy you are running is newer, older or the same.</p>
+
+<p>It happens <b>only when you ask</b>. Nothing checks at start-up: a clipboard manager that contacts a
+server the moment you sign in is doing something you did not request, and it would put a network round trip
+in front of the tray icon appearing.</p>
+
+<p>It reports rather than installs. If a newer release exists you are offered the release page to download
+it from &mdash; replacing a running program needs administrator rights for an installed copy, and a
+signature worth trusting, so PasteJump does not attempt it.</p>
+
 <h2>Where to go next</h2>
 
 <table>

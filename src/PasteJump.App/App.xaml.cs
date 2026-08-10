@@ -11,6 +11,7 @@ using PasteJump.Core.Paste;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
+using PasteJump.Core.Updates;
 using PasteJump.Interop;
 
 namespace PasteJump.App;
@@ -714,6 +715,7 @@ public partial class App : Application
             onHistory: ShowHistory,
             onSettings: ShowSettings,
             onHelp: ShowShortcutHelp,
+            onCheckForUpdates: CheckForUpdates,
             onPauseToggle: TogglePaused,
             onDisableToggle: ToggleDisabled,
             onRestart: RestartFromMenu,
@@ -894,6 +896,105 @@ public partial class App : Application
             TimeSpan.FromMilliseconds(Math.Max(4000, _settings.CopyNotificationMs)),
             ToastPlacement.BottomRight,
             detailIsProse: true);
+    }
+
+    /// <summary>
+    /// Asks GitHub whether a newer release exists, and reports what it finds.
+    /// <para>
+    /// <c>async void</c> because it is an event handler, with the whole body guarded - an unobserved exception
+    /// from one of these takes the process down, and a failed update check has no business doing that. It runs
+    /// only when the menu item is clicked; nothing checks at start-up.
+    /// </para>
+    /// </summary>
+    private async void CheckForUpdates()
+    {
+        try
+        {
+            // Said before the wait rather than after, because a check can take up to ten seconds and a menu
+            // that closes with nothing happening reads as a dead command. In the corner, like the other
+            // messages about the application itself.
+            Toast().Notify(
+                "Checking for updates…",
+                "Asking GitHub about the latest release.",
+                TimeSpan.FromSeconds(10),
+                ToastPlacement.BottomRight,
+                detailIsProse: true);
+
+            var result = await UpdateChecker.CheckAsync().ConfigureAwait(true);
+
+            switch (result.Status)
+            {
+                case UpdateCheckStatus.UpdateAvailable when result.Release is { } release:
+                    if (MessageDialog.Confirm(
+                            $"PasteJump {release.Tag} is available. You have {AppVersion.Current}."
+                                + "\n\nOpen the release page to download it?",
+                            headline: "An update is available",
+                            title: "PasteJump - check for updates",
+                            owner: null))
+                    {
+                        OpenInBrowser(
+                            string.IsNullOrEmpty(release.PageUrl)
+                                ? AppVersion.RepositoryUrl + "/releases"
+                                : release.PageUrl);
+                    }
+
+                    break;
+
+                case UpdateCheckStatus.UpToDate:
+                    MessageDialog.Show(
+                        UpdateCheck.DescribeUpToDate(AppVersion.Current),
+                        headline: "You are up to date",
+                        title: "PasteJump - check for updates");
+
+                    break;
+
+                case UpdateCheckStatus.NoReleases:
+                    // Not an error, and worded so as not to look like one: this is exactly the state of the
+                    // project until a first release is published.
+                    MessageDialog.Show(
+                        "No releases have been published yet, so there is nothing newer than the copy you are "
+                            + $"running ({AppVersion.Current}).",
+                        headline: "No releases published",
+                        title: "PasteJump - check for updates");
+
+                    break;
+
+                default:
+                    MessageDialog.Warn(
+                        result.Detail.Length > 0 ? result.Detail : "The check could not be completed.",
+                        headline: "Could not check for updates");
+
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Deliberately broad. See the async void note above: nothing about failing to check for an update
+            // justifies ending the session.
+            DebugConsole.Log($"update check failed: {ex}");
+
+            MessageDialog.Warn(ex.Message, headline: "Could not check for updates");
+        }
+    }
+
+    /// <summary>
+    /// Opens a URL in the default browser. <c>UseShellExecute</c> is required - without it .NET treats the URI
+    /// as an executable path and throws.
+    /// </summary>
+    private static void OpenInBrowser(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageDialog.Warn(ex.Message, headline: "Could not open the link");
+        }
     }
 
     private void ShowShortcutHelp()

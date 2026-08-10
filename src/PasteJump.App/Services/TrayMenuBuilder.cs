@@ -20,6 +20,7 @@ internal static class TrayMenuBuilder
         Action onHistory,
         Action onSettings,
         Action onHelp,
+        Action onCheckForUpdates,
         Action onPauseToggle,
         Action onDisableToggle,
         Action onRestart,
@@ -34,6 +35,11 @@ internal static class TrayMenuBuilder
         // is what a left-click on the tray icon opens. The emphasis here is presentational only; the
         // tray's own activation behaviour is unchanged.
         menu.Items.Add(MenuItemFor("_About PasteJump…", onAbout, emphasised: true));
+
+        // Beside About, where people look for it, and phrased with an ellipsis because it opens a dialog rather
+        // than doing something silently. It only ever runs when clicked - see UpdateChecker for why there is no
+        // check at start-up.
+        menu.Items.Add(MenuItemFor("Check for _Updates…", onCheckForUpdates));
         menu.Items.Add(new Separator());
         menu.Items.Add(MenuItemFor("Clipboard _History…", onHistory));
         menu.Items.Add(new Separator());

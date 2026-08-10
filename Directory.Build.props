@@ -39,6 +39,7 @@
     <Authors>Lokesh Govindu</Authors>
     <Copyright>Copyright (c) 2026 Lokesh Govindu</Copyright>
     <PasteJumpAuthorUrl>https://github.com/lokeshgovindu</PasteJumpAuthorUrl>
+    <PasteJumpRepositoryUrl>https://github.com/lokeshgovindu/PasteJump</PasteJumpRepositoryUrl>
   </PropertyGroup>
 
   <!--
@@ -59,6 +60,13 @@
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
       <_Parameter1>AuthorUrl</_Parameter1>
       <_Parameter2>$(PasteJumpAuthorUrl)</_Parameter2>
+    </AssemblyAttribute>
+
+    <!-- Read by the update check, which derives the GitHub API URL from it, and by the About window's link.
+         One definition so the two cannot point at different repositories. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RepositoryUrl</_Parameter1>
+      <_Parameter2>$(PasteJumpRepositoryUrl)</_Parameter2>
     </AssemblyAttribute>
   </ItemGroup>
 

@@ -20,6 +20,8 @@ public static class AppVersion
 
     private static readonly Lazy<string> CachedAuthorUrl = new(() => Metadata("AuthorUrl"));
 
+    private static readonly Lazy<string> CachedRepositoryUrl = new(() => Metadata("RepositoryUrl"));
+
     private static readonly Lazy<DateTimeOffset?> CachedBuildTime = new(ResolveBuildTime);
 
     /// <summary>Version as <c>major.minor.build.revision</c>, e.g. <c>2026.1.0.0</c>.</summary>
@@ -48,6 +50,15 @@ public static class AppVersion
 
     /// <summary>The author's profile URL, from assembly metadata. Empty when absent.</summary>
     public static string AuthorUrl => CachedAuthorUrl.Value;
+
+    /// <summary>
+    /// The project's repository URL, from assembly metadata. Empty when absent.
+    /// <para>
+    /// One definition for the two things that need it: the About window's link, and the update check, which
+    /// derives the GitHub API URL from it. Spelling it in both places is how they would come to disagree.
+    /// </para>
+    /// </summary>
+    public static string RepositoryUrl => CachedRepositoryUrl.Value;
 
     /// <summary>
     /// When this build was produced, or null when it cannot be established.
