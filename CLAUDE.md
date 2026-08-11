@@ -837,6 +837,19 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   other two publishes turn the single-file properties **off** on the command line rather than the csproj
   turning them on for one of them, so a plain `dotnet publish` still produces the portable exe the README
   describes — the shape someone reaching for that command wants.
+- **The development deployment is the framework-dependent shape, and `tools/deploy-dev.ps1` is how it gets
+  there.** Deploying the folder build left **257 files in the root beside `data\`**, which was reported, fairly:
+  it makes the one irreplaceable thing in that directory hard to see. Framework-dependent is 15 files and 4 MB
+  to copy against 135 MB, and starts as fast — the runtime comes from the machine, which on a development box
+  is a given. Single-file would be tidier still and is the wrong trade here: about a second per launch, on a
+  build replaced several times an hour.
+  What the script gets right that a `Copy-Item` does not: it **removes the previous build from an explicit keep
+  list** (`data\`, plus documents placed by hand) rather than clearing the directory, so the database, the blobs
+  and `PasteJump.json` cannot be caught by a redeploy; it **refuses a destination with no `PasteJump.exe` in
+  it**, so it cannot be pointed somewhere arbitrary and start deleting; it **stops the running copy first**,
+  because a live exe is held open and a stale exe beside new DLLs fails at load with nothing useful in the
+  message; and it **checks the published version against MSBuild's**, which catches a publish made before the
+  last commit — easy to do by accident now that the revision is the commit count.
 - **A signature can be had locally, and it is worth exactly what it costs.** `tools/sign-local.ps1` creates a
   self-signed code-signing certificate in `CurrentUser\My` (reused after the first run, found by subject
   since the thumbprint changes whenever it is regenerated) and signs the deployed build. That is enough to
