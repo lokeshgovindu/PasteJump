@@ -33,10 +33,33 @@
     <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
   </PropertyGroup>
 
+  <!--
+    What Windows shows about the file. Each of these lands in the Win32 version resource and in the assembly
+    attributes, and they are read in more places than is obvious:
+
+      Product     -> "Product name" in the Details tab, and the group name in Task Manager's process list.
+      Company     -> "Company". A person, not "PasteJump" - the product is not its own publisher, and this is
+                     the field a code-signing certificate's subject would have to agree with. Naming the product
+                     here was simply wrong.
+      AssemblyTitle -> the Win32 FileDescription, which is the MOST visible of the lot: Task Manager shows it as
+                     the process's friendly name, and the SmartScreen and UAC prompts show it above everything
+                     else. NOT <Description>, which is what it looks like it should be - that becomes the
+                     assembly description and appears nowhere in Explorer. Verified by reading the built exe
+                     rather than assumed, having first set the wrong one. It defaulted to the assembly name, so
+                     a build announced itself as the bare word "PasteJump" at exactly the moment a user is
+                     deciding whether to trust it; a sentence saying what the program is does more work there.
+      Description -> the managed assembly description. Kept in step with the title by hand, since nothing reads
+                     both.
+      Copyright   -> "Copyright".
+      Trademark   -> left empty deliberately. There is no registered mark, and claiming one is a false statement
+                     in a legal field rather than a harmless label.
+  -->
   <PropertyGroup Label="Product identity">
     <Product>PasteJump</Product>
-    <Company>PasteJump</Company>
+    <Company>Lokesh Govindu</Company>
     <Authors>Lokesh Govindu</Authors>
+    <AssemblyTitle>PasteJump - keyboard-driven clipboard manager</AssemblyTitle>
+    <Description>PasteJump - keyboard-driven clipboard manager</Description>
     <Copyright>Copyright (c) 2026 Lokesh Govindu</Copyright>
     <PasteJumpAuthorUrl>https://github.com/lokeshgovindu</PasteJumpAuthorUrl>
     <PasteJumpRepositoryUrl>https://github.com/lokeshgovindu/PasteJump</PasteJumpRepositoryUrl>
