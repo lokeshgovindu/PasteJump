@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 725 passing (`dotnet test`) - 673 in Core.Tests, 52 in Interop.Tests |
+| Tests | 740 passing (`dotnet test`) - 688 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      673 tests.
+tests/PasteJump.Core.Tests      688 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -473,6 +473,18 @@ that immediately caught two real bugs. Expect to do the same again.
     every settings-bearing tab contributes (64 settings across 6 tabs today) and runs three queries, one of which
     (`electron`) matches only inline help — proving the help text is indexed. Writing that check found my own wrong
     assumption: the paste-delay help says *Office and Electron*, not Excel.
+- **An exported settings file deliberately carries no data locations, and no legacy-import flag.** `SettingsTransfer`
+  shares `SettingsStore`'s serializer options so an export is byte-shaped like `PasteJump.json` and can be dropped
+  in by hand. Two exclusions matter: **`ClipsLocation`/`SettingsLocation` are in `data-location.json`, not in
+  settings**, and they are machine-specific paths - importing `D:\Clips` onto a laptop with no D: drive would be
+  worse than useless, so an import can never move anyone's clips; and **`LegacyImportCompleted` is taken from the
+  local machine**, because importing someone else's "already done" would silently suppress the Clipjump offer on a
+  machine that has never run it.
+  `TryImport` **refuses** rather than degrading to defaults, unlike `SettingsStore.Load` - there is a person
+  watching who chose the file, so naming the problem beats silently loading defaults over what they had. The shape
+  check runs **before** deserialising: `[]` and `42` are valid JSON that the deserialiser rejects with a
+  type-conversion complaint, which is true and useless to someone who picked the wrong file. There is deliberately
+  no version or schema check, so a partial or hand-edited file importing three settings is fine.
 - **A numeric range is defined once, in `SettingsBounds`.** Every bound used to be written twice - a `Math.Clamp`
   in `Normalise` and a hand-typed comparison plus message in the dialog - and lowering the notification floor from
   250 to 1 changed only the clamp. The dialog went on refusing anything under 250 **with a message quoting the old
@@ -888,7 +900,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 725 tests
+dotnet test                                         # 740 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

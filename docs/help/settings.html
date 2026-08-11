@@ -302,12 +302,29 @@ surprising. The filter box at the top matches on name or value.</p>
 PasteJump is closed. Two things can be done from this page:</p>
 
 <ul>
+<li><b>Export…</b> writes every setting to a JSON file you choose, for moving a configuration to another machine
+or keeping a copy before experimenting. It exports what the dialog currently shows, so an edit you have not
+applied yet is included &mdash; which also means a value the dialog would refuse stops the export, with the same
+message OK would give.</li>
+<li><b>Import…</b> reads such a file back. Nothing is saved until you press OK or Apply, so Cancel still abandons
+an import and trying one is safe. Every imported value goes through the same checks as a typed one, so anything
+out of range is brought back into it.</li>
 <li><b>Reset</b> on a changed row puts that one setting back to its default.</li>
 <li><b>Reset All to Defaults</b> does the same for everything, including the excluded-apps list and both
 data locations. It asks first.</li>
 </ul>
 
-<p>Neither writes anything until you press OK or Apply, so Cancel still abandons a reset.</p>
+<p>None of these writes anything until you press OK or Apply, so Cancel still abandons a reset or an import.</p>
+
+<div class="note">
+<p><b>An export does not carry where your data is kept.</b> <b>Store clips in</b> and <b>Store settings in</b> live
+in <code>data-location.json</code> rather than with the settings, and they are paths that only mean something on
+the machine they were set on &mdash; carrying <code>D:\Clips</code> to a laptop with no D: drive would be worse
+than useless. An import therefore never moves anyone's clips.</p>
+
+<p>The one-time Clipjump import flag is also kept local, so importing a configuration from a machine that had
+already done that import does not suppress the offer on one that has not.</p>
+</div>
 
 </body>
 </html>

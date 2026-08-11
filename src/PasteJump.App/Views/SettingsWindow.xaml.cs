@@ -831,6 +831,112 @@ public partial class SettingsWindow : Window
         brush.BeginAnimation(System.Windows.Media.Brush.OpacityProperty, fade);
     }
 
+    // ------------------------------------------------------------- export and import
+
+    /// <summary>
+    /// Writes the settings as the dialog currently has them to a file the user chooses.
+    /// <para>
+    /// The <em>pending</em> values, not the saved ones, because "export" plainly means "what I am looking at". That
+    /// means it has to validate first, and a refusal is reported the same way OK reports it - exporting a value the
+    /// dialog would not accept would produce a file that cannot be imported.
+    /// </para>
+    /// </summary>
+    private void OnExportSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        if (!TryBuild(out var settings, out var error))
+        {
+            ValidationText.Text = error;
+            ValidationText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export PasteJump settings",
+            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            FileName = SettingsTransfer.SuggestFileName(DateTimeOffset.Now),
+            AddExtension = true,
+            OverwritePrompt = true,
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, SettingsTransfer.Export(settings));
+            AdvancedStatusNote = $"Exported to {Path.GetFileName(dialog.FileName)}.";
+            RefreshAdvanced();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            MessageDialog.Warn(ex.Message, owner: this, headline: "Could not write that file");
+        }
+    }
+
+    /// <summary>
+    /// Loads settings from a file into the dialog's controls.
+    /// <para>
+    /// Into the controls, not into force: nothing is saved until OK or Apply, so Cancel still abandons an import -
+    /// which is what makes trying one safe. That also means every imported value passes back through the same
+    /// validation as a hand-typed one.
+    /// </para>
+    /// </summary>
+    private void OnImportSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Import PasteJump settings",
+            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+            CheckFileExists = true,
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        string json;
+
+        try
+        {
+            json = File.ReadAllText(dialog.FileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            MessageDialog.Warn(ex.Message, owner: this, headline: "Could not read that file");
+            return;
+        }
+
+        var imported = SettingsTransfer.TryImport(json, _baseline, out var error);
+
+        if (imported is null)
+        {
+            MessageDialog.Warn(error, owner: this, headline: "Could not import those settings");
+            return;
+        }
+
+        // Straight through ShowValues, which is the same path a Reset takes - so every control is written and none
+        // keeps a stale value. The excluded-apps list is not a control, so it is replaced by hand.
+        ShowValues(imported, SelectedClipsLocation, SelectedSettingsLocation);
+
+        _excluded.Clear();
+
+        foreach (var process in imported.IgnoredProcesses)
+        {
+            _excluded.Add(process);
+        }
+
+        AdvancedStatusNote =
+            $"Imported from {Path.GetFileName(dialog.FileName)}. Nothing is saved until you press OK or Apply.";
+
+        RefreshAdvanced();
+        RefreshApplyState();
+    }
+
     /// <summary>Reads the Keys tab into the shape <see cref="PasteKeyMap"/> validates and builds from.</summary>
     private Dictionary<string, char?> ReadPasteKeyChoices()
     {
