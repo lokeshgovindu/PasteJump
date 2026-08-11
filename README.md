@@ -124,7 +124,7 @@ powershell -ExecutionPolicy Bypass -File tools/update-help-images.ps1   # after 
 powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
 ```
 
-Sources are in `docs/help`; the result is `artifacts/help/PasteJump.chm` (~408 KB, nine topics, sixteen
+Sources are in `docs/help`; the result is `artifacts/help/PasteJump.chm` (~540 KB, nine topics, twenty
 screenshots). It needs `hhc.exe` from Microsoft's HTML Help Workshop.
 
 The screenshots are **produced by the UI smoke harness**, not taken by hand, so they cannot drift from the

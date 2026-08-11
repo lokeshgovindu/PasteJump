@@ -65,12 +65,45 @@ public partial class RunningAppPicker : Window
     /// Builds the picker without showing it, for the UI smoke harness. <see cref="Choose"/> is modal, which a
     /// harness cannot wait on.
     /// </summary>
-    public static RunningAppPicker CreateForSmokeTest()
+    /// <param name="sample">
+    /// Rows to show instead of the machine's real windows.
+    /// <para>
+    /// This exists because the harness has two jobs and they want opposite things. As a smoke test, enumerating
+    /// the real process list is exactly right - it exercises the code that ships. As the source of the manual's
+    /// screenshots, it is not: the shot went into a published .chm showing the author's Outlook and Teams window
+    /// titles, their user name in a dozen paths, and directories from unrelated private projects.
+    /// </para>
+    /// <para>
+    /// Null keeps the real enumeration, so the smoke run still covers <see cref="Populate"/> and the icon
+    /// extraction behind it. The screenshot pass passes invented rows.
+    /// </para>
+    /// </param>
+    public static RunningAppPicker CreateForSmokeTest(IReadOnlyList<RunningApp>? sample = null)
     {
         var dialog = new RunningAppPicker();
-        dialog.Populate([]);
+
+        if (sample is null)
+        {
+            dialog.Populate([]);
+        }
+        else
+        {
+            dialog.Show(sample);
+        }
 
         return dialog;
+    }
+
+    /// <summary>Fills the grid from a given list, bypassing enumeration.</summary>
+    private void Show(IReadOnlyList<RunningApp> apps)
+    {
+        AppsGrid.ItemsSource = apps;
+
+        CountText.Text = string.Format(
+            CultureInfo.CurrentCulture,
+            "{0} program{1} with a window",
+            apps.Count,
+            apps.Count == 1 ? string.Empty : "s");
     }
 
     private void Populate(IEnumerable<string> alreadyExcluded)

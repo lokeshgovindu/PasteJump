@@ -158,9 +158,17 @@ internal static class Program
                 // rendered - that is the state with the extra status line and the disabled Import button.
                 Check("ImportDialog", () => new ImportDialog(@"D:\Lokesh\DoNotMove\Clipjump_x64"));
 
-                // Enumerates the machine's real windowed processes, which is fine for a harness - it only
-                // reads. Constructed through a test hook because Choose is modal.
-                Check("RunningAppPicker", RunningAppPicker.CreateForSmokeTest);
+                // Twice, deliberately, because this harness has two jobs that want opposite things here.
+                //
+                // The first enumerates the machine's real windowed processes, which is what a smoke test should
+                // do - it exercises Populate and the icon extraction behind it, on real executables.
+                //
+                // The second is the one docs/help publishes, and it is seeded. The real list had been shipping
+                // in the .chm complete with the author's Outlook and Teams window titles, their user name in
+                // every path, and directories from unrelated private projects. A screenshot of a live machine is
+                // a screenshot of whoever built it.
+                Check("RunningAppPicker-Live", () => RunningAppPicker.CreateForSmokeTest());
+                Check("RunningAppPicker", () => RunningAppPicker.CreateForSmokeTest(SampleRunningApps()));
 
                 // Constructed through a test hook rather than Run, which is modal and drives a worker to
                 // completion - neither of which a smoke harness can wait on.
@@ -279,6 +287,29 @@ internal static class Program
         IsEmpty = false,
         SourceExecutable = "chrome.exe",
     };
+
+    /// <summary>
+    /// Invented programs for the published screenshot. Ordinary Windows applications with plausible titles, and
+    /// no icons - the grid's icon column simply stays empty, which is a state the real list can produce anyway
+    /// for a packaged app whose exe carries no icon.
+    /// <para>
+    /// Deliberately nothing personal and no real user name: the point of seeding this is that a manual should not
+    /// document whoever happened to build it. Paths use a generic profile name for the same reason.
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<RunningApp> SampleRunningApps() =>
+    [
+        new("chrome.exe", "PasteJump - Google Chrome", @"C:\Program Files\Google\Chrome\Application\chrome.exe", null),
+        new("Code.exe", "Program.cs - PasteJump - Visual Studio Code", @"C:\Program Files\Microsoft VS Code\Code.exe", null),
+        new("EXCEL.EXE", "Book1 - Excel", @"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE", null),
+        new("explorer.exe", "Downloads", @"C:\Windows\explorer.exe", null),
+        new("keepass.exe", "KeePass", @"C:\Program Files\KeePass Password Safe 2\KeePass.exe", null),
+        new("notepad.exe", "notes.txt - Notepad", @"C:\Windows\System32\notepad.exe", null),
+        new("SnippingTool.exe", "Snipping Tool", @"C:\Windows\System32\SnippingTool.exe", null),
+        new("Teams.exe", "General - Microsoft Teams", @"C:\Program Files\WindowsApps\MSTeams\ms-teams.exe", null),
+        new("WindowsTerminal.exe", "Windows PowerShell", @"C:\Program Files\WindowsApps\Microsoft.WindowsTerminal\WindowsTerminal.exe", null),
+        new("winword.exe", "Report.docx - Word", @"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE", null),
+    ];
 
     /// <summary>An image clip with the stack narrowed to images, which is what the filter is for.</summary>
     private static PasteOverlayModel KindFilterFrame() => new()
