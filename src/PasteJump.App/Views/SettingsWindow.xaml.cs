@@ -307,6 +307,10 @@ public partial class SettingsWindow : Window
 
         TriggerKeyCombo.SelectedItem = TriggerKey.Normalise(source.PasteModeTriggerKey).ToString();
 
+        // The Keys tab shows the trigger too, read-only. Written here rather than left to the combo's own
+        // SelectionChanged, so a Reset moves both.
+        _triggerMirrorCombo.SelectedItem = TriggerKey.Normalise(source.PasteModeTriggerKey).ToString();
+
         // Every combo is written, without exception: a control ShowValues skips keeps its old value through a
         // Reset, which reads as Reset not working. See SettingsInspector's note on the same trap.
         var keyMap = PasteKeyMap.Parse(source.PasteModeKeys);
@@ -457,54 +461,108 @@ public partial class SettingsWindow : Window
     /// makes the state impossible to contradict.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Shows the trigger letter on this tab as well, read-only.
+    /// <para>
+    /// Not part of <see cref="PasteKeyMap"/> and deliberately not editable here: the trigger is its own setting
+    /// on the Paste Mode tab, because it is the one key that <em>opens</em> a session rather than acting inside
+    /// one, and it is not adjustable in this release. But a tab listing every paste-mode key while omitting the
+    /// most important one reads as an oversight, so it appears here showing what the gesture actually is - the
+    /// same reasoning that keeps the Paste Mode combo visible-but-disabled rather than hidden.
+    /// </para>
+    /// </summary>
+    private ComboBox _triggerMirrorCombo = null!;
+
     private void BuildPasteKeyRows()
     {
+        // First, and read-only. The trigger is what the whole gesture is, so it heads the list even though this
+        // tab cannot change it.
+        _triggerMirrorCombo = AddPasteKeyRow(
+            "Step to an older clip",
+            "also Down / Right",
+            offerOff: false,
+            enabled: false,
+            note: "Also the key that opens the gesture, so it has its own setting under Paste Mode.");
+
         foreach (var entry in PasteKeyMap.Entries)
         {
-            var row = new Grid { Style = (Style)FindResource("SettingRow") };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-
-            var label = new TextBlock { Text = entry.Description };
-            Grid.SetColumn(label, 0);
-            row.Children.Add(label);
-
-            var combo = new ComboBox();
-            combo.Items.Add(KeyOffLabel);
-
-            // Every letter is offered, not only the free ones: a swap - moving tags from T to S and the
-            // clipboard from S to T - is a perfectly reasonable thing to want, and it passes through an
-            // intermediate state where two actions share a letter. Refusing at the combo would make that
-            // impossible to type, so the clash is caught by PasteKeyMap.Validate on OK instead, where it can
-            // name both actions.
-            for (var letter = 'A'; letter <= 'Z'; letter++)
-            {
-                combo.Items.Add(letter.ToString());
-            }
-
-            Grid.SetColumn(combo, 1);
-            row.Children.Add(combo);
-            _pasteKeyCombos[entry.Name] = combo;
-
-            // The fixed alias, shown read-only. It is what makes switching a letter off safe rather than
-            // lossy: turn pin off and Space still pins.
-            if (entry.FixedAlias is { } alias)
-            {
-                var aliasText = new TextBlock
-                {
-                    Text = "also " + alias,
-                    Style = (Style)FindResource("SettingHelp"),
-                    Margin = new Thickness(10, 0, 0, 0),
-                    VerticalAlignment = VerticalAlignment.Center,
-                };
-
-                Grid.SetColumn(aliasText, 2);
-                row.Children.Add(aliasText);
-            }
-
-            PasteKeyRows.Children.Add(row);
+            _pasteKeyCombos[entry.Name] = AddPasteKeyRow(
+                entry.Description,
+                entry.FixedAlias is { } alias ? "also " + alias : null);
         }
+    }
+
+    /// <summary>
+    /// One row: a description, a letter combo, and the read-only note about whatever else fires the action.
+    /// <para>
+    /// Shared by the configurable rows and the trigger's read-only one so the two cannot drift apart visually -
+    /// a row that looked different would suggest it behaved differently in some way other than being fixed.
+    /// </para>
+    /// </summary>
+    private ComboBox AddPasteKeyRow(
+        string description,
+        string? alias,
+        bool offerOff = true,
+        bool enabled = true,
+        string? note = null)
+    {
+        var row = new Grid { Style = (Style)FindResource("SettingRow") };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+
+        var label = new TextBlock { Text = description };
+        Grid.SetColumn(label, 0);
+        row.Children.Add(label);
+
+        var combo = new ComboBox { IsEnabled = enabled };
+
+        if (offerOff)
+        {
+            combo.Items.Add(KeyOffLabel);
+        }
+
+        // Every letter is offered, not only the free ones: a swap - moving tags from T to S and the clipboard
+        // from S to T - is a perfectly reasonable thing to want, and it passes through an intermediate state
+        // where two actions share a letter. Refusing at the combo would make that impossible to type, so the
+        // clash is caught by PasteKeyMap.Validate on OK instead, where it can name both actions.
+        for (var letter = 'A'; letter <= 'Z'; letter++)
+        {
+            combo.Items.Add(letter.ToString());
+        }
+
+        Grid.SetColumn(combo, 1);
+        row.Children.Add(combo);
+
+        // What fires the action regardless of the letter. This is what makes switching a letter off safe rather
+        // than lossy: turn pin off and Space still pins.
+        if (alias is not null)
+        {
+            var aliasText = new TextBlock
+            {
+                Text = alias,
+                Style = (Style)FindResource("SettingHelp"),
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+            Grid.SetColumn(aliasText, 2);
+            row.Children.Add(aliasText);
+        }
+
+        PasteKeyRows.Children.Add(row);
+
+        if (note is not null)
+        {
+            PasteKeyRows.Children.Add(new TextBlock
+            {
+                Text = note,
+                Style = (Style)FindResource("SettingHelp"),
+                Margin = new Thickness(0, 0, 0, 6),
+            });
+        }
+
+        return combo;
     }
 
     /// <summary>Reads the Keys tab into the shape <see cref="PasteKeyMap"/> validates and builds from.</summary>
@@ -558,6 +616,13 @@ public partial class SettingsWindow : Window
     private void OnTriggerKeyChanged(object sender, SelectionChangedEventArgs e)
     {
         var key = TriggerKey.Normalise(TriggerKeyCombo.SelectedItem as string);
+
+        // Kept in step with the read-only copy on the Keys tab. Costs nothing today, since the trigger combo is
+        // disabled in this release, and stops the two disagreeing the moment it is enabled.
+        if (_triggerMirrorCombo is not null)
+        {
+            _triggerMirrorCombo.SelectedItem = key.ToString();
+        }
 
         TriggerKeyHintText.Text = key == TriggerKey.Default
             ? $"{TriggerKey.Describe(key)} opens paste mode, and tapping {key} again steps further back."
