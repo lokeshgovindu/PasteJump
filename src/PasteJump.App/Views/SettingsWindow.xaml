@@ -162,6 +162,20 @@
         </Style>
     </Window.Resources>
 
+    <Window.InputBindings>
+        <!--
+            The same three chords the history window uses, deliberately: muscle memory differs - Ctrl+E is the
+            Explorer and Office convention, Ctrl+K the editor one (VS Code, Slack, browsers) - and a shortcut that
+            works in one window of an application and not the other is worse than none.
+
+            All three reach the box at the top, never the Advanced tab's filter, even while that tab is selected.
+            One chord with two possible destinations depending on where you are is not a shortcut anyone can trust.
+        -->
+        <KeyBinding Key="E" Modifiers="Control" Command="{Binding FocusSearchCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <KeyBinding Key="K" Modifiers="Control" Command="{Binding FocusSearchCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <KeyBinding Key="F" Modifiers="Control" Command="{Binding FocusSearchCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+    </Window.InputBindings>
+
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -211,7 +225,7 @@
             -->
             <TextBlock x:Name="SearchCue"
                        Grid.Column="0"
-                       Text="Search settings…"
+                       Text="Search settings…  (Ctrl+K)"
                        Foreground="{DynamicResource MutedTextBrush}"
                        Margin="6,0,0,0"
                        VerticalAlignment="Center"

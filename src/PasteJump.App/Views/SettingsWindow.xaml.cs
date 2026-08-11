@@ -696,6 +696,23 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
+    /// Moves focus to the search box and selects what is there, so typing replaces it.
+    /// <para>
+    /// Bound to Ctrl+K, Ctrl+E and Ctrl+F - the same three the history window uses, because a shortcut that works
+    /// in one window of an application and not the other is worse than none. Always this box, never the Advanced
+    /// tab's filter: one chord with two destinations depending on the selected tab is not a shortcut anyone can
+    /// trust.
+    /// </para>
+    /// </summary>
+    public ICommand FocusSearchCommand => _focusSearch ??= new RelayCommand(() =>
+    {
+        SearchBox.Focus();
+        SearchBox.SelectAll();
+    });
+
+    private ICommand? _focusSearch;
+
+    /// <summary>
     /// Clears the search and puts the caret back in the box.
     /// <para>
     /// Focus is returned deliberately: the button is <c>Focusable="False"</c>, so without this the caret would be
