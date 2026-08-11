@@ -62,6 +62,7 @@ $wanted = [ordered]@{
     'OverlayWindow'             = 'overlay.png'
     'OverlayWindow-Search'      = 'overlay-search.png'
     'OverlayWindow-DeleteAll'   = 'overlay-delete-all.png'
+    'OverlayWindow-KindFilter'  = 'overlay-kind-filter.png'
     'ShortcutHelpWindow'        = 'shortcut-help.png'
     'AboutWindow'               = 'about.png'
     'ImportDialog'              = 'import-dialog.png'

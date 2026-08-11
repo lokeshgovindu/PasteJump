@@ -67,6 +67,9 @@ public sealed class PasteModeController
 
     public string SearchQuery { get; private set; } = string.Empty;
 
+    /// <summary>Which kinds of clip the window is narrowed to. Reset to <see cref="PasteKindFilter.All"/> per session.</summary>
+    public PasteKindFilter KindFilter { get; private set; } = PasteKindFilter.All;
+
     public int CursorIndex => _cursor;
 
     public IReadOnlyList<Clip> Window => _window;
@@ -93,6 +96,12 @@ public sealed class PasteModeController
 
         CommitMode = PasteCommitMode.Paste;
         SearchQuery = string.Empty;
+
+        // Reset per session, deliberately, and not governed by PreserveClipPosition. A filter that survived would
+        // mean opening the gesture on a stack with most of it missing, with only a small chip to explain why -
+        // which reads as clips having been lost rather than as a setting still being in force.
+        KindFilter = PasteKindFilter.All;
+
         _jumpDirection = 1;
         RefreshWindow();
 
@@ -190,6 +199,9 @@ public sealed class PasteModeController
                 Formatter = _formatters.Next(Formatter);
                 Render();
                 break;
+
+            case PasteAction.CycleKindFilter:
+                return CycleKindFilter();
 
             case PasteAction.TogglePin:
                 return TogglePin();
@@ -452,6 +464,33 @@ public sealed class PasteModeController
         return PasteCommitKind.None;
     }
 
+    /// <summary>
+    /// Steps the kind filter on and rebuilds the window.
+    /// <para>
+    /// The clip you were looking at is kept if it survives the new filter, which is what makes cycling feel like
+    /// narrowing rather than jumping - and otherwise the cursor goes to the top of the narrowed stack, because the
+    /// nearest surviving neighbour is not something the user could predict.
+    /// </para>
+    /// <para>
+    /// A filter that matches nothing is a legal state and shows an empty overlay rather than being skipped. That
+    /// keeps the cycle predictable - four taps always returns you to All - and the empty case is already handled
+    /// everywhere, since a search matching nothing does the same thing.
+    /// </para>
+    /// </summary>
+    private PasteCommitKind CycleKindFilter()
+    {
+        var landed = Current?.Id;
+
+        KindFilter = KindFilter.Next();
+        RefreshWindow();
+
+        _cursor = 0;
+        RestoreCursorTo(landed);
+        Render();
+
+        return PasteCommitKind.None;
+    }
+
     private PasteCommitKind PromoteToFront()
     {
         var current = Current;
@@ -578,9 +617,15 @@ public sealed class PasteModeController
     {
         var all = _catalog.Snapshot();
 
-        _window = string.IsNullOrWhiteSpace(SearchQuery)
-            ? [.. all]
-            : [.. all.Where(c => Matches(c, SearchQuery))];
+        // Kind first, then the query, so the two compose: filter to images and then search within them. Applied
+        // in one place because this is the only place the window is built - which is what made the filter a small
+        // change rather than a new mechanism.
+        _window =
+        [
+            .. all
+                .Where(c => KindFilter.Admits(c.Kind))
+                .Where(c => string.IsNullOrWhiteSpace(SearchQuery) || Matches(c, SearchQuery))
+        ];
 
         if (_cursor >= _window.Count)
         {
@@ -656,6 +701,7 @@ public sealed class PasteModeController
             SearchQuery = SearchQuery,
             MatchCount = _window.Count,
             PopOnPaste = ShiftHeld && CommitMode == PasteCommitMode.Paste,
+            KindFilter = KindFilter,
             IsEmpty = current is null,
             SourceExecutable = current?.SourceExecutable,
         });

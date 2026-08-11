@@ -66,6 +66,17 @@ public partial class OverlayWindow : Window
         PinnedChip.Visibility = model.Pinned ? Visibility.Visible : Visibility.Collapsed;
         PopChip.Visibility = model.PopOnPaste ? Visibility.Visible : Visibility.Collapsed;
 
+        // Describe() returns null for "all", which is the state that needs no chip.
+        if (model.KindFilter.Describe() is { } filter)
+        {
+            KindFilterChip.Text = filter;
+            KindFilterChip.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            KindFilterChip.Visibility = Visibility.Collapsed;
+        }
+
         if (model.Tags.Count > 0)
         {
             TagsChip.Text = "#" + string.Join(" #", model.Tags);

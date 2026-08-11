@@ -68,7 +68,7 @@ public class IdleKeyboardTests
     /// </para>
     /// </summary>
     [Theory]
-    [InlineData("pin=K;format=;tags=Z", 0x56)]                  // moved, switched off, trigger V
+    [InlineData("pin=J;format=;tags=Z", 0x56)]                  // moved, switched off, trigger V
     [InlineData("back=;newest=;search=;pin=;front=", 0x56)]     // half of them off
     [InlineData("history=V", 0x42)]                             // V is free because the trigger moved to B
     public void The_promise_holds_for_any_bindings(string stored, int triggerVk)
@@ -107,9 +107,9 @@ public class IdleKeyboardTests
     [Fact]
     public void A_moved_letter_fires_where_it_was_moved_to()
     {
-        var map = PasteKeyMap.Parse("tags=K");
+        var map = PasteKeyMap.Parse("tags=J");
 
-        Assert.Equal(GestureKey.EditTags, VirtualKeyTranslator.ToGestureKey(0x4B, VkV, map)); // VK_K
+        Assert.Equal(GestureKey.EditTags, VirtualKeyTranslator.ToGestureKey(0x4A, VkV, map)); // VK_J
         Assert.Equal(GestureKey.None, VirtualKeyTranslator.ToGestureKey(0x54, VkV, map));     // VK_T
     }
 

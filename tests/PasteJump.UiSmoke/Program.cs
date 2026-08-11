@@ -200,6 +200,11 @@ internal static class Program
                 Check("OverlayWindow", () => RenderOverlay(TextFrame()));
                 Check("OverlayWindow-Search", () => RenderOverlay(SearchFrame()));
                 Check("OverlayWindow-DeleteAll", () => RenderOverlay(DeleteAllFrame()));
+
+                // The kind filter's chip. Worth its own frame because the chip is the only thing that tells the
+                // user why most of their stack has gone, so a version of it that failed to render would be the
+                // one defect this feature could have.
+                Check("OverlayWindow-KindFilter", () => RenderOverlay(KindFilterFrame()));
             }
         }
 
@@ -273,6 +278,24 @@ internal static class Program
         PopOnPaste = false,
         IsEmpty = false,
         SourceExecutable = "chrome.exe",
+    };
+
+    /// <summary>An image clip with the stack narrowed to images, which is what the filter is for.</summary>
+    private static PasteOverlayModel KindFilterFrame() => new()
+    {
+        Position = 2,
+        Total = 5,
+        PreviewText = "[image]",
+        Kind = ClipKind.Image,
+        Pinned = false,
+        FormatterName = "Original",
+        CommitMode = PasteCommitMode.Paste,
+        IsSearching = false,
+        MatchCount = 5,
+        PopOnPaste = false,
+        IsEmpty = false,
+        KindFilter = PasteKindFilter.Images,
+        SourceExecutable = "SnippingTool.exe",
     };
 
     /// <summary>The X cycle at its last stop, which is the one worth showing a picture of.</summary>

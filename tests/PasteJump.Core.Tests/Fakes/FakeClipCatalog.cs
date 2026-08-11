@@ -19,7 +19,10 @@ internal sealed class FakeClipCatalog : IClipCatalog
     /// <summary>Adds an already-pinned clip as the newest. Returns its id.</summary>
     public long AddPinned(string preview, params string[] tags) => AddCore(preview, pinned: true, tags);
 
-    private long AddCore(string preview, bool pinned, string[] tags)
+    /// <summary>Adds a clip of a given kind, for the kind filter's tests.</summary>
+    public long AddOfKind(string preview, ClipKind kind) => AddCore(preview, pinned: false, [], kind);
+
+    private long AddCore(string preview, bool pinned, string[] tags, ClipKind kind = ClipKind.Text)
     {
         var id = _clips.Count == 0 ? 1 : _clips.Max(static c => c.Id) + 1;
 
@@ -30,7 +33,7 @@ internal sealed class FakeClipCatalog : IClipCatalog
             Pinned = pinned,
             CreatedUtc = DateTimeOffset.UnixEpoch.AddSeconds(id),
             Preview = preview,
-            Kind = ClipKind.Text,
+            Kind = kind,
             TotalBytes = preview.Length,
             ContentHash = "hash-" + id,
             Tags = tags,

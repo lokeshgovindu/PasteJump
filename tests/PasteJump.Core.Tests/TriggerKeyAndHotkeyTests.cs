@@ -44,7 +44,7 @@ public sealed class TriggerKeyAndHotkeyTests
     [InlineData('V')]
     [InlineData('B')]
     [InlineData('G')]
-    [InlineData('K')] // was 'P', which now pins - the mnemonic alias for Space
+    [InlineData('J')] // 'P' pins and 'K' filters by kind, so neither is free any more
     public void An_unbound_letter_is_accepted(char key)
     {
         Assert.True(TriggerKey.IsAvailable(key));
@@ -65,8 +65,8 @@ public sealed class TriggerKeyAndHotkeyTests
         Assert.DoesNotContain('M', TriggerKey.Available); // beside Q, move to front
         Assert.DoesNotContain('P', TriggerKey.Available); // beside Space, pin
 
-        // 26 letters minus the 13 bound to an action.
-        Assert.Equal(13, TriggerKey.Available.Count);
+        // 26 letters minus the 14 bound to an action.
+        Assert.Equal(12, TriggerKey.Available.Count);
     }
 
     [Theory]

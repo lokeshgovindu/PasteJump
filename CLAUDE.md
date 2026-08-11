@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 670 passing (`dotnet test`) - 618 in Core.Tests, 52 in Interop.Tests |
+| Tests | 680 passing (`dotnet test`) - 628 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      618 tests.
+tests/PasteJump.Core.Tests      628 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -234,6 +234,23 @@ that immediately caught two real bugs. Expect to do the same again.
   Note the second-order effect: an invariant test used `Handle(PasteAction.Help)` as one of its "many
   intermediate keys", so ending the session there silently made every later key in that test a no-op — it still
   passed, while proving nothing. If you make an action end the session, grep the tests for it.
+- **`K` narrows the stack to one kind of clip, and the chip is not decoration.** `PasteKindFilter` cycles
+  All → Text → Images → Files and **wraps**, unlike the `X` commit cycle — nothing here is destructive, so
+  returning to "show everything" must not cost three more taps. Four rules, each chosen rather than observed
+  (Clipjump has no equivalent, only its `Store_images` capture toggle; Ditto is the closest precedent):
+  - **The overlay must show any filter but `All`.** A filter with no visible sign of itself is a stack that has
+    silently lost most of its clips, which is the one way this could read as a bug.
+  - **It resets per session** and is deliberately *not* governed by `PreserveClipPosition`. A filter that
+    survived would open the gesture on a stack with most of it missing.
+  - **A filter matching nothing is a legal state, not one to skip.** Skipping would make the cycle
+    unpredictable — four taps must always return to `All` — and the empty window is already handled everywhere,
+    because a search matching nothing does the same thing.
+  - **`ClipKind.Other` has no filter of its own** and appears only under `All`. `Admits` errs towards showing a
+    clip, because a filter that hid something reads as the clip having been lost.
+  It was a small change because `RefreshWindow` is the only place the window is built — kind first, then the
+  query, so the two compose. Note there was already an accidental route: an image clip's stored preview is the
+  literal `[image]`, so searching for `image` filtered the stack. That rested on display text behaving like an
+  API; do not reintroduce it as the documented answer.
 - **The letters are configurable and live in `PasteKeyMap` (`Core`); the physical keys are not, and that is a
   safety property.** The bindings were a `switch` in `VirtualKeyTranslator`; the letter half is now data the user
   owns, and `ToGestureKey` checks the map for `A`–`Z` **before** the physical table so an unbound letter falls
@@ -819,7 +836,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 670 tests
+dotnet test                                         # 680 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

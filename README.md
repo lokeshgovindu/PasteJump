@@ -154,6 +154,7 @@ While Ctrl is down:
 | <kbd>P</kbd> · <kbd>Space</kbd> | Pin / unpin (pinned clips sort first and survive Delete All) |
 | <kbd>M</kbd> · <kbd>Q</kbd> | Move this clip to the front of the stack |
 | <kbd>Z</kbd> | Cycle paste format |
+| <kbd>K</kbd> | Show only one kind of clip: all → text → images → files |
 | <kbd>T</kbd> | Edit tags |
 | <kbd>S</kbd> | Put the clip on the Windows clipboard *without* pasting |
 | <kbd>O</kbd> | Open the clip in an external editor |

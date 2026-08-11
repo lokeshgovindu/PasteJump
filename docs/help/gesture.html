@@ -97,6 +97,35 @@ list is a real window that takes the keyboard, and while the overlay is up the g
 &mdash; including the ones the list is busy explaining. So read it, close it, and press
 <code>Ctrl</code>+<code>V</code> again.</p>
 
+<h2>Showing only one kind of clip</h2>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">K</td><td>Narrow the stack: all clips, then text only, images only, files only, and back to
+all.</td></tr>
+</table>
+
+<div class="shot shot-inline">
+<img src="images/overlay-kind-filter.png" alt="The overlay with the stack narrowed to images">
+<p>A chip names the filter, and the count changes with it &mdash; <i>clip 2 of 5</i> rather than <i>of 41</i>.</p>
+</div>
+
+<p>This is what to reach for when you want the screenshot from twenty minutes ago and there are forty text clips
+in the way. Images are the clips most worth looking at before pasting, and the rarest in a stack, so stepping to
+one is the slowest thing the gesture does.</p>
+
+<p>Two things are deliberate. <b>The filter resets every time the gesture opens</b>, because a filter that
+survived would show you a stack with most of it missing and only a small chip to explain why. And <b>a filter
+that matches nothing is allowed</b> &mdash; it shows an empty overlay rather than being skipped, so four taps of
+<code>K</code> always brings you back to seeing everything.</p>
+
+<p>It combines with search: narrow to images, then <code>F</code> and type to search within them.</p>
+
+<div class="note">
+<p>If <b>Store Images</b> is off under <a href="settings.html">Settings, Capture</a>, the images filter will
+always be empty &mdash; nothing is recording them.</p>
+</div>
+
 <h2>Search</h2>
 
 <table>

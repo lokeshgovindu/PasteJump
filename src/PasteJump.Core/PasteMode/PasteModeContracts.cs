@@ -112,6 +112,15 @@ public enum PasteAction
     /// <summary><c>Z</c> - cycle paste formatters.</summary>
     CycleFormatter,
 
+    /// <summary>
+    /// <c>K</c> - narrow the stack to one kind of clip: all, text, images, files.
+    /// <para>
+    /// K for Kind. Wraps back to "all", unlike the <c>X</c> commit cycle, because nothing here is destructive and
+    /// getting back to seeing everything must not cost three more taps.
+    /// </para>
+    /// </summary>
+    CycleKindFilter,
+
     /// <summary><c>Space</c> - pin / unpin.</summary>
     TogglePin,
 
@@ -265,6 +274,15 @@ public sealed record PasteOverlayModel
 
     /// <summary>Shift is held, so the clip will be removed after pasting ("paste popping").</summary>
     public required bool PopOnPaste { get; init; }
+
+    /// <summary>
+    /// Which kinds of clip the stack is narrowed to.
+    /// <para>
+    /// The overlay must show anything other than <see cref="PasteKindFilter.All"/>. A filter with no visible sign
+    /// of itself is a stack that has silently lost most of its clips.
+    /// </para>
+    /// </summary>
+    public PasteKindFilter KindFilter { get; init; } = PasteKindFilter.All;
 
     public required bool IsEmpty { get; init; }
 

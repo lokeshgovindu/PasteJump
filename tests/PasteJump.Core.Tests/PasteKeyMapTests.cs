@@ -33,9 +33,9 @@ public class PasteKeyMapTests
     [Fact]
     public void A_fixed_alias_fires_regardless_of_the_letter()
     {
-        var map = PasteKeyMap.Parse("front=K");
+        var map = PasteKeyMap.Parse("front=J");
 
-        Assert.Equal(GestureKey.PromoteToFront, map.ForLetter('K'));
+        Assert.Equal(GestureKey.PromoteToFront, map.ForLetter('J'));
         Assert.Equal(GestureKey.PromoteToFront, map.ForLetter('Q'));
         Assert.Equal(GestureKey.None, map.ForLetter('M'));
     }
@@ -63,7 +63,7 @@ public class PasteKeyMapTests
     {
         var map = PasteKeyMap.Default;
 
-        foreach (var letter in "BDGIJKLNRUWY")
+        foreach (var letter in "BDGIJLNRUWY")
         {
             Assert.Equal(GestureKey.None, map.ForLetter(letter));
         }
@@ -90,10 +90,10 @@ public class PasteKeyMapTests
     [Fact]
     public void A_settings_string_round_trips()
     {
-        var original = PasteKeyMap.Parse("pin=K;format=;tags=T");
+        var original = PasteKeyMap.Parse("pin=J;format=;tags=T");
         var again = PasteKeyMap.Parse(original.ToSettingsString());
 
-        Assert.Equal(GestureKey.TogglePin, again.ForLetter('K'));
+        Assert.Equal(GestureKey.TogglePin, again.ForLetter('J'));
         Assert.Equal(GestureKey.None, again.ForLetter('Z'));
         Assert.Equal(GestureKey.EditTags, again.ForLetter('T'));
         Assert.Equal(original.ToSettingsString(), again.ToSettingsString());
@@ -172,12 +172,12 @@ public class PasteKeyMapTests
     [Fact]
     public void Normalise_canonicalises_the_stored_value()
     {
-        var settings = new PasteJumpSettings { PasteModeKeys = "pin=k;rubbish;unknown=Z" };
+        var settings = new PasteJumpSettings { PasteModeKeys = "pin=j;rubbish;unknown=Z" };
 
         settings.Normalise();
 
         Assert.Equal(PasteKeyMap.Parse(settings.PasteModeKeys).ToSettingsString(), settings.PasteModeKeys);
-        Assert.Equal(GestureKey.TogglePin, PasteKeyMap.Parse(settings.PasteModeKeys).ForLetter('K'));
+        Assert.Equal(GestureKey.TogglePin, PasteKeyMap.Parse(settings.PasteModeKeys).ForLetter('J'));
     }
 
     private static Dictionary<string, char?> Choices()

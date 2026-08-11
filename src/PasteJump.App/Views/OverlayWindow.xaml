@@ -106,6 +106,16 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!--
+                            Not optional decoration. A kind filter with no visible sign of itself is a stack that
+                            has silently lost most of its clips, which is the one way this feature could read as a
+                            bug. Accent-coloured rather than muted for the same reason.
+                        -->
+                        <TextBlock x:Name="KindFilterChip"
+                                   Style="{StaticResource ChipText}"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   Margin="0,0,8,0"
+                                   Visibility="Collapsed" />
                         <TextBlock x:Name="PopChip"
                                    Style="{StaticResource ChipText}"
                                    Foreground="{DynamicResource DangerBrush}"

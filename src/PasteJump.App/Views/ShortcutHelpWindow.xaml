@@ -1,4 +1,4 @@
-﻿<Window x:Class="PasteJump.App.Views.ShortcutHelpWindow"
+<Window x:Class="PasteJump.App.Views.ShortcutHelpWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PasteJump - Paste-mode keys"
@@ -174,10 +174,14 @@
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition />
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Name="KeySearch" Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open search. Ctrl can be released - just type to filter by content or tag" />
+
+                <TextBlock x:Name="KeyKind" Grid.Row="5" Grid.Column="0" Style="{StaticResource KeyStyle}" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Show only one kind of clip: all, then text, images, files. A chip names the filter, and it resets each time the gesture opens" />
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Backspace" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Delete a character from the query" />

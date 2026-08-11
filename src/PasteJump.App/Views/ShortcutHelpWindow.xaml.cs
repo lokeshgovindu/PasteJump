@@ -43,6 +43,7 @@ public partial class ShortcutHelpWindow : Window
         KeyPin.Text = Keys(map, "pin");
         KeyFront.Text = Keys(map, "front");
         KeyFormat.Text = Keys(map, "format");
+        KeyKind.Text = Keys(map, "kind");
         KeyTags.Text = Keys(map, "tags");
         KeyClipboard.Text = Keys(map, "clipboard");
         KeyEditor.Text = Keys(map, "editor");
