@@ -67,6 +67,10 @@ $wanted = [ordered]@{
     'ShortcutHelpWindow'        = 'shortcut-help.png'
     'AboutWindow'               = 'about.png'
     'ImportDialog'              = 'import-dialog.png'
+
+    # The Remove duplicates confirmation. Worth a picture because the choice that widens the sweep lives
+    # inside the prompt rather than on the toolbar, so the button alone does not hint that it exists.
+    'MessageDialogOption'       = 'remove-duplicates.png'
     'ToastWindow'               = 'toast.png'
 }
 

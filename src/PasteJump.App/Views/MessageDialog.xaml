@@ -68,6 +68,27 @@
                        Foreground="{DynamicResource TextBrush}"
                        FontSize="12.5"
                        LineHeight="18" />
+
+            <!--
+                An optional choice that belongs to the question being asked. Collapsed unless a caller supplies
+                one, so every existing prompt is unchanged.
+
+                It lives inside the dialog rather than beside the button that opens it because that is where the
+                decision is actually made: a check box on a toolbar is a setting you have to notice before you
+                act, while one here is part of answering. The first attempt put it on the toolbar and was
+                corrected.
+            -->
+            <CheckBox x:Name="OptionCheck"
+                      Margin="0,14,0,0"
+                      Visibility="Collapsed" />
+
+            <TextBlock x:Name="OptionHelpText"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       FontSize="12"
+                       LineHeight="17"
+                       TextWrapping="Wrap"
+                       Margin="23,4,0,0"
+                       Visibility="Collapsed" />
         </StackPanel>
 
         <StackPanel x:Name="Buttons"

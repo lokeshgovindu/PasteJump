@@ -69,14 +69,25 @@ public partial class MessageDialog : Window
 
         dialog.ApplyKind(kind);
         dialog.ApplyButtons(buttons);
-
-        if (owner is not null && owner.IsLoaded)
-        {
-            dialog.Owner = owner;
-            dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        }
+        dialog.Centre(owner);
 
         return dialog.ShowDialog() == true ? DialogResultKind.Accepted : DialogResultKind.Cancelled;
+    }
+
+    /// <summary>
+    /// Centres on the owner when there is one, on the screen otherwise.
+    /// <para>
+    /// Extracted rather than duplicated once a second entry point existed. The <c>IsLoaded</c> test is not
+    /// decoration: assigning an owner that has not been shown throws.
+    /// </para>
+    /// </summary>
+    private void Centre(Window? owner)
+    {
+        if (owner is not null && owner.IsLoaded)
+        {
+            Owner = owner;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        }
     }
 
     /// <summary>
@@ -87,15 +98,33 @@ public partial class MessageDialog : Window
     /// instantiate it and a broken template would go unnoticed until the app first had something to say.
     /// </para>
     /// </summary>
+    /// <param name="optionText">
+    /// Renders the optional check box, so the harness can prove that branch of the template too. It is a control
+    /// that only ever appears on one prompt, which is exactly the kind that goes unexercised.
+    /// </param>
     public static MessageDialog CreateForSmokeTest(
         string message,
         string? headline = null,
         DialogKind kind = DialogKind.Warning,
-        DialogButtons buttons = DialogButtons.YesNo)
+        DialogButtons buttons = DialogButtons.YesNo,
+        string? optionText = null,
+        string? optionHelp = null)
     {
         var dialog = new MessageDialog();
 
         dialog.BodyText.Text = message;
+
+        if (!string.IsNullOrWhiteSpace(optionText))
+        {
+            dialog.OptionCheck.Content = optionText;
+            dialog.OptionCheck.Visibility = Visibility.Visible;
+
+            if (!string.IsNullOrWhiteSpace(optionHelp))
+            {
+                dialog.OptionHelpText.Text = optionHelp;
+                dialog.OptionHelpText.Visibility = Visibility.Visible;
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(headline))
         {
@@ -108,6 +137,62 @@ public partial class MessageDialog : Window
         dialog.ApplyButtons(buttons);
 
         return dialog;
+    }
+
+    /// <summary>
+    /// Shows a prompt carrying one extra choice, and reports both the answer and the state of that choice.
+    /// <para>
+    /// For a question whose scope the user should be able to change while answering it - "remove duplicates" and
+    /// "should the timestamp count" being the case this exists for. The alternative was a check box on the toolbar
+    /// beside the button, which is what was built first and was wrong: that makes it a setting you have to notice
+    /// <em>before</em> you act, when it is really part of the answer.
+    /// </para>
+    /// <para>
+    /// The option's state is returned rather than left on the dialog, so a caller cannot read it from a window it
+    /// has already closed.
+    /// </para>
+    /// </summary>
+    /// <param name="optionText">The check box's label. Supplying none is the same as calling <see cref="Show"/>.</param>
+    /// <param name="optionHelp">A muted line beneath it, for saying what the choice actually changes.</param>
+    public static (DialogResultKind Result, bool OptionChecked) ShowWithOption(
+        string message,
+        string optionText,
+        string? optionHelp = null,
+        bool optionInitiallyChecked = false,
+        string? headline = null,
+        string title = "PasteJump",
+        DialogKind kind = DialogKind.Information,
+        DialogButtons buttons = DialogButtons.OkCancel,
+        Window? owner = null)
+    {
+        var dialog = new MessageDialog { Title = title };
+
+        dialog.BodyText.Text = message;
+
+        if (!string.IsNullOrWhiteSpace(headline))
+        {
+            dialog.HeadlineText.Text = headline;
+            dialog.HeadlineText.Visibility = Visibility.Visible;
+            dialog.BodyText.Margin = new Thickness(0, 8, 0, 0);
+        }
+
+        dialog.OptionCheck.Content = optionText;
+        dialog.OptionCheck.IsChecked = optionInitiallyChecked;
+        dialog.OptionCheck.Visibility = Visibility.Visible;
+
+        if (!string.IsNullOrWhiteSpace(optionHelp))
+        {
+            dialog.OptionHelpText.Text = optionHelp;
+            dialog.OptionHelpText.Visibility = Visibility.Visible;
+        }
+
+        dialog.ApplyKind(kind);
+        dialog.ApplyButtons(buttons);
+        dialog.Centre(owner);
+
+        var result = dialog.ShowDialog() == true ? DialogResultKind.Accepted : DialogResultKind.Cancelled;
+
+        return (result, dialog.OptionCheck.IsChecked == true);
     }
 
     /// <summary>Convenience for the common "tell the user something went wrong" case.</summary>

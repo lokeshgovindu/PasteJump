@@ -92,20 +92,11 @@
                         Content="Remove D_uplicates"
                         ToolTip="Collapse entries that are exact duplicates, keeping one of each. Acts on whichever of the two stores is shown. Imports before this version were not idempotent, so importing Clipjump more than once left a copy per run." />
                 <!--
-                    Beside the button it modifies, and visible before you press it - the alternative was a check
-                    box inside the confirmation, which MessageDialog cannot carry and which would hide the option
-                    from anyone who never opened that prompt.
-
-                    Only meaningful for history: a clip is already judged by content alone, so in the Clips view
-                    this is disabled rather than hidden - a control that vanishes invites the question of where it
-                    went, and the tooltip can explain instead.
+                    "Ignore time" used to sit here, beside the button. It is inside the Remove Duplicates prompt
+                    now, which is where the decision is actually made - a check box on a toolbar is a setting you
+                    have to notice before acting, while one in the prompt is part of answering the question. It
+                    also keeps this toolbar to buttons that do things.
                 -->
-                <CheckBox x:Name="IgnoreTimestampCheck"
-                          Content="Ignore _time"
-                          VerticalAlignment="Center"
-                          Margin="8,0,0,0"
-                          ToolTip="When ticked, Remove Duplicates treats the same content copied at different times as one entry, and keeps the most recent. Clips are always judged by content alone, so this applies to history only." />
-
                 <Button x:Name="ClearButton"
                         Click="OnClearClicked"
                         Content="Clear _History"

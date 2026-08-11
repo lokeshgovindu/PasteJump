@@ -176,6 +176,23 @@ internal static class Program
                     + "folder is modified.\n\nYou can also do this later from Settings, History.",
                     "Import from Clipjump?",
                     DialogKind.Question));
+
+                // Again with the optional check box, which only one prompt in the app uses - so it would otherwise
+                // never be rendered by anything but that one code path. This is also the shot docs/help publishes
+                // for Remove duplicates, so the wording is kept in step with HistoryWindow.OnDeduplicateClicked.
+                Check("MessageDialogOption", () => MessageDialog.CreateForSmokeTest(
+                    "Entries that are an exact duplicate of another are removed, keeping one of each. Nothing that "
+                    + "differs in any way is touched.\n\n"
+                    + "An entry is judged by its timestamp, its kind, its text and its image, so two screenshots "
+                    + "taken in the same second are not mistaken for one. The oldest of each set is kept."
+                    + "\n\nThis cannot be undone.",
+                    "Remove duplicate history entries?",
+                    DialogKind.Warning,
+                    DialogButtons.OkCancel,
+                    optionText: "Ignore the _time it was copied",
+                    optionHelp: "Judges an entry by its kind, its text and its image only, so the same thing copied "
+                        + "on different days counts as one and the most recent is kept. This removes far more than "
+                        + "the sweep described above."));
                 // Seeded with a folder that does not exist, so the invalid branch of the validation is the one
                 // rendered - that is the state with the extra status line and the disabled Import button.
                 Check("ImportDialog", () => new ImportDialog(@"D:\Lokesh\DoNotMove\Clipjump_x64"));
