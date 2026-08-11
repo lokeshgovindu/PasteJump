@@ -28,19 +28,116 @@
 .PARAMETER OutputDirectory
     Where the finished packages go. Defaults to artifacts/release.
 
+.PARAMETER SignThumbprint
+    SHA1 thumbprint of a code-signing certificate in CurrentUser\My. Everything shippable is signed with it
+    before anything is hashed. Omit both signing parameters and the release is unsigned, which is what it has
+    always been.
+
+.PARAMETER SignAzureMetadata
+    Path to an Azure Artifact Signing (formerly Trusted Signing) metadata .json. Uses that service's signtool
+    plug-in instead of a local certificate, which is the route that needs no hardware token.
+
+.PARAMETER TimestampUrl
+    RFC 3161 timestamp server. Not optional in practice - see the note on Invoke-CodeSign.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools/pack-release.ps1
+
+.EXAMPLE
+    # With a certificate in the current user's store
+    powershell -File tools/pack-release.ps1 -SignThumbprint 1A2B3C...
+
+.EXAMPLE
+    # With Azure Artifact Signing
+    powershell -File tools/pack-release.ps1 -SignAzureMetadata signing.json -TimestampUrl http://timestamp.acs.microsoft.com
 #>
 [CmdletBinding()]
 param(
     [switch] $SkipPublish,
-    [string] $OutputDirectory
+    [string] $OutputDirectory,
+    [string] $SignThumbprint,
+    [string] $SignAzureMetadata,
+    [string] $TimestampUrl = 'http://timestamp.digicert.com'
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repoRoot 'src\PasteJump.App\PasteJump.App.csproj'
+
+$signing = $SignThumbprint -or $SignAzureMetadata
+
+if ($SignThumbprint -and $SignAzureMetadata) {
+    throw "Choose one signing method: -SignThumbprint or -SignAzureMetadata, not both."
+}
+
+<#
+.SYNOPSIS
+    Signs files with Authenticode, or explains why it cannot.
+
+.DESCRIPTION
+    Called before anything is hashed or zipped, and that ordering is the point rather than a detail: signing
+    rewrites the file, so a hash taken first would not match what anyone downloads. It is also why setup.exe is
+    signed between ISCC and its own hash.
+
+    /tr with a timestamp server, never /t, and never neither. Without a timestamp countersignature an
+    Authenticode signature stops validating the day the certificate expires - so a release signed today would
+    start warning in a year or two even though nothing about it changed. /td sha256 sets the timestamp digest;
+    omitting it leaves it at SHA1, which modern Windows distrusts.
+
+    signtool is located rather than assumed on PATH: it lives in the Windows SDK, which does not add itself.
+    Highest version wins, because the older ones predate some of these switches.
+#>
+function Invoke-CodeSign([string[]] $paths) {
+    if (-not $signing) {
+        return
+    }
+
+    $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter 'signtool.exe' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match '\\x64\\' } |
+        Sort-Object -Property FullName -Descending |
+        Select-Object -First 1
+
+    if (-not $signtool) {
+        throw "Signing was requested but signtool.exe was not found. Install the Windows SDK, or drop the signing parameters."
+    }
+
+    foreach ($path in $paths) {
+        Write-Host "  signing $(Split-Path -Leaf $path)"
+
+        $arguments = @('sign', '/fd', 'sha256', '/tr', $TimestampUrl, '/td', 'sha256')
+
+        if ($SignThumbprint) {
+            $arguments += @('/sha1', $SignThumbprint)
+        }
+        else {
+            # The Azure Artifact Signing plug-in. /dlib names the library and /dmdf the account metadata, which is
+            # what replaces a local private key - nothing sensitive is on this machine.
+            $arguments += @('/dlib', 'Azure.CodeSigning.Dlib.dll', '/dmdf', (Resolve-Path $SignAzureMetadata).Path)
+        }
+
+        $arguments += $path
+
+        $log = & $signtool.FullName @arguments 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            $log | ForEach-Object { Write-Host "    $_" }
+            throw "signtool failed for $path (exit $LASTEXITCODE)."
+        }
+
+        # Verified rather than trusted. /pa uses the Authenticode policy - the one Windows itself applies when
+        # deciding whether to warn - so a signature that signtool wrote happily but Windows would reject fails
+        # here instead of in front of a user. A self-signed certificate fails this on purpose: see the note in
+        # the release checklist about what self-signing is and is not good for.
+        $verify = & $signtool.FullName verify /pa /q $path 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            $verify | ForEach-Object { Write-Host "    $_" }
+            Write-Warning "$(Split-Path -Leaf $path) is signed but does not verify against the Authenticode policy."
+            Write-Warning "Windows will still warn. This is expected for a self-signed certificate."
+        }
+    }
+}
 
 if (-not $OutputDirectory) {
     $OutputDirectory = Join-Path $repoRoot 'artifacts\release'
@@ -153,6 +250,15 @@ $folderFileCount = (Get-ChildItem $folderPublishDirectory -Recurse -File).Count
 
 if ($folderFileCount -lt 50) {
     throw "The folder publish has only $folderFileCount files, so it is still a single-file build. Check the -p: overrides."
+}
+
+# Signed here: after the version check, so a mismatched build is rejected before anything is signed, and well
+# before staging or hashing. Only the two executables, not the folder build's 250 DLLs - SmartScreen and the
+# publisher prompt read the exe, the .NET assemblies beside it are Microsoft's and already signed, and each
+# signature is a billable call on the Azure route.
+if ($signing) {
+    Write-Host "  code signing..."
+    Invoke-CodeSign @($exe, $folderExe)
 }
 
 # --------------------------------------------------------------- 3. help
@@ -298,6 +404,11 @@ else {
         throw "ISCC reported success but produced no $setup."
     }
 
+    # Between ISCC and the hash, for the same reason the executables are signed before staging: signing rewrites
+    # the file. Note the exe inside the installer was already signed above, so a signed setup.exe means both the
+    # thing you download and the thing it installs carry a signature.
+    Invoke-CodeSign @($setup)
+
     $setupHash = Write-Hash $setup
 }
 
@@ -320,4 +431,15 @@ if ($setup) {
 }
 
 Write-Host ""
-Write-Host "Neither package is code-signed, so Windows will show a SmartScreen warning on first run."
+
+if (-not $signing) {
+    Write-Host "Neither package is code-signed, so Windows will show a SmartScreen warning on first run."
+    Write-Host "Pass -SignThumbprint or -SignAzureMetadata to sign. See the release checklist in CLAUDE.md."
+}
+else {
+    $how = if ($SignThumbprint) { "certificate $SignThumbprint" } else { "Azure Artifact Signing" }
+
+    Write-Host "Signed with $how, timestamped by $TimestampUrl."
+    Write-Host "A signature names the publisher; it does not silence SmartScreen on its own - reputation accrues"
+    Write-Host "as the file is downloaded, so early downloads may still be warned about."
+}
