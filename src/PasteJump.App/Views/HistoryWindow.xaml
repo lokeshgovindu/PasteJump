@@ -140,8 +140,17 @@
                  left over. Filling the remainder is what a search field should do anyway. -->
             <Grid Grid.Column="2">
                 <TextBox x:Name="SearchBox" MinHeight="32" VerticalAlignment="Center"
+                         Padding="5,2,24,2"
                          TextChanged="OnSearchTextChanged"
                          ToolTip="Search history by content. Ctrl+E, Ctrl+K or Ctrl+F to jump here; Esc to clear." />
+
+                <Button x:Name="SearchClear"
+                        Style="{StaticResource SearchClearButton}"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,6,0"
+                        Visibility="Collapsed"
+                        Click="OnSearchClearClicked" />
 
                 <TextBlock x:Name="SearchCue"
                            Text="Search history…  (Ctrl+K)"

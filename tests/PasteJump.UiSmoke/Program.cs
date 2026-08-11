@@ -125,6 +125,26 @@ internal static class Program
 
                         VerifySearchIndex((SettingsWindow)window);
                     });
+                // The dialog with a query in the search box. Its own case because the clear cross and the match
+                // count only exist once there is text, so the empty dialog above proves nothing about either.
+                Check(
+                    "SettingsWindow-Searching",
+                    () => new SettingsWindow(settings, formatters, DataLocation.UserProfile),
+                    (window, name) =>
+                    {
+                        ((SettingsWindow)window).TypeInSearchForSmokeTest("theme");
+                        window.UpdateLayout();
+                        Drain();
+
+                        // Captured here rather than relying on Check's own shot: that one is taken before this
+                        // callback runs, so it would show an empty box - which is exactly what this case exists to
+                        // avoid. Same reason CycleTabs saves its own per-tab shots.
+                        if (_shotDirectory is not null)
+                        {
+                            Capture(window, Path.Combine(_shotDirectory, $"{_theme}-{name}.png"));
+                        }
+                    });
+
                 // The same dialog with both halves on a custom folder, which is the only way the path box and
                 // its Browse button are realised at all - a collapsed row's template is never applied, so the
                 // ordinary case above proves nothing about it.

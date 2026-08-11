@@ -467,9 +467,25 @@ public partial class HistoryWindow : Window
     /// layered over the box; it must be hidden the moment there is content or it shows through.
     /// </summary>
     private void UpdateSearchCue()
-        => SearchCue.Visibility = string.IsNullOrEmpty(SearchBox.Text)
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+    {
+        var empty = string.IsNullOrEmpty(SearchBox.Text);
+
+        SearchCue.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+
+        // The clear button appears only when there is something to clear - a cross on an empty box invites a click
+        // that does nothing, and it crowds the cue text.
+        SearchClear.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Clears the search and returns the caret to the box, since the button itself is not focusable. Esc already
+    /// did this from the keyboard; the cross is the same action for the mouse.
+    /// </summary>
+    private void OnSearchClearClicked(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        SearchBox.Focus();
+    }
 
     /// <summary>Moves focus to the search box and selects what is there, so typing replaces it.</summary>
     public ICommand FocusSearchCommand => _focusSearch ??= new RelayCommand(() =>

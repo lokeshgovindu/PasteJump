@@ -184,11 +184,22 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <!-- Padding on the right leaves room for the clear button, so a long query cannot run underneath it. -->
             <TextBox x:Name="SearchBox"
                      Grid.Column="0"
+                     Padding="5,2,24,2"
                      TextChanged="OnSearchTextChanged"
                      PreviewKeyDown="OnSearchKeyDown"
                      ToolTip="Find a setting on any tab by its name or its description" />
+
+            <Button x:Name="SearchClear"
+                    Grid.Column="0"
+                    Style="{StaticResource SearchClearButton}"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Margin="0,0,4,0"
+                    Visibility="Collapsed"
+                    Click="OnSearchClearClicked" />
 
             <!--
                 Cue text over the empty box. IsHitTestVisible="False" so it cannot steal a click.
@@ -863,8 +874,17 @@
 
                     <Grid Grid.Row="0" Margin="0,0,0,8">
                         <TextBox x:Name="AdvancedFilterBox"
+                                 Padding="5,2,24,2"
                                  TextChanged="OnAdvancedFilterChanged"
                                  ToolTip="Narrows the list below by setting name or value. To find a setting and jump to its control, use the search box at the top of the dialog." />
+
+                        <Button x:Name="AdvancedFilterClear"
+                                Style="{StaticResource SearchClearButton}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,0,4,0"
+                                Visibility="Collapsed"
+                                Click="OnAdvancedFilterClearClicked" />
 
                         <!--
                             "Filter this list", not "Search settings" - that is now the box at the top of the

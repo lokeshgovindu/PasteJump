@@ -672,6 +672,21 @@ public partial class SettingsWindow : Window
     public IReadOnlyList<(string Label, string TabName)> SearchIndexForSmokeTest()
         => [.. SettingsSearch.Build(Tabs, (Style)FindResource("SettingRow")).Select(h => (h.Label, h.TabName))];
 
+    /// <summary>
+    /// Types into the search box, for the UI smoke harness.
+    /// <para>
+    /// Exists so a screenshot can show the box in use: the clear button and the match count only appear once there
+    /// is a query, so an empty dialog proves nothing about either. The results popup opens as a side effect and is
+    /// closed again here - it is a separate window, so it would not appear in a render anyway, and leaving one open
+    /// behind a window the harness is about to close is asking for trouble.
+    /// </para>
+    /// </summary>
+    public void TypeInSearchForSmokeTest(string text)
+    {
+        SearchBox.Text = text;
+        SearchPopup.IsOpen = false;
+    }
+
     /// <summary>Runs a query against the index, for the UI smoke harness. Results in the order the popup shows.</summary>
     public IReadOnlyList<(string Label, string TabName)> SearchForSmokeTest(string query)
     {
@@ -680,9 +695,34 @@ public partial class SettingsWindow : Window
         return [.. SettingsSearch.Filter(_searchIndex, query).Select(h => (h.Label, h.TabName))];
     }
 
+    /// <summary>
+    /// Clears the search and puts the caret back in the box.
+    /// <para>
+    /// Focus is returned deliberately: the button is <c>Focusable="False"</c>, so without this the caret would be
+    /// left wherever it was and the obvious next action - typing a different query - would go somewhere else.
+    /// </para>
+    /// </summary>
+    private void OnSearchClearClicked(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        SearchBox.Focus();
+    }
+
+    private void OnAdvancedFilterClearClicked(object sender, RoutedEventArgs e)
+    {
+        AdvancedFilterBox.Clear();
+        AdvancedFilterBox.Focus();
+    }
+
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
     {
-        SearchCue.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var empty = SearchBox.Text.Length == 0;
+
+        SearchCue.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+
+        // Shown only when there is something to clear. A permanently visible cross invites a click that does
+        // nothing, and it crowds an empty box that already carries its cue text.
+        SearchClear.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
 
         _searchIndex ??= SettingsSearch.Build(Tabs, (Style)FindResource("SettingRow"));
 
@@ -1493,6 +1533,10 @@ public partial class SettingsWindow : Window
         AdvancedFilterCue.Visibility = string.IsNullOrEmpty(filter)
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        AdvancedFilterClear.Visibility = string.IsNullOrEmpty(filter)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     private void OnAdvancedFilterChanged(object sender, TextChangedEventArgs e) => RefreshAdvanced();

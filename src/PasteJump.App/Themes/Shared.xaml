@@ -48,4 +48,53 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <!--
+        The clear button that sits at the right-hand end of a search box. Defined here rather than per window so the
+        three of them - the settings search, the Advanced filter and the history search - cannot drift apart.
+
+        Its own template rather than the themed Button style: that one carries a border, a background and a minimum
+        width meant for a dialog button, all of which look wrong on a glyph inside a text field. Transparent
+        background rather than none, because a null background is not hit-testable and the button would only
+        respond on the glyph itself.
+
+        Sized 18x18 and vertically centred by the caller. The glyph is U+2715 MULTIPLICATION X, which is the shape
+        Windows uses for this and reads better at small sizes than a letter x or U+00D7.
+    -->
+    <Style x:Key="SearchClearButton" TargetType="Button">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Cursor" Value="Arrow" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        <Setter Property="ToolTip" Value="Clear (Esc)" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome"
+                            Background="Transparent"
+                            CornerRadius="9">
+                        <TextBlock x:Name="Glyph"
+                                   Text="&#x2715;"
+                                   FontSize="10"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource TextBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
