@@ -207,6 +207,23 @@
                        HorizontalAlignment="Left"
                        Visibility="Collapsed" />
 
+                <!--
+                    A copied TEXT file's contents, in the same slot the thumbnail of a copied image file uses -
+                    the path stays above in PreviewText and this appears beneath it. Muted rather than the ordinary
+                    text colour, because it is the file's content rather than the clip's: what a paste puts on the
+                    clipboard is the path.
+                -->
+                <TextBlock x:Name="PreviewFileText"
+                           Grid.Row="1"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           FontFamily="Consolas"
+                           FontSize="12"
+                           TextWrapping="NoWrap"
+                           MaxHeight="260"
+                           LineHeight="16"
+                           Margin="0,6,0,0"
+                           Visibility="Collapsed" />
+
                 <!-- Dimensions left, bytes right: the two facts a picture cannot tell you about itself. -->
                 <Grid x:Name="ImageFacts" Grid.Row="2" Margin="0,6,0,0" Visibility="Collapsed">
                     <TextBlock x:Name="ImageDimensions"
@@ -236,8 +253,9 @@
             -->
             <TextBlock x:Name="KeyHintText"
                        Margin="10,0,10,8"
-                       Foreground="{DynamicResource MutedTextBrush}"
-                       FontSize="10" />
+                       Foreground="{DynamicResource TextBrush}"
+                       TextWrapping="Wrap"
+                       FontSize="12" />
 
         </StackPanel>
     </Border>

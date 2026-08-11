@@ -1563,74 +1563,74 @@ public partial class SettingsWindow : Window
         }
 
         if (!int.TryParse(CopyNotificationMsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var toastMs)
-            || toastMs is < 250 or > 10_000)
+            || !SettingsBounds.CopyNotificationMs.Admits(toastMs))
         {
-            error = "Notification duration must be between 250 and 10000 milliseconds.";
+            error = SettingsBounds.CopyNotificationMs.Refuse("Notification duration", "milliseconds");
             return false;
         }
 
         if (!int.TryParse(PasteSettleDelayBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var settleMs)
-            || settleMs is < 0 or > 500)
+            || !SettingsBounds.PasteSettleDelayMs.Admits(settleMs))
         {
-            error = "Pause before pasting must be between 0 and 500 milliseconds.";
+            error = SettingsBounds.PasteSettleDelayMs.Refuse("Pause before pasting", "milliseconds");
             return false;
         }
 
         if (!int.TryParse(BeepFrequencyBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var beepHz)
-            || beepHz is < 37 or > 32_767)
+            || !SettingsBounds.BeepFrequencyHz.Admits(beepHz))
         {
-            error = "Beep pitch must be between 37 and 32767 hertz.";
+            error = SettingsBounds.BeepFrequencyHz.Refuse("Beep pitch", "hertz");
             return false;
         }
 
         // The bounds match PasteJumpSettings.Normalise. Rejected here rather than clamped there, because a
         // number silently changing to 1400 after OK reads as the box not having taken the value.
         if (!int.TryParse(PreviewWidthBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var previewWidth)
-            || previewWidth is < 120 or > 1400)
+            || !SettingsBounds.OverlayPreviewMaxWidth.Admits(previewWidth))
         {
-            error = "Image preview width must be between 120 and 1400 pixels.";
+            error = SettingsBounds.OverlayPreviewMaxWidth.Refuse("Image preview width", "pixels");
             return false;
         }
 
         if (!int.TryParse(PreviewHeightBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var previewHeight)
-            || previewHeight is < 80 or > 900)
+            || !SettingsBounds.OverlayPreviewMaxHeight.Admits(previewHeight))
         {
-            error = "Image preview height must be between 80 and 900 pixels.";
+            error = SettingsBounds.OverlayPreviewMaxHeight.Refuse("Image preview height", "pixels");
             return false;
         }
 
         if (!int.TryParse(OverlayPreviewCharsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var overlayChars)
-            || overlayChars is < 40 or > 4_000)
+            || !SettingsBounds.OverlayPreviewChars.Admits(overlayChars))
         {
-            error = "Characters of text shown in the overlay must be between 40 and 4000.";
+            error = SettingsBounds.OverlayPreviewChars.Refuse("Characters of text shown in the overlay");
             return false;
         }
 
         if (!int.TryParse(BeepDurationBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var beepMs)
-            || beepMs is < 20 or > 2_000)
+            || !SettingsBounds.BeepDurationMs.Admits(beepMs))
         {
-            error = "Beep length must be between 20 and 2000 milliseconds.";
+            error = SettingsBounds.BeepDurationMs.Refuse("Beep length", "milliseconds");
             return false;
         }
 
         if (!int.TryParse(PreviewMaxCharsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var previewChars)
-            || previewChars is < 256 or > 65_536)
+            || !SettingsBounds.PreviewMaxChars.Admits(previewChars))
         {
-            error = "Characters kept per history entry must be between 256 and 65536.";
+            error = SettingsBounds.PreviewMaxChars.Refuse("Characters kept per history entry");
             return false;
         }
 
         if (!int.TryParse(HistoryLoadLimitBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var historyLimit)
-            || historyLimit is < 100 or > 1_000_000)
+            || !SettingsBounds.HistoryLoadLimit.Admits(historyLimit))
         {
-            error = "Rows the history window loads must be between 100 and 1000000.";
+            error = SettingsBounds.HistoryLoadLimit.Refuse("Rows the history window loads");
             return false;
         }
 
         if (!int.TryParse(HistoryPreviewWidthBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var historyPreviewWidth)
-            || historyPreviewWidth is < 120 or > 4_096)
+            || !SettingsBounds.HistoryPreviewMaxWidth.Admits(historyPreviewWidth))
         {
-            error = "History preview image width must be between 120 and 4096 pixels.";
+            error = SettingsBounds.HistoryPreviewMaxWidth.Refuse("History preview image width", "pixels");
             return false;
         }
 

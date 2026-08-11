@@ -127,13 +127,13 @@ public sealed class PasteJumpSettings
     /// accepted; anything else is coerced back to <c>V</c> by <see cref="Normalise"/>.
     /// </para>
     /// </summary>
+    public string PasteModeTriggerKey { get; set; } = PasteMode.TriggerKey.Default.ToString();
+
     /// <summary>
     /// What a left click on the tray icon does. Right click always opens the menu - see
     /// <see cref="TrayClickAction"/> for why that one is not negotiable.
     /// </summary>
     public TrayClickAction TrayLeftClick { get; set; } = TrayClickAction.History;
-
-    public string PasteModeTriggerKey { get; set; } = PasteMode.TriggerKey.Default.ToString();
 
     /// <summary>
     /// Which letter fires which paste-mode action, as <c>name=letter</c> pairs: <c>back=C;newest=A;pin=P</c>. An
@@ -318,7 +318,7 @@ public sealed class PasteJumpSettings
     /// <summary>Clamps anything a hand-edited JSON file could have made nonsensical.</summary>
     public void Normalise()
     {
-        MaxClips = Math.Clamp(MaxClips, 1, 100_000);
+        MaxClips = Math.Clamp(MaxClips, SettingsBounds.MaxClips.Min, SettingsBounds.MaxClips.Max);
 
         if (HistoryRetentionDays < 0)
         {
@@ -346,12 +346,12 @@ public sealed class PasteJumpSettings
         // "Ctrl+Shift+H" and anything unparseable becomes empty rather than sitting there looking valid.
         HistoryHotkey = HotkeySpec.ParseOrNone(HistoryHotkey).ToString();
 
-        BeepFrequencyHz = Math.Clamp(BeepFrequencyHz, 37, 32_767);
-        BeepDurationMs = Math.Clamp(BeepDurationMs, 20, 2_000);
+        BeepFrequencyHz = Math.Clamp(BeepFrequencyHz, SettingsBounds.BeepFrequencyHz.Min, SettingsBounds.BeepFrequencyHz.Max);
+        BeepDurationMs = Math.Clamp(BeepDurationMs, SettingsBounds.BeepDurationMs.Min, SettingsBounds.BeepDurationMs.Max);
 
         // Floor is high enough that search still has something to index; the ceiling is where a preview column
         // stops being a preview. Text past it is archived whole regardless, so neither bound loses data.
-        PreviewMaxChars = Math.Clamp(PreviewMaxChars, 256, 65_536);
+        PreviewMaxChars = Math.Clamp(PreviewMaxChars, SettingsBounds.PreviewMaxChars.Min, SettingsBounds.PreviewMaxChars.Max);
 
         // Either both or neither. See OverlayX for why half a fixed position is not a state worth having.
         if (OverlayX is null || OverlayY is null)
@@ -360,22 +360,22 @@ public sealed class PasteJumpSettings
             OverlayY = null;
         }
 
-        HistoryLoadLimit = Math.Clamp(HistoryLoadLimit, 100, 1_000_000);
-        HistoryPreviewMaxWidth = Math.Clamp(HistoryPreviewMaxWidth, 120, 4_096);
-        OverlayPreviewChars = Math.Clamp(OverlayPreviewChars, 40, 4_000);
+        HistoryLoadLimit = Math.Clamp(HistoryLoadLimit, SettingsBounds.HistoryLoadLimit.Min, SettingsBounds.HistoryLoadLimit.Max);
+        HistoryPreviewMaxWidth = Math.Clamp(HistoryPreviewMaxWidth, SettingsBounds.HistoryPreviewMaxWidth.Min, SettingsBounds.HistoryPreviewMaxWidth.Max);
+        OverlayPreviewChars = Math.Clamp(OverlayPreviewChars, SettingsBounds.OverlayPreviewChars.Min, SettingsBounds.OverlayPreviewChars.Max);
 
-        PasteSettleDelayMs = Math.Clamp(PasteSettleDelayMs, 0, 500);
+        PasteSettleDelayMs = Math.Clamp(PasteSettleDelayMs, SettingsBounds.PasteSettleDelayMs.Min, SettingsBounds.PasteSettleDelayMs.Max);
         // Floor of 1, not 250. The old floor silently overrode anyone who asked for something shorter, and there
         // is no reason to: the toast fades on its own timer, so a tiny value gives a brief flash rather than
         // anything broken. 0 is excluded because that reads as "off", and off is ShowCopyNotification's job -
         // two ways to express the same state is how they end up contradicting each other.
-        CopyNotificationMs = Math.Clamp(CopyNotificationMs, 1, 10_000);
+        CopyNotificationMs = Math.Clamp(CopyNotificationMs, SettingsBounds.CopyNotificationMs.Min, SettingsBounds.CopyNotificationMs.Max);
 
         // Floors are low enough to be useful for someone who wants the overlay out of the way, and the ceilings
         // are what a 1080p screen can show without the overlay becoming the thing being looked at rather than
         // the document underneath it.
-        OverlayPreviewMaxWidth = Math.Clamp(OverlayPreviewMaxWidth, 120, 1400);
-        OverlayPreviewMaxHeight = Math.Clamp(OverlayPreviewMaxHeight, 80, 900);
+        OverlayPreviewMaxWidth = Math.Clamp(OverlayPreviewMaxWidth, SettingsBounds.OverlayPreviewMaxWidth.Min, SettingsBounds.OverlayPreviewMaxWidth.Max);
+        OverlayPreviewMaxHeight = Math.Clamp(OverlayPreviewMaxHeight, SettingsBounds.OverlayPreviewMaxHeight.Min, SettingsBounds.OverlayPreviewMaxHeight.Max);
 
         if (!Enum.IsDefined(Theme))
         {

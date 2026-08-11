@@ -194,6 +194,13 @@ older clip" and would otherwise shadow that action for ever.</p>
 <p>A text clip states its size the way a picture does: lines and characters on the left, bytes on the right.</p>
 </div>
 
+<p><b>A copied text file shows its contents too.</b> The path stays on top, the first lines of the file appear
+beneath it in a muted colour, and the facts row gives the line count and the file's size on disk &mdash; the same
+treatment a copied image file gets, where a thumbnail appears instead. Only the first file of a copy is read, only
+the first few kilobytes of it, never a file on a network share, and only for extensions that are plainly text: the
+overlay is redrawn on every tap of the trigger key, so nothing here may be slow. What a paste puts on the
+clipboard is still the path, which is why the contents are dimmed.</p>
+
 <p>For text, the counts are of what PasteJump <b>stored</b> rather than of what it is showing you &mdash; the
 preview on screen is elided to fit. If the clip was longer than <b>Characters Kept per Entry</b> allows, both
 numbers carry a <code>+</code>: what you copied is bigger than anything that was kept, and saying so beats a

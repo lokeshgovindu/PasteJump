@@ -239,7 +239,10 @@ public partial class App : Application
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
-        _pasteHost.SetKeyHint(_settings.ShowOverlayKeyHint, TriggerKey.Normalise(_settings.PasteModeTriggerKey));
+        _pasteHost.SetKeyHint(
+            _settings.ShowOverlayKeyHint,
+            TriggerKey.Normalise(_settings.PasteModeTriggerKey),
+            PasteKeyMap.Parse(_settings.PasteModeKeys));
 
         _controller = new PasteModeController(
             new ClipStoreCatalog(_store),
@@ -1111,7 +1114,10 @@ public partial class App : Application
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
-        _pasteHost.SetKeyHint(_settings.ShowOverlayKeyHint, TriggerKey.Normalise(_settings.PasteModeTriggerKey));
+        _pasteHost.SetKeyHint(
+            _settings.ShowOverlayKeyHint,
+            TriggerKey.Normalise(_settings.PasteModeTriggerKey),
+            PasteKeyMap.Parse(_settings.PasteModeKeys));
 
         _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
         _keyMap = PasteKeyMap.Parse(_settings.PasteModeKeys);

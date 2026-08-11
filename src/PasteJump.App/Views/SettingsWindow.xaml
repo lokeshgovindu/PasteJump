@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PasteJump - Settings"
-        Width="780"
-        Height="560"
-        MinWidth="680"
-        MinHeight="460"
+        Width="900"
+        Height="660"
+        MinWidth="740"
+        MinHeight="500"
         Background="{DynamicResource SurfaceBrush}"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display"
@@ -252,7 +252,7 @@
         <TabControl x:Name="Tabs" Grid.Row="1">
 
             <!-- ==================================================== Capture -->
-            <TabItem Header="_Capture">
+            <TabItem Header="Cap_ture">
                 <ScrollViewer Style="{StaticResource TabScroller}">
                     <StackPanel>
 
@@ -529,13 +529,13 @@
                                     ToolTip="Pick from the programs currently open, so you do not have to know the executable name." />
                             <Button x:Name="BrowseExcludedButton"
                                     Click="OnBrowseExcludedClicked"
-                                    Content="_Browse for a Program…"
+                                    Content="Browse for a Program…"
                                     Margin="0,0,0,6"
                                     MinWidth="150"
                                     ToolTip="Choose an .exe on disk. Only its file name is stored, not the path." />
                             <Button x:Name="RemoveExcludedButton"
                                     Click="OnRemoveExcludedClicked"
-                                    Content="_Remove"
+                                    Content="Re_move"
                                     Margin="0,0,0,6"
                                     MinWidth="150"
                                     IsEnabled="False"
@@ -563,7 +563,7 @@
                             <Button x:Name="AddExcludedButton"
                                     Grid.Column="1"
                                     Click="OnAddExcludedClicked"
-                                    Content="_Add"
+                                    Content="A_dd"
                                     MinWidth="84" />
                         </Grid>
 
@@ -575,7 +575,7 @@
             </TabItem>
 
             <!-- ==================================================== Appearance -->
-            <TabItem Header="_Appearance">
+            <TabItem Header="App_earance">
                 <ScrollViewer Style="{StaticResource TabScroller}">
                     <StackPanel>
 
@@ -744,7 +744,7 @@
                             -->
                             <Button Grid.Column="2"
                                     Click="OnBrowseTextEditorClicked"
-                                    Content="_Browse…"
+                                    Content="Browse…"
                                     MinWidth="0"
                                     Padding="10,2"
                                     ToolTip="Choose the program to open text clips with" />
@@ -762,7 +762,7 @@
                             <TextBox x:Name="ImageEditorBox" Grid.Column="1" />
                             <Button Grid.Column="2"
                                     Click="OnBrowseImageEditorClicked"
-                                    Content="B_rowse…"
+                                    Content="Browse…"
                                     MinWidth="0"
                                     Padding="10,2"
                                     ToolTip="Choose the program to open image clips with" />
@@ -795,7 +795,7 @@
                             <TextBox x:Name="ClipsCustomPathBox" Grid.Column="0" TextChanged="OnDataLocationPathChanged" />
                             <Button Grid.Column="1"
                                     Click="OnBrowseClipsFolder"
-                                    Content="B_rowse…"
+                                    Content="Browse…"
                                     Margin="8,0,0,0"
                                     MinWidth="88" />
                         </Grid>
@@ -827,7 +827,7 @@
                             <TextBox x:Name="SettingsCustomPathBox" Grid.Column="0" TextChanged="OnDataLocationPathChanged" />
                             <Button Grid.Column="1"
                                     Click="OnBrowseSettingsFolder"
-                                    Content="Br_owse…"
+                                    Content="Browse…"
                                     Margin="8,0,0,0"
                                     MinWidth="88" />
                         </Grid>
@@ -961,7 +961,7 @@
                         <Button x:Name="ResetAllButton"
                                 Grid.Column="1"
                                 Click="OnResetAllClicked"
-                                Content="Reset _All to Defaults"
+                                Content="Reset A_ll to Defaults"
                                 MinWidth="160"
                                 VerticalAlignment="Center"
                                 ToolTip="Put every setting back to the value a fresh install would have" />

@@ -39,13 +39,20 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     /// Sets the overlay's key reminder and the trigger letter it names. Both together, because the hint has to
     /// name the key that is actually configured.
     /// </summary>
-    public void SetKeyHint(bool show, char triggerKey)
+    public void SetKeyHint(bool show, char triggerKey, PasteKeyMap? keyMap = null)
     {
         _showKeyHint = show;
         _triggerKey = triggerKey;
+        _keyMap = keyMap;
 
-        _overlay?.ApplyKeyHint(show, triggerKey);
+        _overlay?.ApplyKeyHint(show, triggerKey, keyMap);
     }
+
+    /// <summary>
+    /// The letter bindings the hint names. Held because the overlay is created lazily on the first gesture, long
+    /// after the settings were read - the same reason the trigger letter is kept here.
+    /// </summary>
+    private PasteKeyMap? _keyMap;
 
     /// <summary>
     /// Pins the overlay to a fixed screen position, or restores "follow the caret" when either is null.
@@ -182,7 +189,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
             // Applied on creation as well as on change, because the overlay is created lazily on the first
             // gesture - which is usually long after the settings were loaded.
             _overlay.ApplyPreviewSize(_previewMaxWidth, _previewMaxHeight);
-            _overlay.ApplyKeyHint(_showKeyHint, _triggerKey);
+            _overlay.ApplyKeyHint(_showKeyHint, _triggerKey, _keyMap);
         }
 
         // A configured position wins over the caret. Both halves have to be set for it to mean anything, which

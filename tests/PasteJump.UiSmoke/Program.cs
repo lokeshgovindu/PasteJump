@@ -216,6 +216,16 @@ internal static class Program
                 // one defect this feature could have.
                 Check("OverlayWindow-KindFilter", () => RenderOverlay(KindFilterFrame()));
                 Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
+
+                // A copied TEXT FILE, whose contents are read off disk. Written as a real file because that is
+                // the branch being exercised - FileTextPreviewCache opens it - and seeding a path that does not
+                // exist would prove nothing and look identical to the feature being broken. Same reasoning as the
+                // image file the history preview uses.
+                //
+                // Deliberately NOT in update-help-images.ps1's list. The frame necessarily shows a real path, so
+                // the shot would carry the build machine's user name into a published .chm - the same leak the
+                // running-app picker had. This exists to prove the read works, not to be published.
+                Check("OverlayWindow-TextFile", () => RenderOverlay(TextFileFrame(root)));
             }
         }
 
@@ -411,6 +421,46 @@ internal static class Program
         TotalBytes = 178,
         SourceExecutable = "devenv.exe",
     };
+
+    /// <summary>
+    /// A copied text file: the path above, the file's first lines below, and its line count and size in the facts
+    /// row. Writes the file it points at, so the read path is genuinely exercised.
+    /// </summary>
+    private static PasteOverlayModel TextFileFrame(string root)
+    {
+        var path = Path.Combine(root, "notes.txt");
+
+        File.WriteAllText(
+            path,
+            """
+            PasteJump - release checklist
+            =============================
+
+            1. dotnet build, zero warnings
+            2. dotnet test
+            3. UI smoke harness, both themes
+            4. Rebuild the help and its screenshots
+            5. Publish the folder build and deploy
+            """);
+
+        var description = FileListPreview.Describe([path]);
+
+        return new PasteOverlayModel
+        {
+            Position = 7,
+            Total = 41,
+            PreviewText = description,
+            Kind = ClipKind.Files,
+            Pinned = false,
+            FormatterName = "Original",
+            CommitMode = PasteCommitMode.Paste,
+            IsSearching = false,
+            MatchCount = 41,
+            PopOnPaste = false,
+            IsEmpty = false,
+            SourceExecutable = "explorer.exe",
+        };
+    }
 
     /// <summary>The X cycle at its last stop, which is the one worth showing a picture of.</summary>
     private static PasteOverlayModel DeleteAllFrame() => new()

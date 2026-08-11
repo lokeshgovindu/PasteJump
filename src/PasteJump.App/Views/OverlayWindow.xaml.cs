@@ -37,10 +37,20 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// Sets the key hint, or hides it. The trigger letter is passed in rather than assumed, because it is
-    /// configurable and a hint naming a key that does nothing would be worse than no hint.
+    /// Sets the key hint, or hides it.
+    /// <para>
+    /// Built as coloured runs rather than one string: the keys are accented and the words beside them are ordinary
+    /// text, separated by a dim pipe. At 10px in a single muted colour it was reported as unreadable on the dark
+    /// palette, and it was - a hint nobody can read is worse than the space it occupies, because it looks like
+    /// something is wrong with the rendering.
+    /// </para>
+    /// <para>
+    /// The letters come from the key map, not from literals. They are configurable now, so a hint saying
+    /// <c>A: newest</c> after the user moved that action would name a key that does nothing - the same failure the
+    /// F1 card avoids by reading the map. An action switched off is left out entirely.
+    /// </para>
     /// </summary>
-    public void ApplyKeyHint(bool show, char triggerKey)
+    public void ApplyKeyHint(bool show, char triggerKey, PasteKeyMap? keyMap = null)
     {
         if (!show)
         {
@@ -48,8 +58,53 @@ public partial class OverlayWindow : Window
             return;
         }
 
+        var map = keyMap ?? PasteKeyMap.Default;
+
+        // Ordered by how often someone reaching for the hint needs them: getting back to the top, moving, and the
+        // two ways out. F1 last, because it is the answer when none of the others were enough.
+        var pairs = new List<(string Key, string What)>();
+
+        if (map.LetterFor("newest") is { } newest)
+        {
+            pairs.Add(($"{newest}/Home", "newest"));
+        }
+        else
+        {
+            pairs.Add(("Home", "newest"));
+        }
+
+        pairs.Add((map.LetterFor("back") is { } back ? $"{triggerKey}/{back}" : $"{triggerKey}/↑↓", "step"));
+        pairs.Add(("Del", "delete"));
+
+        if (map.LetterFor("kind") is { } kind)
+        {
+            pairs.Add((kind.ToString(), "filter"));
+        }
+
+        pairs.Add(("Esc", "cancel"));
+        pairs.Add(("F1", "all keys"));
+
         KeyHintText.Visibility = Visibility.Visible;
-        KeyHintText.Text = $"A  newest    {triggerKey} / C  step    X  delete    Esc  cancel    F1  all keys";
+        KeyHintText.Inlines.Clear();
+
+        for (var i = 0; i < pairs.Count; i++)
+        {
+            if (i > 0)
+            {
+                KeyHintText.Inlines.Add(new System.Windows.Documents.Run("  |  ")
+                {
+                    Foreground = (System.Windows.Media.Brush)FindResource("MutedTextBrush"),
+                });
+            }
+
+            KeyHintText.Inlines.Add(new System.Windows.Documents.Run(pairs[i].Key)
+            {
+                Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush"),
+                FontWeight = FontWeights.SemiBold,
+            });
+
+            KeyHintText.Inlines.Add(new System.Windows.Documents.Run(": " + pairs[i].What));
+        }
     }
 
     /// <summary>Applies a frame and positions the window at the anchor, clamped to the work area.</summary>
@@ -180,6 +235,7 @@ public partial class OverlayWindow : Window
         {
             PreviewText.Visibility = Visibility.Collapsed;
             PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewFileText.Visibility = Visibility.Collapsed;
             ImageFacts.Visibility = Visibility.Collapsed;
             EmptyText.Visibility = Visibility.Visible;
             return;
@@ -204,7 +260,11 @@ public partial class OverlayWindow : Window
             }
         }
 
+        // Reset before the file branches below decide to show one. The overlay is a single reused window, so a
+        // block left visible from the previous clip is drawn under the next one - which reads as the wrong file's
+        // contents rather than as a stale control.
         PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewFileText.Visibility = Visibility.Collapsed;
         PreviewText.Visibility = Visibility.Visible;
         PreviewText.Text = string.IsNullOrEmpty(model.PreviewText)
             ? DescribeKind(model.Kind)
@@ -217,6 +277,16 @@ public partial class OverlayWindow : Window
             PreviewImage.Source = thumb.Bitmap;
             PreviewImage.Visibility = Visibility.Visible;
             ShowImageFacts($"{thumb.PixelWidth} × {thumb.PixelHeight}", FormatBytes(thumb.FileBytes));
+            return;
+        }
+
+        // A copied text file gets the same treatment: path above, contents below, facts underneath. Tried after
+        // the thumbnail, so a file that is somehow both is drawn as a picture.
+        if (model.Kind == ClipKind.Files && FileTextPreviewCache.TryGet(model.PreviewText) is { } textFile)
+        {
+            PreviewFileText.Text = textFile.Text;
+            PreviewFileText.Visibility = Visibility.Visible;
+            ShowImageFacts(textFile.Facts, FormatBytes(textFile.FileBytes));
             return;
         }
 

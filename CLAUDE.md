@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 716 passing (`dotnet test`) - 664 in Core.Tests, 52 in Interop.Tests |
+| Tests | 725 passing (`dotnet test`) - 673 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      664 tests.
+tests/PasteJump.Core.Tests      673 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -473,6 +473,21 @@ that immediately caught two real bugs. Expect to do the same again.
     every settings-bearing tab contributes (64 settings across 6 tabs today) and runs three queries, one of which
     (`electron`) matches only inline help — proving the help text is indexed. Writing that check found my own wrong
     assumption: the paste-delay help says *Office and Electron*, not Excel.
+- **A numeric range is defined once, in `SettingsBounds`.** Every bound used to be written twice - a `Math.Clamp`
+  in `Normalise` and a hand-typed comparison plus message in the dialog - and lowering the notification floor from
+  250 to 1 changed only the clamp. The dialog went on refusing anything under 250 **with a message quoting the old
+  number**, so it read as a deliberate restriction rather than as a disagreement, and nothing warned. The message
+  is now generated from the bound by `SettingBound.Refuse`, so the check and what it says cannot drift.
+  `SettingsBoundsTests` also asserts every default sits inside its own bound — a default outside its range is
+  clamped on the first `Normalise`, which makes the Advanced tab report a row as modified when nothing was touched.
+- **Access keys must be unique, and four claimants on `Alt+A` is why `Apply` did nothing.** WPF *moves focus*
+  between candidates rather than invoking when a letter is ambiguous, so the symptom is a button that only responds
+  to the mouse. `Alt+A` had `_Add`, `_Appearance`, `Reset _All` and `_Apply`; `Alt+C` had `_Capture` and `_Cancel`;
+  `Alt+O` had `Br_owse…` and `_OK`. Note the scoping subtlety: an unselected tab's controls are not loaded, so
+  which collisions are live depends on the selected tab - but a **tab header** and a **dialog button** are always
+  loaded, which is why those two were broken everywhere. Rules now: `_OK`, `_Cancel` and `_Apply` own O, C and A;
+  tab headers avoid all three (`Cap_ture`, `App_earance`); and the four `Browse…` buttons carry **no access key at
+  all**, since four cannot have four sensible distinct letters and an ambiguous one is worse than none.
 - **Everything the app uses must appear on the Advanced tab.** Reflection over `PasteJumpSettings` gives
   that for free, so a new setting belongs on that class rather than in a field somewhere. The two data
   locations are the exception — they are in `data-location.json` — so `SettingsInspector.Describe` takes
@@ -873,7 +888,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 716 tests
+dotnet test                                         # 725 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
