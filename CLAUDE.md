@@ -799,9 +799,29 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ## Constraints, already decided
 
-- **The two packages deploy different shapes on purpose, and the installer's is the fast one.**
-  `tools/pack-release.ps1` publishes twice: single-file for the portable ZIP, and a **folder** build for
-  `setup.exe`. Single-file spends about a second per launch before our first line runs, and it buys nothing
+- **There are three shapes of one build, not three products, and `pack-release.ps1` publishes all three.**
+  Asked for after someone opened the deployed folder and found 257 files. "Do we really need all of them?"
+  has a different answer per shape, and that is the point:
+
+  | ZIP | files | size | who supplies .NET |
+  |---|---|---|---|
+  | `…-win-x64.zip` | 1 exe | 60.1 MB | bundled, single-file |
+  | `…-win-x64-unpacked.zip` | 257 | 59.3 MB | bundled, already unpacked |
+  | `…-win-x64-net10.zip` | 15 | 2.6 MB | **the machine** — .NET 10 Desktop Runtime |
+
+  Three things measured rather than assumed. The **unpacked ZIP is no larger than the single-file one**
+  (59.3 against 60.1 MB): raw DLLs compress well and a single-file bundle is already compressed, so zipping
+  it again gains almost nothing — which removes the instinct to treat the unpacked shape as "the big
+  download". The framework-dependent shape is **2.6 MB**, and size is not its only argument: it is the one
+  where a .NET security update reaches PasteJump without a new release. Against that, it is the only shape
+  that can fail to start, and `dotnet --list-runtimes` on a developer machine says nothing about a user's.
+  All three are launch-tested, which is *not* redundant with publishing cleanly: **`--self-contained false`
+  silently ignored yields a perfectly working 135 MB directory** that nothing distinguishes from the
+  unpacked shape until someone looks at its size, so the script fails if `coreclr.dll` appears in that one.
+  Note the single-instance mutex makes a naive launch test useless — a second copy surfaces the first and
+  exits, which looks identical to starting successfully. Stop the running copy first.
+- **The installer installs the unpacked shape, which is the fast one.**
+  Single-file spends about a second per launch before our first line runs, and it buys nothing
   once an installer is putting files in a directory for you. Measured warm, same store, D: drive:
 
   | | pre-`Compose` | `Compose` | total |
@@ -814,8 +834,21 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   files instead of one. For a logon-resident app that starts once and runs all day, warm is the case that
   matters — but do not quote the warm figure alone. Note also that `setup.exe` came out *smaller* (45 MB
   against 60 MB): solid LZMA2 over raw files beats recompressing a bundle that is already compressed. The
-  folder publish turns the single-file properties **off** on the command line rather than the csproj
-  turning them on for it, so a plain `dotnet publish` still produces the portable exe the README describes.
+  other two publishes turn the single-file properties **off** on the command line rather than the csproj
+  turning them on for one of them, so a plain `dotnet publish` still produces the portable exe the README
+  describes — the shape someone reaching for that command wants.
+- **A signature can be had locally, and it is worth exactly what it costs.** `tools/sign-local.ps1` creates a
+  self-signed code-signing certificate in `CurrentUser\My` (reused after the first run, found by subject
+  since the thumbprint changes whenever it is regenerated) and signs the deployed build. That is enough to
+  put a **Digital Signatures tab** on the file with the publisher named, and it is *not* enough for Windows
+  to accept it: `Get-AuthenticodeSignature` reports `UnknownError` and `signtool verify /pa` fails with
+  "terminated in a root certificate which is not trusted" on every machine but one that has chosen to trust
+  it. So it is a development convenience, and **signing a release with it would be worse than shipping
+  unsigned** — an unsigned file is unknown, one carrying a signature that fails to validate looks tampered
+  with. That is why `pack-release.ps1` has no `-SelfSigned` switch: pass a thumbprint explicitly if you mean
+  to rehearse that path. Two mechanical notes: **signing rewrites the file, so a running copy must be closed
+  first**, and making the certificate trusted means installing it into `CurrentUser\Root`, which raises a
+  security prompt that no script can answer — the script prints the commands rather than trying.
 - **Publish is a single self-contained `PasteJump.exe`, ~65 MB, with nothing beside it — for the ZIP.**
   `PublishSingleFile` plus `IncludeNativeLibrariesForSelfExtract` (WPF's native libraries cannot load from
   inside the bundle) plus `EnableCompressionInSingleFile`.

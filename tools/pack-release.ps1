@@ -1,29 +1,51 @@
 <#
 .SYNOPSIS
-    Builds the release packages: a portable ZIP and a Windows installer.
+    Builds the release packages: three ZIPs of the same build, and a Windows installer.
 
 .DESCRIPTION
-    One staging folder feeds both packages, which is the point of doing it in one script: a ZIP and an
-    installer assembled separately drift, and the first sign of it is a user reporting a file that is in
-    one and not the other.
+    One script, because packages assembled separately drift, and the first sign of it is a user reporting a
+    file that is in one and not the other. Everything below comes from the same publish of the same commit.
+
+    THREE ZIPS, which is three shapes of one program rather than three products. What separates them is who
+    supplies .NET and whether the runtime is unpacked in advance:
+
+      PasteJump-<version>-win-x64.zip           One PasteJump.exe. Nothing to install, nothing beside it,
+                                                copies to a USB stick and takes its data with it. About
+                                                65 MB, and the default download.
+      PasteJump-<version>-win-x64-unpacked.zip  The same build with the runtime already unpacked - ~257
+                                                files. Starts about 4x faster warm (see the table below),
+                                                because single-file spends that time extracting before a
+                                                line of our code runs. For an app that starts at logon and
+                                                runs all day, that is the case that matters.
+      PasteJump-<version>-win-x64-net10.zip     PasteJump's own files only - 15 files, under 4 MB. Needs the
+                                                .NET 10 Desktop Runtime already on the machine; without it
+                                                Windows says so and offers the download.
+
+    Measured warm, same store, D: drive:
+
+      single file   1,100-1,145 ms before Compose,  138-140 ms in it,  ~1,260 ms total
+      unpacked        171-176 ms before Compose,  112-114 ms in it,    ~286 ms total
+
+    The cold case reverses and honestly so: a first launch after unpacking is slower, because Defender scans
+    255 new files instead of one. Do not quote the warm figure alone.
 
     Steps, in order, because each depends on the last:
 
       1. Ask MSBuild for the version. Never passed in - a version typed on the command line is a version
          that can disagree with the binary it names. It is not read out of Directory.Build.props either,
          because the revision is not stored there: it is the commit count, resolved by a target.
-      2. Publish Release, self-contained, single-file, win-x64.
-      3. Compile the help, so the .chm in the package matches this source tree.
-      4. Stage exe + chm + README + LICENSE.txt.
-      5. Zip the staging folder, and hash it.
-      6. Compile the installer from the same staging folder, and hash that.
+      2. Publish Release three times, win-x64, and check all three report the version above.
+      3. Compile the help, so the .chm in the packages matches this source tree.
+      4. Stage each shape with the same documents beside it.
+      5. Zip each staging folder, and hash it.
+      6. Compile the installer from the unpacked staging folder, and hash that.
 
-    Step 6 is skipped with a warning when Inno Setup is not installed, because the ZIP is the primary
-    artifact and half a release is better than none.
+    Step 6 is skipped with a warning when Inno Setup is not installed, because the ZIPs are the primary
+    artifacts and most of a release is better than none.
 
 .PARAMETER SkipPublish
-    Reuse whatever is already in artifacts/publish. For iterating on the packaging itself - a publish
-    takes far longer than everything else here.
+    Reuse whatever is already under artifacts\publish*. For iterating on the packaging itself - three
+    publishes take far longer than everything else here.
 
 .PARAMETER OutputDirectory
     Where the finished packages go. Defaults to artifacts/release.
@@ -31,7 +53,8 @@
 .PARAMETER SignThumbprint
     SHA1 thumbprint of a code-signing certificate in CurrentUser\My. Everything shippable is signed with it
     before anything is hashed. Omit both signing parameters and the release is unsigned, which is what it has
-    always been.
+    always been. tools/sign-local.ps1 -ThumbprintOnly prints a self-signed one, which is good for rehearsing
+    this path and for nothing else - see that script's warnings before using it on something you publish.
 
 .PARAMETER SignAzureMetadata
     Path to an Azure Artifact Signing (formerly Trusted Signing) metadata .json. Uses that service's signtool
@@ -148,7 +171,7 @@ if (-not $OutputDirectory) {
 # Asked of MSBuild rather than read out of Directory.Build.props with a regex, because the version is no
 # longer written there: the revision is the commit count, resolved by a target. Reimplementing "base plus
 # git rev-list --count" here would work and then quietly stop agreeing the first time either side changed,
-# and the symptom is a .zip whose name disagrees with the exe inside it. Step 5 still verifies the two
+# and the symptom is a .zip whose name disagrees with the exe inside it. Step 2 still verifies the two
 # match, which is what would catch this going wrong anyway.
 
 $versionOutput = & dotnet msbuild $project -t:PrintPasteJumpVersion -nologo -v:m
@@ -167,30 +190,65 @@ if (-not $match.Success) {
 $version = $match.Groups[1].Value
 Write-Host "PasteJump $version" -ForegroundColor Cyan
 
-$stageName = "PasteJump-$version-win-x64"
-$stageDirectory = Join-Path $OutputDirectory "stage\$stageName"
-$installerStageDirectory = Join-Path $OutputDirectory 'stage-installer'
-
-$publishDirectory = Join-Path $repoRoot 'artifacts\publish'
-$folderPublishDirectory = Join-Path $repoRoot 'artifacts\publish-folder'
-
 # --------------------------------------------------------------- 2. publish
 
-# TWO publishes, deliberately, because the two packages want opposite things.
+# THREE publishes of one commit. The shapes and what each is for are described at the top of this file; what
+# follows is only how each is asked for.
 #
-#   Single file, for the ZIP. Portability is the whole point of that download: one executable that can be
-#     dropped on a USB stick, with data\ appearing beside it.
-#
-#   A folder, for the installer. Single-file costs about a second on every launch before a line of our
-#     code runs - measured 1,100-1,145 ms pre-Compose against 228 ms for a folder build - and it buys
-#     nothing once an installer is putting files in a directory for you. Someone who ran a setup program
-#     does not care that the directory has 200 files in it; they do notice a second of nothing happening
-#     after they press the shortcut.
-#
-# The cost is disk: roughly 143 MB installed against 65 MB. That is the trade being made on purpose.
+# Note the direction of the overrides: the csproj turns single-file ON for everyone, so the other two turn it
+# back off rather than the single-file one turning it on. That way a plain `dotnet publish` by hand still
+# produces the portable exe the README describes, which is the one someone reaching for that command wants.
+
+$shapes = @(
+    [ordered]@{
+        Key          = 'single'
+        Label        = 'single file, portable'
+        Suffix       = ''
+        PublishDir   = Join-Path $repoRoot 'artifacts\publish'
+        Arguments    = @()
+        MinimumFiles = 1
+        Note         = 'one exe, no prerequisites'
+    }
+    [ordered]@{
+        Key          = 'unpacked'
+        Label        = 'unpacked, runtime included'
+        Suffix       = '-unpacked'
+        PublishDir   = Join-Path $repoRoot 'artifacts\publish-folder'
+        Arguments    = @(
+            '-p:PublishSingleFile=false',
+            '-p:EnableCompressionInSingleFile=false',
+            '-p:IncludeNativeLibrariesForSelfExtract=false'
+        )
+        # Fifty is a long way below the ~257 this really produces, deliberately: the check is here to catch a
+        # single-file build wearing this name, not to assert an exact file count that every .NET update moves.
+        MinimumFiles = 50
+        Note         = 'no prerequisites, fastest warm start'
+    }
+    [ordered]@{
+        Key          = 'net10'
+        Label        = 'framework-dependent'
+        Suffix       = '-net10'
+        PublishDir   = Join-Path $repoRoot 'artifacts\publish-framework'
+        Arguments    = @(
+            '--self-contained', 'false',
+            '-p:PublishSingleFile=false',
+            '-p:EnableCompressionInSingleFile=false',
+            '-p:IncludeNativeLibrariesForSelfExtract=false'
+        )
+        MinimumFiles = 5
+        Note         = 'needs the .NET 10 Desktop Runtime'
+    }
+)
 
 function Invoke-Publish([string] $label, [string] $destination, [string[]] $extra) {
     Write-Host "  $label"
+
+    # A stale publish is worse than none: files a later build stopped producing would stay behind and be
+    # packaged, and one wrong assembly version is a runtime failure with no clue as to why. This matters most
+    # for the two directory shapes, but costs nothing for the single-file one.
+    if (Test-Path $destination) {
+        Remove-Item $destination -Recurse -Force
+    }
 
     $log = & dotnet publish $project -c Release -o $destination --nologo -v q @extra
 
@@ -201,64 +259,60 @@ function Invoke-Publish([string] $label, [string] $destination, [string[]] $extr
 }
 
 if ($SkipPublish) {
-    Write-Host "[1/5] Publish skipped; reusing artifacts\publish and artifacts\publish-folder"
+    Write-Host "[1/5] Publish skipped; reusing what is already under artifacts\publish*"
 }
 else {
-    Write-Host "[1/5] Publishing Release twice..."
+    Write-Host "[1/5] Publishing Release three times..."
 
-    Invoke-Publish 'single file, for the ZIP' $publishDirectory @()
-
-    # The csproj turns single-file on for everyone, so it is turned back off here rather than the other way
-    # round: the default publish - what someone gets from `dotnet publish` by hand - should stay the
-    # portable one described in the README. Compression and native-library extraction only mean anything
-    # inside a bundle, so both go with it.
-    if (Test-Path $folderPublishDirectory) {
-        # A stale folder publish is worse than none: files that a later build stopped producing would stay
-        # behind and be packaged, and a single wrong assembly version is a runtime failure with no clue.
-        Remove-Item $folderPublishDirectory -Recurse -Force
+    foreach ($shape in $shapes) {
+        Invoke-Publish $shape.Label $shape.PublishDir $shape.Arguments
     }
-
-    Invoke-Publish 'folder, for the installer' $folderPublishDirectory @(
-        '-p:PublishSingleFile=false',
-        '-p:EnableCompressionInSingleFile=false',
-        '-p:IncludeNativeLibrariesForSelfExtract=false'
-    )
 }
 
-$exe = Join-Path $publishDirectory 'PasteJump.exe'
-$folderExe = Join-Path $folderPublishDirectory 'PasteJump.exe'
+foreach ($shape in $shapes) {
+    $shapeExe = Join-Path $shape.PublishDir 'PasteJump.exe'
 
-foreach ($candidate in @($exe, $folderExe)) {
-    if (-not (Test-Path $candidate)) {
-        throw "No PasteJump.exe at $candidate."
+    if (-not (Test-Path $shapeExe)) {
+        throw "No PasteJump.exe at $shapeExe."
     }
 
-    # Both published binaries must be the version this script claims to be packaging. Cheap to check, and
-    # it catches -SkipPublish being used against a stale publish, which would otherwise ship the wrong
-    # build under the right name - in one package and not the other, which is worse than in both. Now that
+    # Every published binary must be the version this script claims to be packaging. Cheap to check, and it
+    # catches -SkipPublish being used against a stale publish, which would otherwise ship the wrong build
+    # under the right name - in one package and not the others, which is worse than in all of them. Now that
     # the revision comes from the commit count it also catches a publish made before the last commit.
-    $candidateVersion = (Get-Item $candidate).VersionInfo.FileVersion
+    $shapeVersion = (Get-Item $shapeExe).VersionInfo.FileVersion
 
-    if ($candidateVersion -ne $version) {
-        throw "$candidate reports $candidateVersion but this build resolves to $version. Publish again without -SkipPublish."
+    if ($shapeVersion -ne $version) {
+        throw "$shapeExe reports $shapeVersion but this build resolves to $version. Publish again without -SkipPublish."
     }
-}
 
-# A folder publish that produced only the exe means the single-file properties did not actually come off,
-# and the installer would ship a single-file build while claiming to be the fast one.
-$folderFileCount = (Get-ChildItem $folderPublishDirectory -Recurse -File).Count
+    $shapeFiles = Get-ChildItem $shape.PublishDir -Recurse -File
+    $shape.Exe = $shapeExe
+    $shape.FileCount = $shapeFiles.Count
+    $shape.Bytes = ($shapeFiles | Measure-Object -Property Length -Sum).Sum
 
-if ($folderFileCount -lt 50) {
-    throw "The folder publish has only $folderFileCount files, so it is still a single-file build. Check the -p: overrides."
+    # A publish that came out the wrong shape is the failure this guards, and each shape fails differently:
+    # too few files means the single-file properties did not come off and this "unpacked" package would ship a
+    # single-file build while claiming to be the fast one.
+    if ($shape.FileCount -lt $shape.MinimumFiles) {
+        throw "The $($shape.Key) publish has only $($shape.FileCount) files, fewer than the $($shape.MinimumFiles) expected. Check its -p: overrides."
+    }
+
+    # And the framework-dependent one fails the other way round: --self-contained false silently ignored
+    # would produce a perfectly working 135 MB directory that nobody could tell from the unpacked shape until
+    # they looked at its size. coreclr.dll is the runtime itself, so its presence is the tell.
+    if ($shape.Key -eq 'net10' -and (Test-Path (Join-Path $shape.PublishDir 'coreclr.dll'))) {
+        throw "The framework-dependent publish contains coreclr.dll, so it is self-contained after all. Check --self-contained false."
+    }
 }
 
 # Signed here: after the version check, so a mismatched build is rejected before anything is signed, and well
-# before staging or hashing. Only the two executables, not the folder build's 250 DLLs - SmartScreen and the
+# before staging or hashing. Only the executables, not the unpacked shape's 250 DLLs - SmartScreen and the
 # publisher prompt read the exe, the .NET assemblies beside it are Microsoft's and already signed, and each
 # signature is a billable call on the Azure route.
 if ($signing) {
     Write-Host "  code signing..."
-    Invoke-CodeSign @($exe, $folderExe)
+    Invoke-CodeSign @($shapes | ForEach-Object { $_.Exe })
 }
 
 # --------------------------------------------------------------- 3. help
@@ -274,7 +328,7 @@ try {
     & $helpScript 6>$null | Out-Null
 }
 catch {
-    # Not fatal on its own, but the package would silently lose its manual - so it fails here unless a
+    # Not fatal on its own, but the packages would silently lose their manual - so it fails here unless a
     # previously built .chm is lying around to use.
     if (Test-Path $chm) {
         Write-Warning "The help did not rebuild ($($_.Exception.Message)). Packaging the existing $chm."
@@ -292,7 +346,7 @@ if (-not (Test-Path $chm)) {
 
 Write-Host "[3/5] Staging..."
 
-# The documents both packages carry. LICENSE is renamed on the way in: the repository file has no
+# The documents every package carries. LICENSE is renamed on the way in: the repository file has no
 # extension, and both Explorer and Inno's licence page want one.
 $documents = @(
     @{ From = $chm; To = 'PasteJump.chm' },
@@ -300,51 +354,42 @@ $documents = @(
     @{ From = Join-Path $repoRoot 'LICENSE'; To = 'LICENSE.txt' }
 )
 
-# The ZIP: one executable and the documents.
-if (Test-Path $stageDirectory) {
-    Remove-Item $stageDirectory -Recurse -Force
+foreach ($shape in $shapes) {
+    $stageName = "PasteJump-$version-win-x64$($shape.Suffix)"
+    $stageDirectory = Join-Path $OutputDirectory "stage\$stageName"
+
+    if (Test-Path $stageDirectory) {
+        Remove-Item $stageDirectory -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Force -Path $stageDirectory | Out-Null
+
+    # The single-file shape stages its one executable; the other two stage the whole publish. Written as a
+    # test on the shape rather than on the file count, so an empty directory fails later as a missing exe
+    # instead of quietly staging nothing.
+    if ($shape.Key -eq 'single') {
+        Copy-Item $shape.Exe (Join-Path $stageDirectory 'PasteJump.exe')
+    }
+    else {
+        Copy-Item "$($shape.PublishDir)\*" $stageDirectory -Recurse -Force
+    }
+
+    foreach ($document in $documents) {
+        Copy-Item $document.From (Join-Path $stageDirectory $document.To)
+    }
+
+    $shape.StageName = $stageName
+    $shape.StageDirectory = $stageDirectory
+
+    $staged = Get-ChildItem $stageDirectory -Recurse -File
+
+    Write-Host ("  {0,-28} {1,4} files  {2,7:N1} MB" -f $stageName, $staged.Count,
+        (($staged | Measure-Object -Property Length -Sum).Sum / 1MB))
 }
-
-New-Item -ItemType Directory -Force -Path $stageDirectory | Out-Null
-Copy-Item $exe (Join-Path $stageDirectory 'PasteJump.exe')
-
-foreach ($document in $documents) {
-    Copy-Item $document.From (Join-Path $stageDirectory $document.To)
-}
-
-# The installer: the whole folder publish, plus the same documents. Staged rather than pointing the
-# installer at artifacts\publish-folder directly, so both packages are assembled from a directory this
-# script controls and the .iss needs one Source line rather than a list that can fall behind the build.
-if (Test-Path $installerStageDirectory) {
-    Remove-Item $installerStageDirectory -Recurse -Force
-}
-
-New-Item -ItemType Directory -Force -Path $installerStageDirectory | Out-Null
-Copy-Item "$folderPublishDirectory\*" $installerStageDirectory -Recurse -Force
-
-foreach ($document in $documents) {
-    Copy-Item $document.From (Join-Path $installerStageDirectory $document.To)
-}
-
-$installerBytes = (Get-ChildItem $installerStageDirectory -Recurse -File | Measure-Object -Property Length -Sum).Sum
-
-Write-Host ("  ZIP payload:       1 exe + {0} documents" -f $documents.Count)
-Write-Host ("  installer payload: {0} files, {1:N0} MB on disk once installed" -f
-    (Get-ChildItem $installerStageDirectory -Recurse -File).Count, ($installerBytes / 1MB))
 
 # --------------------------------------------------------------- 5. zip
 
 Write-Host "[4/5] Zipping..."
-
-$zip = Join-Path $OutputDirectory "$stageName.zip"
-
-if (Test-Path $zip) {
-    Remove-Item $zip -Force
-}
-
-# The staging folder itself is compressed, not its contents, so the archive expands into a named folder
-# rather than scattering four files into whatever directory it was opened in.
-Compress-Archive -Path $stageDirectory -DestinationPath $zip -CompressionLevel Optimal
 
 function Write-Hash([string] $path) {
     $hash = (Get-FileHash -Path $path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -356,7 +401,23 @@ function Write-Hash([string] $path) {
     return $hash
 }
 
-$zipHash = Write-Hash $zip
+foreach ($shape in $shapes) {
+    $zip = Join-Path $OutputDirectory "$($shape.StageName).zip"
+
+    if (Test-Path $zip) {
+        Remove-Item $zip -Force
+    }
+
+    # The staging folder itself is compressed, not its contents, so each archive expands into a named folder
+    # rather than scattering files - four of them for one shape and 260 for another - into whatever directory
+    # it was opened in.
+    Compress-Archive -Path $shape.StageDirectory -DestinationPath $zip -CompressionLevel Optimal
+
+    $shape.Zip = $zip
+    $shape.ZipHash = Write-Hash $zip
+
+    Write-Host ("  {0,-44} {1,7:N1} MB" -f (Split-Path -Leaf $zip), ((Get-Item $zip).Length / 1MB))
+}
 
 # --------------------------------------------------------------- 6. installer
 
@@ -376,19 +437,23 @@ if (-not $iscc) {
 }
 
 $setup = $null
+$setupHash = $null
 
 if (-not $iscc) {
-    Write-Warning "Inno Setup not found, so no installer was built. The ZIP above is complete."
+    Write-Warning "Inno Setup not found, so no installer was built. The ZIPs above are complete."
     Write-Warning "Install it with:  winget install --id JRSoftware.InnoSetup"
 }
 else {
     $script = Join-Path $repoRoot 'packaging\PasteJump.iss'
 
-    # The installer staging folder, not the ZIP's: this is what makes setup.exe deploy the fast folder
-    # build while the ZIP stays one file.
+    # The unpacked shape's staging folder, which is also what that ZIP contains - one directory feeding both,
+    # so an installed copy and an unzipped one cannot differ. This is what makes setup.exe deploy the fast
+    # build while the default download stays one file.
+    $unpackedStage = ($shapes | Where-Object { $_.Key -eq 'unpacked' }).StageDirectory
+
     $isccLog = & $iscc `
         "/DAppVersion=$version" `
-        "/DStageDir=$installerStageDirectory" `
+        "/DStageDir=$unpackedStage" `
         "/DOutputDir=$OutputDirectory" `
         "/DRepoRoot=$repoRoot" `
         $script
@@ -416,15 +481,25 @@ else {
 
 Write-Host ""
 Write-Host "Packages in $OutputDirectory" -ForegroundColor Green
+Write-Host ""
 
-foreach ($file in @($zip, $setup) | Where-Object { $_ }) {
-    $item = Get-Item $file
-    Write-Host ("  {0,-44} {1,8:N1} MB" -f $item.Name, ($item.Length / 1MB))
+foreach ($shape in $shapes) {
+    $item = Get-Item $shape.Zip
+
+    Write-Host ("  {0,-44} {1,7:N1} MB  {2}" -f $item.Name, ($item.Length / 1MB), $shape.Note)
+}
+
+if ($setup) {
+    $setupItem = Get-Item $setup
+    Write-Host ("  {0,-44} {1,7:N1} MB  {2}" -f $setupItem.Name, ($setupItem.Length / 1MB), 'installs the unpacked shape')
 }
 
 Write-Host ""
 Write-Host "SHA256"
-Write-Host "  $zipHash  $(Split-Path -Leaf $zip)"
+
+foreach ($shape in $shapes) {
+    Write-Host "  $($shape.ZipHash)  $(Split-Path -Leaf $shape.Zip)"
+}
 
 if ($setup) {
     Write-Host "  $setupHash  $(Split-Path -Leaf $setup)"
@@ -433,7 +508,7 @@ if ($setup) {
 Write-Host ""
 
 if (-not $signing) {
-    Write-Host "Neither package is code-signed, so Windows will show a SmartScreen warning on first run."
+    Write-Host "Nothing here is code-signed, so Windows will show a SmartScreen warning on first run."
     Write-Host "Pass -SignThumbprint or -SignAzureMetadata to sign. See the release checklist in CLAUDE.md."
 }
 else {
