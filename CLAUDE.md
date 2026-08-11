@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 680 passing (`dotnet test`) - 628 in Core.Tests, 52 in Interop.Tests |
+| Tests | 685 passing (`dotnet test`) - 633 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      628 tests.
+tests/PasteJump.Core.Tests      633 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -353,6 +353,17 @@ that immediately caught two real bugs. Expect to do the same again.
   mark-of-the-web opens with every page blank** ("Navigation to the webpage was canceled") — detected by probing
   the `Zone.Identifier` alternate data stream and *reported*, not stripped, because silently removing a Windows
   security marker is not this application's business.
+- **A left click on the tray is configurable; a right click is not, and that asymmetry is deliberate.**
+  `TrayClickAction` offers history (the default, and what it always did), the menu, settings or nothing - there is
+  no single convention, and plenty of tray applications open their menu on the left button. **Right click always
+  opens the menu**, because it is the one thing every tray application agrees on and therefore the way back from
+  any choice made here; a machine where neither button reached the menu could not be put right.
+  Three details worth keeping: `History` is the **zero** value, so a settings file written before this existed
+  deserialises to the old behaviour rather than to whichever member came first; `TrayIcon.Activated` now carries
+  the cursor position, because the menu has to be placed and asking for the position later would read it after the
+  pointer moved; and **`WM_LBUTTONDBLCLK` is no longer handled at all** - Windows sends `WM_LBUTTONUP` *and* then
+  the double-click, so acting on both fired twice, which was invisible when it opened an already-open window and a
+  visible flicker once the menu became a choice.
 - **The trigger key is configurable, so nothing may hard-code `V` or "Ctrl+V".** `TriggerKey` in `Core`
   owns the rules; `VirtualKeyTranslator.ToGestureKey` takes the trigger VK and checks it *first*, and `V` is
   deliberately absent from the binding table so it falls through to search input when it is not the
@@ -836,7 +847,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 680 tests
+dotnet test                                         # 685 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

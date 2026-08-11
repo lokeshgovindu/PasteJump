@@ -40,6 +40,18 @@ public partial class SettingsWindow : Window
         (PasteKeystroke.ShiftInsert, "Shift+Insert"),
     ];
 
+    /// <summary>
+    /// What a left click on the tray icon does. Labelled by what happens rather than by the enum name, and
+    /// "Nothing" is offered because someone who keeps catching the icon by accident has no other remedy.
+    /// </summary>
+    private static readonly (TrayClickAction Action, string Label)[] TrayLeftClickChoices =
+    [
+        (TrayClickAction.History, "Open the clipboard history"),
+        (TrayClickAction.Menu, "Open the menu"),
+        (TrayClickAction.Settings, "Open settings"),
+        (TrayClickAction.Nothing, "Do nothing"),
+    ];
+
     /// <summary>Density options, labelled as Outlook and Explorer label them.</summary>
     private static readonly (GridDensity Density, string Label)[] DensityChoices =
     [
@@ -240,6 +252,11 @@ public partial class SettingsWindow : Window
             ThemeCombo.Items.Add(choice.Label);
         }
 
+        foreach (var choice in TrayLeftClickChoices)
+        {
+            TrayLeftClickCombo.Items.Add(choice.Label);
+        }
+
         foreach (var choice in DensityChoices)
         {
             DensityCombo.Items.Add(choice.Label);
@@ -324,6 +341,9 @@ public partial class SettingsWindow : Window
         UpdatePasteKeysHint(keyMap);
 
         HistoryHotkeyBox.Text = source.HistoryHotkey;
+
+        TrayLeftClickCombo.SelectedItem = TrayLeftClickChoices
+            .First(c => c.Action == source.TrayLeftClick).Label;
 
         ThemeCombo.SelectedItem = ThemeChoices.First(c => c.Theme == source.Theme).Label;
         DensityCombo.SelectedItem = DensityChoices.First(c => c.Density == source.GridDensity).Label;
@@ -1529,6 +1549,11 @@ public partial class SettingsWindow : Window
         // position set by hand in PasteJump.json was silently discarded by opening this dialog and clicking OK.
         settings.OverlayX = overlayX;
         settings.OverlayY = overlayY;
+
+        var trayLabel = TrayLeftClickCombo.SelectedItem as string;
+        settings.TrayLeftClick = TrayLeftClickChoices
+            .FirstOrDefault(c => string.Equals(c.Label, trayLabel, StringComparison.Ordinal))
+            .Action;
 
         settings.RunAtLogon = RunAtLogonCheck.IsChecked == true;
         settings.TextEditor = TextEditorBox.Text;

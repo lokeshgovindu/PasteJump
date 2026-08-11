@@ -127,6 +127,12 @@ public sealed class PasteJumpSettings
     /// accepted; anything else is coerced back to <c>V</c> by <see cref="Normalise"/>.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// What a left click on the tray icon does. Right click always opens the menu - see
+    /// <see cref="TrayClickAction"/> for why that one is not negotiable.
+    /// </summary>
+    public TrayClickAction TrayLeftClick { get; set; } = TrayClickAction.History;
+
     public string PasteModeTriggerKey { get; set; } = PasteMode.TriggerKey.Default.ToString();
 
     /// <summary>

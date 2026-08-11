@@ -294,7 +294,7 @@ public partial class App : Application
         StartupTrace.Mark("keyboard hook and hotkey");
 
         _trayIcon = new TrayIcon(BuildTrayTooltip(), _messageWindow);
-        _trayIcon.Activated += ShowHistory;
+        _trayIcon.Activated += OnTrayLeftClick;
         _trayIcon.ContextMenuRequested += ShowTrayMenu;
 
         // Before Show(), so the shell receives the crisply-sized icon from the start rather than the
@@ -712,6 +712,31 @@ public partial class App : Application
     }
 
     // ------------------------------------------------------------- tray and windows
+
+    /// <summary>
+    /// The configurable left click. Right click is not routed through here - it always opens the menu, which is
+    /// the one convention every tray application shares and the way back from any choice made here.
+    /// </summary>
+    private void OnTrayLeftClick(int x, int y)
+    {
+        switch (_settings.TrayLeftClick)
+        {
+            case TrayClickAction.Menu:
+                ShowTrayMenu(x, y);
+                break;
+
+            case TrayClickAction.Settings:
+                ShowSettings();
+                break;
+
+            case TrayClickAction.Nothing:
+                break;
+
+            default:
+                ShowHistory();
+                break;
+        }
+    }
 
     private void ShowTrayMenu(int x, int y)
     {

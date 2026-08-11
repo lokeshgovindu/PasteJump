@@ -42,7 +42,9 @@ dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/pu
 artifacts/publish/PasteJump.exe
 ```
 
-It lives in the notification area. Left-click for history, right-click for the menu.
+It lives in the notification area. Left-click for history, right-click for the menu. What the left button does is
+configurable under **Settings → System** &mdash; the menu, settings, or nothing &mdash; because plenty of tray
+programs open their menu on a left click. Right-click always opens the menu.
 
 That produces one file and nothing else. Data goes in a `data/` folder next to the executable, so it stays
 portable — copy the exe to a USB stick and it takes its history with it.

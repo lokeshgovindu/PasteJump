@@ -630,6 +630,17 @@
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="190" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Left-Clicking the Tray Icon" />
+                            <ComboBox x:Name="TrayLeftClickCombo" Grid.Column="1" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Text="Right-clicking always opens the menu, whatever this says — that is the one thing every tray program agrees on, and the way back from any choice here." />
+
+                        <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Pause Before Pasting (ms)" />
@@ -644,11 +655,11 @@
                                 <ColumnDefinition Width="190" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Editor for Text Clips (H key)" />
+                            <TextBlock Grid.Column="0" Text="Editor for Text Clips (O key)" />
                             <TextBox x:Name="TextEditorBox" Grid.Column="1" />
                             <!--
                                 Browse, because nobody knows an executable's path off the top of their head and a
-                                wrong guess fails at the moment you press H rather than here. Same reasoning as
+                                wrong guess fails at the moment you press O rather than here. Same reasoning as
                                 the picker on the Excluded Apps tab.
                             -->
                             <Button Grid.Column="2"
@@ -659,7 +670,7 @@
                                     ToolTip="Choose the program to open text clips with" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
-                                   Text="Opened when you press H during the gesture on a text clip. The clip is written to a temporary file first; editing it does not change the stored clip." />
+                                   Text="Opened when you press O during the gesture on a text clip. The clip is written to a temporary file first; editing it does not change the stored clip." />
 
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
@@ -667,7 +678,7 @@
                                 <ColumnDefinition Width="190" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Editor for Image Clips (H key)" />
+                            <TextBlock Grid.Column="0" Text="Editor for Image Clips (O key)" />
                             <TextBox x:Name="ImageEditorBox" Grid.Column="1" />
                             <Button Grid.Column="2"
                                     Click="OnBrowseImageEditorClicked"

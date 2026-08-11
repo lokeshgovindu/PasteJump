@@ -22,8 +22,16 @@ public sealed class TrayIcon : IDisposable
     private bool _disposed;
     private string _tooltip;
 
-    /// <summary>Left click or double click.</summary>
-    public event Action? Activated;
+    /// <summary>
+    /// Left click or double click. Screen coordinates are the cursor position, as for
+    /// <see cref="ContextMenuRequested"/>.
+    /// <para>
+    /// Carries the position because what a left click does is configurable, and one of the choices is the tray
+    /// menu - which has to be placed at the cursor. Without it the handler would have to ask for the cursor
+    /// position itself, by which time the pointer may have moved.
+    /// </para>
+    /// </summary>
+    public event Action<int, int>? Activated;
 
     /// <summary>Right click. Screen coordinates are the cursor position.</summary>
     public event Action<int, int>? ContextMenuRequested;
@@ -152,9 +160,15 @@ public sealed class TrayIcon : IDisposable
 
         switch ((int)lParam)
         {
+            // Only the button-up, not the double-click. Windows sends LBUTTONUP and then LBUTTONDBLCLK for a
+            // double click, so handling both fired the action twice - harmless when it opened a window that was
+            // already open, and a visible flicker now that one of the choices is the tray menu.
             case NativeConstants.WM_LBUTTONUP:
-            case NativeConstants.WM_LBUTTONDBLCLK:
-                Activated?.Invoke();
+                if (NativeMethods.GetCursorPos(out var clicked))
+                {
+                    Activated?.Invoke(clicked.X, clicked.Y);
+                }
+
                 break;
 
             case NativeConstants.WM_RBUTTONUP:
