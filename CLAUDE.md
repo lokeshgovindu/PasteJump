@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 591 passing (`dotnet test`) |
+| Tests | 634 passing (`dotnet test`) - 598 in Core.Tests, 36 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,8 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      591 tests.
+tests/PasteJump.Core.Tests      598 tests.
+tests/PasteJump.Interop.Tests   36 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -233,6 +234,27 @@ that immediately caught two real bugs. Expect to do the same again.
   Note the second-order effect: an invariant test used `Handle(PasteAction.Help)` as one of its "many
   intermediate keys", so ending the session there silently made every later key in that test a no-op — it still
   passed, while proving nothing. If you make an action end the session, grep the tests for it.
+- **`GestureKey.Paste` is the key that *opens* a session, so nothing may ever be aliased onto it.** This was
+  shipped and reported within a day: the Down and Right arrows were mapped to `Paste`, and entry is
+  `key == GestureKey.Paste && IsControlDown && !IsActive` (`PasteGestureRecognizer.cs:223`), so **`Ctrl+Right`
+  opened the overlay, swallowed the keystroke so the editor never moved the caret, and pasted a clip when Ctrl
+  came up** — over word-navigation, one of the most-used chords on the keyboard. `GestureKey.StepOlder` exists
+  for this: it maps to `PasteAction.Advance` and cannot open a session. Note the asymmetry that makes the
+  mistake easy to repeat — `Ctrl+Left` and `Ctrl+Up` were *unaffected*, because `Back` was never an entry point,
+  so testing the "obvious" pair would have shown nothing wrong.
+  **The guard is `VirtualKeyTranslatorTests.The_trigger_is_the_only_key_that_can_open_a_session`**, which sweeps
+  all 256 virtual keys rather than asserting per key, so a new binding cannot slip through by being one nobody
+  thought to test. Verified by reintroducing the defect: it fails.
+  That test lives in **`tests/PasteJump.Interop.Tests`, a project this bug is the reason for.** The binding table
+  is a pure lookup with no Win32 in it, but it sat in `Interop`, and "Interop is verified by the probe and by
+  hand" meant it had no tests at all. Anything in `Interop` needing no message loop, window or live keyboard
+  belongs there now. Its virtual keys are written as **literals with the name in a comment**, deliberately not
+  taken from `NativeConstants` — those are Windows' numbers from WinUser.h, so stating them independently means a
+  typo in the constants table fails the test instead of agreeing with it. (`NativeConstants` is also internal,
+  which is what forced the question.)
+  Two more invariants moved out of prose and into that project: every letter bound to an action **is** in
+  `TriggerKey.Reserved`, and every reserved letter **is** really bound. The first is the rule CLAUDE.md had been
+  asking a human to maintain; it is what catches an alias added on one side only.
 - **The paste-mode keys are additive from here on: nothing that works may stop working.** The physical keys
   (`↓`/`→` and `↑`/`←` for stepping, `Home`, `End`, `Delete`) were added *beside* Clipjump's letters, not instead
   of them, and `O` for "open in an editor" is an **alias** of `H` rather than a replacement — `H` reads as Help,
@@ -742,7 +764,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 591 tests
+dotnet test                                         # 634 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

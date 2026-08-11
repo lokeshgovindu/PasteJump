@@ -112,11 +112,17 @@ public static class VirtualKeyTranslator
         NativeConstants.VK_ESCAPE => GestureKey.Escape,
         NativeConstants.VK_BACK => GestureKey.Backspace,
 
-        // The physical navigation keys, all additive. Down/Right and Up/Left simply duplicate the trigger and
-        // C, so a hand that already knows those loses nothing; they exist because stepping through a list with
-        // an arrow key needs no learning at all. Clipjump binds Up and Down to its channel keys
+        // The physical navigation keys, all additive. Down/Right and Up/Left step the same way as the trigger
+        // and C, so a hand that already knows those loses nothing; they exist because stepping through a list
+        // with an arrow key needs no learning at all. Clipjump binds Up and Down to its channel keys
         // (Clipjump.ahk:222) - channels are out of scope here, so nothing of ours was using them.
-        NativeConstants.VK_DOWN or NativeConstants.VK_RIGHT => GestureKey.Paste,
+        //
+        // GestureKey.StepOlder, NOT GestureKey.Paste. Paste is the key that OPENS a session, so mapping the
+        // arrows onto it claimed Ctrl+Right and Ctrl+Down machine-wide: the overlay appeared, the keystroke was
+        // swallowed so the editor never saw it, and releasing Ctrl pasted instead of moving the caret by a word.
+        // Reported immediately, and it is the reason StepOlder exists. Up/Left were unaffected because Back was
+        // never an entry point - which is exactly the asymmetry that makes this easy to reintroduce.
+        NativeConstants.VK_DOWN or NativeConstants.VK_RIGHT => GestureKey.StepOlder,
         NativeConstants.VK_UP or NativeConstants.VK_LEFT => GestureKey.Back,
 
         // Home was a second Escape until now, which was our own invention rather than the original's and

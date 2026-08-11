@@ -35,6 +35,64 @@ public class PasteModeNavigationKeyTests
         return (controller, catalog, host);
     }
 
+    /// <summary>
+    /// The arrow keys step an open session and must never open one. Mapping them onto
+    /// <see cref="GestureKey.Paste"/> - which is the entry key - claimed Ctrl+Right and Ctrl+Down machine-wide:
+    /// the overlay appeared over an editor, the keystroke was swallowed so the caret never moved, and releasing
+    /// Ctrl pasted. Reported within a day of shipping it.
+    /// </summary>
+    [Theory]
+    [InlineData(GestureKey.StepOlder)]
+    [InlineData(GestureKey.Back)]
+    [InlineData(GestureKey.JumpToNewest)]
+    [InlineData(GestureKey.JumpToOldest)]
+    [InlineData(GestureKey.DeleteCurrent)]
+    public void No_navigation_key_can_open_a_session(GestureKey key)
+    {
+        var (controller, _, host) = Build();
+        var recognizer = new PasteGestureRecognizer(controller) { AltHeld = false, WinHeld = false };
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+
+        var swallowed = recognizer.Handle(key, isDown: true);
+
+        // Both halves matter. Not opening a session is the behaviour; not swallowing is what lets the editor
+        // underneath actually receive Ctrl+Right and move the caret.
+        Assert.False(swallowed);
+        Assert.False(controller.IsActive);
+        Assert.False(host.OverlayVisible);
+    }
+
+    /// <summary>The trigger itself must still open one, or the fix above has broken the product.</summary>
+    [Fact]
+    public void The_trigger_key_still_opens_a_session()
+    {
+        var (controller, _, host) = Build();
+        var recognizer = new PasteGestureRecognizer(controller);
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+
+        Assert.True(recognizer.Handle(GestureKey.Paste, isDown: true));
+        Assert.True(controller.IsActive);
+        Assert.True(host.OverlayVisible);
+    }
+
+    /// <summary>And once it is open, the arrow steps like the trigger does.</summary>
+    [Fact]
+    public void StepOlder_advances_an_open_session()
+    {
+        var (controller, _, host) = Build(clipCount: 5);
+        var recognizer = new PasteGestureRecognizer(controller);
+
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        var first = host.LastFrame!.Position;
+
+        Assert.True(recognizer.Handle(GestureKey.StepOlder, isDown: true));
+        Assert.Equal(first + 1, host.LastFrame!.Position);
+    }
+
     [Fact]
     public void JumpToOldest_lands_on_the_last_clip_in_the_window()
     {

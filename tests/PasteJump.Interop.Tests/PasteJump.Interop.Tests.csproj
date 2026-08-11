@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    net10.0-windows, unlike PasteJump.Core.Tests, because PasteJump.Interop is a Windows-targeted assembly.
+    That difference is the whole reason this project exists: the key-binding table lives in Interop and so had
+    no unit tests at all, on the reasoning that Interop is "verified by the probe and by hand". That held right
+    up until an arrow key was aliased onto the entry trigger and claimed Ctrl+Right machine-wide - a pure
+    lookup table with no Win32 in it, and nothing to catch it.
+
+    Only the parts that need no message loop, no window and no live keyboard belong here. Anything that calls
+    into Win32 for real is still the probe's job.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>false</UseWPF>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PasteJump.Core\PasteJump.Core.csproj" />
+    <ProjectReference Include="..\..\src\PasteJump.Interop\PasteJump.Interop.csproj" />
+  </ItemGroup>
+
+</Project>

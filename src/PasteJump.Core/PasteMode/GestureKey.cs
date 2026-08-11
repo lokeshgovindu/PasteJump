@@ -14,8 +14,26 @@ public enum GestureKey
     /// <summary>Tracked only so paste-popping knows whether Shift is down.</summary>
     Shift,
 
-    /// <summary>Entry key, and the "step to older clip" key once a session is open.</summary>
+    /// <summary>
+    /// Entry key, and the "step to older clip" key once a session is open.
+    /// <para>
+    /// <b>Nothing may be aliased onto this.</b> It is the only key that <em>opens</em> a session, and it opens
+    /// one by swallowing the keystroke - so anything mapped here claims that chord machine-wide and hides it
+    /// from the application underneath. The Down and Right arrows were mapped here, which made
+    /// <c>Ctrl+Right</c> open the overlay and then paste over the word-navigation the user had asked for.
+    /// Anything that should only step an <em>already open</em> session belongs on <see cref="StepOlder"/>.
+    /// </para>
+    /// </summary>
     Paste,
+
+    /// <summary>
+    /// Steps to an older clip without being able to open a session. What the Down and Right arrows map to.
+    /// <para>
+    /// Its counterpart <see cref="Back"/> needs no such twin, because "step to a newer clip" was never an entry
+    /// point - which is exactly why <c>Ctrl+Left</c> and <c>Ctrl+Up</c> were unaffected by the same mistake.
+    /// </para>
+    /// </summary>
+    StepOlder,
 
     Back,
     CycleCommitMode,
@@ -69,6 +87,7 @@ internal static class GestureKeyExtensions
     public static PasteAction? ToAction(this GestureKey key) => key switch
     {
         GestureKey.Paste => PasteAction.Advance,
+        GestureKey.StepOlder => PasteAction.Advance,
         GestureKey.Back => PasteAction.Back,
         GestureKey.CycleCommitMode => PasteAction.CycleCommitMode,
         GestureKey.JumpToNewest => PasteAction.JumpToNewest,
