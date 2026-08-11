@@ -149,6 +149,62 @@ public class VirtualKeyTranslatorTests
         => Assert.Equal(expected, VirtualKeyTranslator.ToGestureKey(virtualKey, VkV));
 
     /// <summary>
+    /// Every key the Keys tab presents as fixed really fires something, and the tab lists them all.
+    /// <para>
+    /// <c>PasteKeyMap.FixedActions</c> is display text in <c>Core</c>, which cannot see a virtual key - so the
+    /// two halves are joined here. Without this, a key could be documented on that tab, and in the help built
+    /// from it, while being wired to nothing: the sort of claim that is only ever discovered by a user pressing
+    /// it. The count check is what catches a fixed action added to the list and to nothing else.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Every_key_documented_as_fixed_actually_does_something()
+    {
+        // Display text -> the virtual key a user would press. "1 - 9" is checked at both ends of its range.
+        var expected = new Dictionary<string, int[]>
+        {
+            ["Delete"] = [0x2E],
+            ["End"] = [0x23],
+            ["1 - 9"] = [0x31, 0x39],
+            ["-"] = [0xBD],
+            ["Enter"] = [0x0D],
+            ["Esc"] = [0x1B],
+            ["F1"] = [0x70],
+        };
+
+        Assert.Equal(expected.Count, PasteKeyMap.FixedActions.Count);
+
+        foreach (var (keys, _) in PasteKeyMap.FixedActions)
+        {
+            Assert.True(expected.ContainsKey(keys), $"No virtual key known for the fixed row \"{keys}\".");
+
+            foreach (var vk in expected[keys])
+            {
+                Assert.NotEqual(GestureKey.None, VirtualKeyTranslator.ToGestureKey(vk, VkV));
+            }
+        }
+    }
+
+    /// <summary>
+    /// And none of them can be taken away by rebinding, which is the promise that makes them worth listing as
+    /// fixed. Esc above all: a session that could not be cancelled would present as a dead keyboard.
+    /// </summary>
+    [Fact]
+    public void No_set_of_bindings_can_unbind_a_fixed_key()
+    {
+        var map = PasteKeyMap.Parse("back=;newest=;search=;pin=;front=;format=;tags=;clipboard=;editor=;history=;export=;commit=");
+
+        Assert.Equal(GestureKey.Escape, VirtualKeyTranslator.ToGestureKey(0x1B, VkV, map));         // Esc
+        Assert.Equal(GestureKey.JumpToOldest, VirtualKeyTranslator.ToGestureKey(0x23, VkV, map));   // End
+        Assert.Equal(GestureKey.DeleteCurrent, VirtualKeyTranslator.ToGestureKey(0x2E, VkV, map));  // Delete
+        Assert.Equal(GestureKey.JumpToNewest, VirtualKeyTranslator.ToGestureKey(0x24, VkV, map));   // Home
+        Assert.Equal(GestureKey.Commit, VirtualKeyTranslator.ToGestureKey(0x0D, VkV, map));         // Enter
+        Assert.Equal(GestureKey.Help, VirtualKeyTranslator.ToGestureKey(0x70, VkV, map));           // F1
+        Assert.Equal(GestureKey.StepOlder, VirtualKeyTranslator.ToGestureKey(0x27, VkV, map));      // Right
+        Assert.Equal(GestureKey.Back, VirtualKeyTranslator.ToGestureKey(0x26, VkV, map));           // Up
+    }
+
+    /// <summary>
     /// Modifiers are never swallowed, whatever else is happening: the foreground application tracks them, and
     /// eating a release leaves it believing a modifier is still down. The left/right variants are in the list
     /// because a low-level hook reports those rather than the generic code.

@@ -64,6 +64,35 @@ public sealed class PasteKeyMap
     ];
 
     /// <summary>
+    /// The actions that have no letter, and the keys that fire them.
+    /// <para>
+    /// Listed so the Keys tab is a complete map of the gesture rather than only its configurable half. It was
+    /// not, and that read as an omission: <c>End</c> and <c>Delete</c> appeared nowhere at all, while
+    /// <c>Home</c> showed up only as an aside on another row.
+    /// </para>
+    /// <para>
+    /// These cannot be moved, and that is the safety property the whole design rests on - see the note on this
+    /// class. <c>Esc</c> above all: a session that could not be cancelled would be a dead keyboard.
+    /// </para>
+    /// <para>
+    /// Display text rather than key codes, because <c>Core</c> has no business knowing Windows virtual keys.
+    /// <c>VirtualKeyTranslatorTests</c> checks that each of these really does fire something, and that the count
+    /// here matches what it knows about - so a key documented here but never wired up fails a test rather than a
+    /// user.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<(string Keys, string Description)> FixedActions { get; } =
+    [
+        ("Delete", "Delete this clip now and carry on browsing"),
+        ("End", "Jump to the oldest clip"),
+        ("1 - 9", "Jump that many clips at once"),
+        ("-", "Reverse the direction the number keys jump in"),
+        ("Enter", "Paste and stay open, to paste several clips in a row"),
+        ("Esc", "Cancel and restore the previous clipboard"),
+        ("F1", "Show the key list"),
+    ];
+
+    /// <summary>
     /// Letters that fire an action, indexed by <c>letter - 'A'</c>. A 26-entry array rather than a dictionary
     /// because this is read inside the keyboard hook, once per keystroke, where the callback blocks all input
     /// on the machine until it returns.

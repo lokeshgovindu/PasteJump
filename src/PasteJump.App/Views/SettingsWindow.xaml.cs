@@ -490,6 +490,56 @@ public partial class SettingsWindow : Window
                 entry.Description,
                 entry.FixedAlias is { } alias ? "also " + alias : null);
         }
+
+        // And the actions that have no letter at all. Without these the tab documented only its own configurable
+        // half - End and Delete appeared nowhere, and Home only as an aside on the newest-clip row - which reads
+        // as an omission rather than as the deliberate exclusion it is.
+        PasteKeyRows.Children.Add(new TextBlock
+        {
+            Text = "These cannot be changed",
+            Style = (Style)FindResource("SettingHelp"),
+            Margin = new Thickness(0, 14, 0, 4),
+        });
+
+        foreach (var (keys, description) in PasteKeyMap.FixedActions)
+        {
+            AddFixedKeyRow(keys, description);
+        }
+    }
+
+    /// <summary>
+    /// A read-only row for an action with no letter: the key on the left, what it does on the right.
+    /// <para>
+    /// Not a disabled combo like the trigger's row, because a combo of letters cannot show <c>End</c> or
+    /// <c>1 - 9</c> - and a control that looks editable but never will be is worse than plain text.
+    /// </para>
+    /// </summary>
+    private void AddFixedKeyRow(string keys, string description)
+    {
+        var row = new Grid { Style = (Style)FindResource("SettingRow") };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+
+        var label = new TextBlock { Text = description };
+        Grid.SetColumn(label, 0);
+        row.Children.Add(label);
+
+        var keyText = new TextBlock
+        {
+            Text = keys,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        // SetResourceReference, not FindResource: the palette dictionary is swapped wholesale when the theme
+        // changes, and a brush fetched once here would keep the colour it had when the row was built. This is
+        // the code equivalent of DynamicResource - the styles above are safe because their own setters use it.
+        keyText.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+
+        Grid.SetColumn(keyText, 1);
+        row.Children.Add(keyText);
+
+        PasteKeyRows.Children.Add(row);
     }
 
     /// <summary>
