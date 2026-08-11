@@ -215,6 +215,7 @@ internal static class Program
                 // user why most of their stack has gone, so a version of it that failed to render would be the
                 // one defect this feature could have.
                 Check("OverlayWindow-KindFilter", () => RenderOverlay(KindFilterFrame()));
+                Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
             }
         }
 
@@ -387,6 +388,28 @@ internal static class Program
         IsEmpty = false,
         KindFilter = PasteKindFilter.Images,
         SourceExecutable = "SnippingTool.exe",
+    };
+
+    /// <summary>
+    /// A multi-line text clip, which is the frame that exercises the facts line for text - lines and characters
+    /// on the left, bytes on the right. The ordinary TextFrame is one line and would not show the plural.
+    /// </summary>
+    private static PasteOverlayModel TextFactsFrame() => new()
+    {
+        Position = 4,
+        Total = 41,
+        PreviewText = "SELECT id, preview, captured_utc\nFROM history\nWHERE kind = 0\nORDER BY captured_utc DESC;",
+        Kind = ClipKind.Text,
+        Pinned = false,
+        FormatterName = "Original",
+        CommitMode = PasteCommitMode.Paste,
+        IsSearching = false,
+        MatchCount = 41,
+        PopOnPaste = false,
+        IsEmpty = false,
+        TextFacts = TextMetrics.Describe("SELECT id, preview, captured_utc\nFROM history\nWHERE kind = 0\nORDER BY captured_utc DESC;"),
+        TotalBytes = 178,
+        SourceExecutable = "devenv.exe",
     };
 
     /// <summary>The X cycle at its last stop, which is the one worth showing a picture of.</summary>

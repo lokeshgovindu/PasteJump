@@ -702,9 +702,35 @@ public sealed class PasteModeController
             MatchCount = _window.Count,
             PopOnPaste = ShiftHeld && CommitMode == PasteCommitMode.Paste,
             KindFilter = KindFilter,
+            TextFacts = DescribeTextFacts(current),
+            TotalBytes = current?.TotalBytes ?? 0,
             IsEmpty = current is null,
             SourceExecutable = current?.SourceExecutable,
         });
+    }
+
+    /// <summary>
+    /// Lines and characters for a text clip, or null for anything else.
+    /// <para>
+    /// Counted from the clip's <em>stored</em> preview, not from the elided string the overlay draws - the
+    /// overlay's limit is a display choice and counting against it would report the width of the window rather
+    /// than the size of the clip. Where the stored preview is itself at the cap, the numbers are marked with a
+    /// <c>+</c>: what was copied is longer than anything we kept, and saying so is better than a confident wrong
+    /// count.
+    /// </para>
+    /// <para>
+    /// Only for text. An image's facts are its dimensions, which the overlay already shows, and a file copy's are
+    /// its size - neither has a line count worth printing.
+    /// </para>
+    /// </summary>
+    private string? DescribeTextFacts(Clip? clip)
+    {
+        if (clip is null || clip.Kind != ClipKind.Text)
+        {
+            return null;
+        }
+
+        return TextMetrics.Describe(clip.Preview, clip.Preview.Length >= _options.PreviewMaxChars);
     }
 
     private string BuildPreviewText(Clip? clip)

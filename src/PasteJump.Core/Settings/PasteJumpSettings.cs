@@ -309,6 +309,10 @@ public sealed class PasteJumpSettings
         ResetFormatterOnEntry = ResetFormatterOnEntry,
         DefaultFormatterId = DefaultFormatterId,
         OverlayPreviewChars = OverlayPreviewChars,
+
+        // Not a display choice, unlike the line above: the overlay needs it to know whether its line and
+        // character counts are the whole clip or only as much of it as was stored.
+        PreviewMaxChars = PreviewMaxChars,
     };
 
     /// <summary>Clamps anything a hand-edited JSON file could have made nonsensical.</summary>

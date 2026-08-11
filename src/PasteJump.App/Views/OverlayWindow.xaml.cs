@@ -220,6 +220,15 @@ public partial class OverlayWindow : Window
             return;
         }
 
+        // Text says as much about itself as a picture does: lines and characters on the left, bytes on the right.
+        // The counts are computed by the controller, which is the only place that knows how much of the clip was
+        // actually stored - see PasteModeController.DescribeTextFacts.
+        if (model.TextFacts is { Length: > 0 } facts)
+        {
+            ShowImageFacts(facts, model.TotalBytes > 0 ? FormatBytes(model.TotalBytes) : null);
+            return;
+        }
+
         ImageFacts.Visibility = Visibility.Collapsed;
     }
 

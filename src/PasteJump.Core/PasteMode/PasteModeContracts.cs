@@ -284,6 +284,15 @@ public sealed record PasteOverlayModel
     /// </summary>
     public PasteKindFilter KindFilter { get; init; } = PasteKindFilter.All;
 
+    /// <summary>
+    /// Lines and characters for a text clip, or null for anything else. Pre-rendered rather than left to the
+    /// overlay: the counts depend on how much of the clip was actually stored, which only the controller knows.
+    /// </summary>
+    public string? TextFacts { get; init; }
+
+    /// <summary>Bytes the clip occupies, as history reports it. Zero when not applicable.</summary>
+    public long TotalBytes { get; init; }
+
     public required bool IsEmpty { get; init; }
 
     public string? SourceExecutable { get; init; }

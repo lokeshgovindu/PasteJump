@@ -30,4 +30,10 @@ public sealed class PasteModeOptions
     /// Characters of clip text the overlay shows before eliding. The original used 200.
     /// </summary>
     public int OverlayPreviewChars { get; init; } = PasteModeController.DefaultOverlayPreviewChars;
+
+    /// <summary>
+    /// The cap the clip store applies to a stored preview, so the overlay can say when its counts are short of
+    /// the whole truth rather than stating a wrong number confidently. Mirrors <c>PasteJumpSettings.PreviewMaxChars</c>.
+    /// </summary>
+    public int PreviewMaxChars { get; init; } = 4096;
 }
