@@ -96,14 +96,20 @@ public static class VirtualKeyTranslator
         NativeConstants.VK_Q => GestureKey.PromoteToFront,
         NativeConstants.VK_F => GestureKey.ToggleSearch,
         NativeConstants.VK_Z => GestureKey.CycleFormatter,
-        NativeConstants.VK_SPACE => GestureKey.TogglePin,
+        // P and M are aliases, added because Space and Q are the only two actions that were both unmemorable and
+        // unreachable by an obvious physical key - the arrows, Home, End and Delete cover the others. Both
+        // originals keep working; the cost is two fewer letters available as the trigger.
+        NativeConstants.VK_SPACE or NativeConstants.VK_P => GestureKey.TogglePin,
+        NativeConstants.VK_M => GestureKey.PromoteToFront,
         NativeConstants.VK_T => GestureKey.EditTags,
         NativeConstants.VK_S => GestureKey.PushToClipboard,
 
-        // O is the mnemonic one - H reads as Help, which is what made someone press F1 in the first place -
-        // but H is kept as an alias rather than moved. Nothing that already works may stop working, and the
-        // cost of the alias is one letter fewer available as the trigger.
-        NativeConstants.VK_O or NativeConstants.VK_H => GestureKey.EditClip,
+        NativeConstants.VK_O => GestureKey.EditClip,
+
+        // H was Clipjump's key for "open the clip in an editor", which read as Help to everyone who met it. It
+        // gained O as a mnemonic alias and has now given the letter up altogether, because H for History is the
+        // mnemonic that made the original confusing. Nothing was lost: the editor answers to O.
+        NativeConstants.VK_H => GestureKey.ShowHistory,
 
         NativeConstants.VK_E => GestureKey.ExportClip,
         NativeConstants.VK_RETURN => GestureKey.Commit,

@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 641 passing (`dotnet test`) - 598 in Core.Tests, 43 in Interop.Tests |
+| Tests | 644 passing (`dotnet test`) - 599 in Core.Tests, 45 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,8 +93,8 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      598 tests.
-tests/PasteJump.Interop.Tests   43 tests. Interop logic needing no message loop or live keyboard.
+tests/PasteJump.Core.Tests      599 tests.
+tests/PasteJump.Interop.Tests   45 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -265,6 +265,18 @@ that immediately caught two real bugs. Expect to do the same again.
   "open a session", and neither component was wrong when looked at on its own. A fresh recogniser per key,
   because one key wrongly opening a session would make every key after it swallowed too and the failure would
   name the wrong culprit. Verified by reintroducing the arrow defect: 7 tests fail.
+- **`H` shows the history and no longer opens the editor — the one binding that has changed meaning.** It was
+  Clipjump's key for "open the clip in an editor" and read as *help* to everybody, which is what sent a user to
+  `F1` and started this whole thread. It gained `O` as a mnemonic alias first and then gave the letter up, since
+  H-for-History is the mnemonic that made the original confusing; nothing was lost, because the editor answers
+  to `O`. Like `F1` it **ends the session first** (`EndAndOpenWindow`, the clip-less sibling of
+  `EndAndDelegate`), and more urgently than `F1` does: the history window has a search box, so an overlay left
+  up would eat the query as it was typed.
+  `P` (pin) and `M` (move to front) were added as aliases beside `Space` and `Q` after auditing every action's
+  mnemonic. Those two were the only actions that were *both* unmemorable **and** unreachable by an obvious
+  physical key — the arrows, `Home`, `End` and `Delete` already cover stepping, the ends of the stack and
+  deleting, so `N`, `B` and `D` were considered and deliberately not added. `Z` (format) and `S` (clipboard
+  without pasting) keep their letters because nothing better exists: "format" has no natural initial.
 - **The paste-mode keys are additive from here on: nothing that works may stop working.** The physical keys
   (`↓`/`→` and `↑`/`←` for stepping, `Home`, `End`, `Delete`) were added *beside* Clipjump's letters, not instead
   of them, and `O` for "open in an editor" is an **alias** of `H` rather than a replacement — `H` reads as Help,
@@ -774,7 +786,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 641 tests
+dotnet test                                         # 644 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

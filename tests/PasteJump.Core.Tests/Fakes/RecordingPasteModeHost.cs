@@ -32,6 +32,8 @@ internal sealed class RecordingPasteModeHost : IPasteModeHost
 
     public int HelpCount { get; private set; }
 
+    public int HistoryCount { get; private set; }
+
     public PasteOverlayModel? LastFrame => OverlayFrames.Count == 0 ? null : OverlayFrames[^1];
 
     public bool OverlayVisible { get; private set; }
@@ -101,6 +103,12 @@ internal sealed class RecordingPasteModeHost : IPasteModeHost
     {
         HelpCount++;
         Calls.Add("help");
+    }
+
+    public void RequestHistoryWindow()
+    {
+        HistoryCount++;
+        Calls.Add("history");
     }
 
     /// <summary>Clips at stake in the last confirmation request, or null if none was made.</summary>

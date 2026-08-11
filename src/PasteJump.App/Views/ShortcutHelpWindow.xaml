@@ -137,22 +137,26 @@
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Space" />
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="P  Space" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Pin or unpin. Pinned clips sort first and survive Delete All" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Q" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="M  Q" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Move this clip to the front of the stack" />
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="T" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Edit tags" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="O  H" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clip in an external editor. H still works, and always will" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="O" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clip in an external editor" />
 
                 <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="E" />
                 <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Export the clip to a file" />
+
+                <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="H" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clipboard history window. Ends the gesture, since that window takes the keyboard" />
             </Grid>
 
             <TextBlock Style="{StaticResource SectionStyle}" Text="SEARCH" />

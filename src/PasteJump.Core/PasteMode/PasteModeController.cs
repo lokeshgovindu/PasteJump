@@ -213,10 +213,12 @@ public sealed class PasteModeController
                 // Ends the session, like the tag and clip editors: the card is a real window that takes
                 // focus, and leaving the overlay up meant the gesture went on swallowing every key the card
                 // was busy explaining. No clip is needed, hence its own path rather than EndAndDelegate.
-                _host.RestoreExistingClipboard();
-                EndSession();
-                _host.ShowShortcutHelp();
-                return PasteCommitKind.Cancelled;
+                return EndAndOpenWindow(static host => host.ShowShortcutHelp());
+
+            case PasteAction.ShowHistory:
+                // Same shape, and for a sharper version of the same reason: the history window has a search box,
+                // so an overlay left up would eat the query as it was typed.
+                return EndAndOpenWindow(static host => host.RequestHistoryWindow());
 
             case PasteAction.ToggleJumpDirection:
                 _jumpDirection = -_jumpDirection;
@@ -464,6 +466,23 @@ public sealed class PasteModeController
         RestoreCursorTo(current.Id);
         Render();
         return PasteCommitKind.None;
+    }
+
+    /// <summary>
+    /// Ends the session and then opens a window that needs no clip.
+    /// <para>
+    /// The clip-less sibling of <see cref="EndAndDelegate"/>, and the ordering is the point of both: the
+    /// clipboard goes back and the overlay comes down <em>before</em> anything that takes the keyboard appears.
+    /// Without that, the gesture carries on swallowing keys aimed at the new window - which is exactly how F1
+    /// behaved when it did not end the session.
+    /// </para>
+    /// </summary>
+    private PasteCommitKind EndAndOpenWindow(Action<IPasteModeHost> request)
+    {
+        _host.RestoreExistingClipboard();
+        EndSession();
+        request(_host);
+        return PasteCommitKind.Cancelled;
     }
 
     private PasteCommitKind EndAndDelegate(Action<IPasteModeHost, Clip> request)

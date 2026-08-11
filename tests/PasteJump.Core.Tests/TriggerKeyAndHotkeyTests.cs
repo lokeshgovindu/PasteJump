@@ -44,7 +44,7 @@ public sealed class TriggerKeyAndHotkeyTests
     [InlineData('V')]
     [InlineData('B')]
     [InlineData('G')]
-    [InlineData('P')]
+    [InlineData('K')] // was 'P', which now pins - the mnemonic alias for Space
     public void An_unbound_letter_is_accepted(char key)
     {
         Assert.True(TriggerKey.IsAvailable(key));
@@ -57,14 +57,16 @@ public sealed class TriggerKeyAndHotkeyTests
         Assert.Contains('V', TriggerKey.Available);
         Assert.DoesNotContain('C', TriggerKey.Available);
 
-        // Both letters that open the clip in an editor. O is the one the help names and H is the original
-        // binding kept working beside it, so an alias has to be reserved as firmly as the primary - a trigger
-        // on either would steal the action from whichever letter the user still presses.
-        Assert.DoesNotContain('O', TriggerKey.Available);
-        Assert.DoesNotContain('H', TriggerKey.Available);
+        Assert.DoesNotContain('O', TriggerKey.Available); // open in an editor
+        Assert.DoesNotContain('H', TriggerKey.Available); // show the history
 
-        // 26 letters minus the 11 bound to other actions - 10 actions, one of which answers to two letters.
-        Assert.Equal(15, TriggerKey.Available.Count);
+        // The two mnemonic aliases, and an alias has to be reserved as firmly as the primary - a trigger on
+        // either would steal the action from whichever letter the user actually presses.
+        Assert.DoesNotContain('M', TriggerKey.Available); // beside Q, move to front
+        Assert.DoesNotContain('P', TriggerKey.Available); // beside Space, pin
+
+        // 26 letters minus the 13 bound to an action.
+        Assert.Equal(13, TriggerKey.Available.Count);
     }
 
     [Theory]

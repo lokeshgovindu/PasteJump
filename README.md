@@ -151,12 +151,13 @@ While Ctrl is down:
 | <kbd>-</kbd> | Reverse the direction the number keys jump |
 | <kbd>Delete</kbd> | Delete this clip now and carry on browsing |
 | <kbd>X</kbd> | Cycle what release will do: Cancel → Delete → Delete All |
-| <kbd>Space</kbd> | Pin / unpin (pinned clips sort first and survive Delete All) |
-| <kbd>Q</kbd> | Move this clip to the front of the stack |
+| <kbd>P</kbd> · <kbd>Space</kbd> | Pin / unpin (pinned clips sort first and survive Delete All) |
+| <kbd>M</kbd> · <kbd>Q</kbd> | Move this clip to the front of the stack |
 | <kbd>Z</kbd> | Cycle paste format |
 | <kbd>T</kbd> | Edit tags |
 | <kbd>S</kbd> | Put the clip on the Windows clipboard *without* pasting |
-| <kbd>O</kbd> · <kbd>H</kbd> | Open the clip in an external editor |
+| <kbd>O</kbd> | Open the clip in an external editor |
+| <kbd>H</kbd> | Open the clipboard history window - this ends the gesture |
 | <kbd>E</kbd> | Export the clip to a file |
 | <kbd>F</kbd> | Open incremental search |
 | <kbd>Enter</kbd> | Paste and stay open, for pasting several clips in a row |
@@ -166,7 +167,9 @@ While Ctrl is down:
 | <kbd>Esc</kbd> | Cancel and restore the previous clipboard |
 
 Where two keys are listed, both work. The letters are Clipjump's layout and are not going away; the arrows,
-<kbd>Home</kbd>/<kbd>End</kbd>, <kbd>Delete</kbd> and <kbd>O</kbd> were added beside them.
+<kbd>Home</kbd>/<kbd>End</kbd>, <kbd>Delete</kbd>, <kbd>O</kbd>, <kbd>P</kbd> and <kbd>M</kbd> were added beside
+them. <kbd>H</kbd> is the one key that changed meaning: it opened the editor in Clipjump, which read as "help",
+and now opens the history - the editor answers to <kbd>O</kbd>.
 
 **Only <kbd>Ctrl</kbd>+<kbd>V</kbd> starts the gesture.** Any extra modifier passes straight through, because
 each one belongs to somebody else: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is how terminals paste and how

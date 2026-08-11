@@ -225,6 +225,7 @@ public partial class App : Application
         _pasteHost.ClipEditorRequested += OnClipEditorRequested;
         _pasteHost.ExportRequested += OnExportRequested;
         _pasteHost.HelpRequested += ShowShortcutHelp;
+        _pasteHost.HistoryRequested += ShowHistory;
         _pasteHost.TransientMessage += OnTransientMessage;
         _pasteHost.DeleteAllConfirmationRequested += OnDeleteAllConfirmationRequested;
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);

@@ -95,6 +95,10 @@ internal sealed class StubHost : IPasteModeHost
     {
     }
 
+    public void RequestHistoryWindow()
+    {
+    }
+
     public void RequestDeleteAllConfirmation(int unpinnedCount, Action confirmed)
     {
     }

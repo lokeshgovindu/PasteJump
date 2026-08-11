@@ -124,6 +124,21 @@ public enum PasteAction
     /// <summary><c>O</c> - open the clip in an editor.</summary>
     EditClip,
 
+    /// <summary>
+    /// <c>H</c> - open the clipboard history window.
+    /// <para>
+    /// <c>H</c> used to open the clip in an editor, which is the binding Clipjump had and the one that read as
+    /// "help" to everybody. It moved to <c>O</c> first and then gave the letter up entirely, because H for
+    /// History is the mnemonic that made the original confusing. Nothing was lost in the move: the editor still
+    /// answers to <c>O</c>.
+    /// </para>
+    /// <para>
+    /// Ends the session, like <see cref="Help"/> and for the same reason - the history window takes the
+    /// keyboard, and an overlay left up would go on swallowing the keys the user then tries to search with.
+    /// </para>
+    /// </summary>
+    ShowHistory,
+
     /// <summary><c>E</c> - export the clip to a file.</summary>
     ExportClip,
 
@@ -196,6 +211,13 @@ public interface IPasteModeHost
     void RequestExport(Clip clip);
 
     void ShowShortcutHelp();
+
+    /// <summary>
+    /// Open the clipboard history window. Like <see cref="ShowShortcutHelp"/>, the implementation must defer -
+    /// this is reached from the keyboard hook, where showing a window inline runs a nested message loop and
+    /// blocks every keystroke on the machine.
+    /// </summary>
+    void RequestHistoryWindow();
 
     /// <summary>
     /// Ask the user to confirm clearing the stack, and invoke <paramref name="confirmed"/> only if they agree.

@@ -65,6 +65,9 @@ public class VirtualKeyTranslatorTests
     [InlineData(0x1B, GestureKey.Escape)]      // VK_ESCAPE
     [InlineData(0x0D, GestureKey.Commit)]      // VK_RETURN
     [InlineData(0x20, GestureKey.TogglePin)]   // VK_SPACE
+    [InlineData(0x50, GestureKey.TogglePin)]   // VK_P, mnemonic alias for Space
+    [InlineData(0x4D, GestureKey.PromoteToFront)] // VK_M, mnemonic alias for Q
+    [InlineData(0x51, GestureKey.PromoteToFront)] // VK_Q
     [InlineData(0x70, GestureKey.Help)]        // VK_F1
     public void The_physical_keys_map_where_the_help_says_they_do(int virtualKey, GestureKey expected)
         => Assert.Equal(expected, VirtualKeyTranslator.ToGestureKey(virtualKey, VkV));
@@ -80,12 +83,17 @@ public class VirtualKeyTranslatorTests
         Assert.Equal(GestureKey.Escape, VirtualKeyTranslator.ToGestureKey(0x1B, VkV));       // VK_ESCAPE
     }
 
-    /// <summary>Both letters open the clip in an editor: O is the one the help names, H is the original.</summary>
-    [Theory]
-    [InlineData(0x4F)] // VK_O
-    [InlineData(0x48)] // VK_H
-    public void O_and_H_both_open_the_editor(int virtualKey)
-        => Assert.Equal(GestureKey.EditClip, VirtualKeyTranslator.ToGestureKey(virtualKey, VkV));
+    /// <summary>
+    /// O opens the clip in an editor and H shows the history. H was the editor's key, inherited from Clipjump,
+    /// and it read as "help" to everybody; it gave the letter up once O existed, because H for History is the
+    /// mnemonic that made the original confusing.
+    /// </summary>
+    [Fact]
+    public void O_opens_the_editor_and_H_shows_the_history()
+    {
+        Assert.Equal(GestureKey.EditClip, VirtualKeyTranslator.ToGestureKey(0x4F, VkV));    // VK_O
+        Assert.Equal(GestureKey.ShowHistory, VirtualKeyTranslator.ToGestureKey(0x48, VkV)); // VK_H
+    }
 
     /// <summary>
     /// The invariant CLAUDE.md says has to be maintained by hand, checked instead: every letter bound to an

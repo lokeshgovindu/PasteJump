@@ -233,6 +233,29 @@ public class PasteModeNavigationKeyTests
             host.Calls);
     }
 
+    /// <summary>
+    /// H opens the history window, and must end the session first for a sharper version of Help's reason: the
+    /// history window has a search box, so an overlay left up would eat the query as it was typed.
+    /// </summary>
+    [Fact]
+    public void ShowHistory_ends_the_session_before_opening_the_window()
+    {
+        var (controller, _, host) = Build();
+
+        controller.Begin();
+
+        var result = controller.Handle(PasteAction.ShowHistory);
+
+        Assert.Equal(PasteCommitKind.Cancelled, result);
+        Assert.False(controller.IsActive);
+        Assert.False(host.OverlayVisible);
+        Assert.Equal(1, host.HistoryCount);
+
+        Assert.Equal(
+            ["snapshot", "show", "restore", "hide", "history"],
+            host.Calls);
+    }
+
     /// <summary>Invariant 2 still holds for the route out through Help: the clipboard goes back.</summary>
     [Fact]
     public void Help_restores_the_clipboard()

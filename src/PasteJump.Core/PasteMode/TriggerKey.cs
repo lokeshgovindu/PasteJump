@@ -32,17 +32,15 @@ public static class TriggerKey
         ['X'] = "cycle what release does",
         ['A'] = "jump to the newest clip",
         ['Q'] = "move the clip to the front",
+        ['M'] = "move the clip to the front",
+        ['P'] = "pin or unpin the clip",
         ['F'] = "open search",
         ['Z'] = "cycle the paste format",
         ['T'] = "edit tags",
         ['S'] = "put the clip on the clipboard",
 
-        // Two letters for one action. O is the one the help names; H is kept working because it was the
-        // original binding, and an alias has to be reserved just as firmly as the primary - a trigger on H
-        // would steal the editor from anyone still pressing it.
         ['O'] = "open the clip in an editor",
-        ['H'] = "open the clip in an editor",
-
+        ['H'] = "show the clipboard history",
         ['E'] = "export the clip",
     };
 

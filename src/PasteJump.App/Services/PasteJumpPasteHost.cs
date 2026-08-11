@@ -113,6 +113,9 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     /// <summary>Raised when the shortcut help should be shown.</summary>
     public event Action? HelpRequested;
 
+    /// <summary>Raised when the clipboard history window should be shown.</summary>
+    public event Action? HistoryRequested;
+
     /// <summary>
     /// Raised with the number of clips at stake and the action that performs the deletion. Handlers must invoke
     /// the action only if the user agrees.
@@ -214,6 +217,8 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     public void RequestExport(Clip clip) => _dispatcher.BeginInvoke(() => ExportRequested?.Invoke(clip));
 
     public void ShowShortcutHelp() => _dispatcher.BeginInvoke(() => HelpRequested?.Invoke());
+
+    public void RequestHistoryWindow() => _dispatcher.BeginInvoke(() => HistoryRequested?.Invoke());
 
     /// <summary>
     /// Queues the confirmation and returns at once. The BeginInvoke is the whole point: this is reached from the

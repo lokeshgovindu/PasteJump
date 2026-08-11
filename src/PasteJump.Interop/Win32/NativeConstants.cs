@@ -136,7 +136,9 @@ internal static class NativeConstants
     public const int VK_E = 0x45;
     public const int VK_F = 0x46;
     public const int VK_H = 0x48;
+    public const int VK_M = 0x4D;
     public const int VK_O = 0x4F;
+    public const int VK_P = 0x50;
     public const int VK_Q = 0x51;
     public const int VK_S = 0x53;
     public const int VK_T = 0x54;
