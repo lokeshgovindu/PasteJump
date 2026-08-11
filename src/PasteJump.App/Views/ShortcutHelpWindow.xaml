@@ -75,10 +75,11 @@
                 <TextBlock x:Name="TriggerKeyText" Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Step to an older clip" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="C  ↑  ←" />
+                <!-- Every key column below is set in code-behind: the letters are configurable. -->
+                <TextBlock x:Name="KeyBack" Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Step back to a newer clip" />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="A  Home" />
+                <TextBlock x:Name="KeyNewest" Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Jump to the newest clip" />
 
                 <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="End" />
@@ -116,10 +117,10 @@
                 <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste and stay open, to paste several clips in a row" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Z" />
+                <TextBlock x:Name="KeyFormat" Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cycle paste format: Original, Plain text, Collapse whitespace, Sentence case, Unindent" />
 
-                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="S" />
+                <TextBlock x:Name="KeyClipboard" Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Put the clip on the Windows clipboard without pasting it" />
             </Grid>
 
@@ -140,22 +141,22 @@
                     <RowDefinition />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="P  Space" />
+                <TextBlock x:Name="KeyPin" Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Pin or unpin. Pinned clips sort first and survive Delete All" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="M  Q" />
+                <TextBlock x:Name="KeyFront" Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Move this clip to the front of the stack" />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="T" />
+                <TextBlock x:Name="KeyTags" Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Edit tags" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="O" />
+                <TextBlock x:Name="KeyEditor" Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clip in an external editor" />
 
-                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="E" />
+                <TextBlock x:Name="KeyExport" Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Export the clip to a file" />
 
-                <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="H" />
+                <TextBlock x:Name="KeyHistory" Grid.Row="5" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clipboard history window. Ends the gesture, since that window takes the keyboard" />
             </Grid>
 
@@ -175,7 +176,7 @@
                     <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="F" />
+                <TextBlock x:Name="KeySearch" Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open search. Ctrl can be released - just type to filter by content or tag" />
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
@@ -208,7 +209,7 @@
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}"
                            Text="Delete this clip straight away and carry on browsing. Nothing is pasted, and releasing Ctrl still does whatever it was going to." />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="X" />
+                <TextBlock x:Name="KeyCommit" Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}"
                            Text="Cycle what releasing Ctrl will do: Cancel, then Delete this clip, then Delete All. A banner shows the current mode. Pressing X repeatedly cycles between those three and never returns to pasting." />
 

@@ -233,6 +233,8 @@ public partial class SettingsWindow : Window
             TriggerKeyCombo.Items.Add(key.ToString());
         }
 
+        BuildPasteKeyRows();
+
         foreach (var choice in ThemeChoices)
         {
             ThemeCombo.Items.Add(choice.Label);
@@ -304,6 +306,18 @@ public partial class SettingsWindow : Window
         WarnAboutConflictCheck.IsChecked = source.WarnAboutClipboardManagerConflict;
 
         TriggerKeyCombo.SelectedItem = TriggerKey.Normalise(source.PasteModeTriggerKey).ToString();
+
+        // Every combo is written, without exception: a control ShowValues skips keeps its old value through a
+        // Reset, which reads as Reset not working. See SettingsInspector's note on the same trap.
+        var keyMap = PasteKeyMap.Parse(source.PasteModeKeys);
+
+        foreach (var entry in PasteKeyMap.Entries)
+        {
+            _pasteKeyCombos[entry.Name].SelectedItem =
+                keyMap.LetterFor(entry.Name) is { } letter ? letter.ToString() : KeyOffLabel;
+        }
+
+        UpdatePasteKeysHint(keyMap);
 
         HistoryHotkeyBox.Text = source.HistoryHotkey;
 
@@ -421,6 +435,118 @@ public partial class SettingsWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             target.Text = dialog.FolderName;
+        }
+    }
+
+    /// <summary>What "switched off" reads as in the letter combos. Not a letter, so it cannot collide with one.</summary>
+    private const string KeyOffLabel = "(off)";
+
+    /// <summary>The letter combo for each configurable action, by <c>PasteKeyMap.Entry.Name</c>.</summary>
+    private readonly Dictionary<string, ComboBox> _pasteKeyCombos = [];
+
+    /// <summary>
+    /// Builds the Keys tab from <see cref="PasteKeyMap.Entries"/>.
+    /// <para>
+    /// Generated rather than written in XAML so a new paste-mode action cannot be added without appearing here -
+    /// the same reason the Advanced tab reflects over the settings class. Built once in the constructor, because
+    /// <c>ShowValues</c> runs on every reset and reload and must only ever set values, not rebuild controls.
+    /// </para>
+    /// <para>
+    /// One combo per action rather than a combo plus an "enabled" checkbox: two controls can express "enabled,
+    /// but no letter" and "disabled, but a letter", neither of which means anything. <c>(off)</c> as an item
+    /// makes the state impossible to contradict.
+    /// </para>
+    /// </summary>
+    private void BuildPasteKeyRows()
+    {
+        foreach (var entry in PasteKeyMap.Entries)
+        {
+            var row = new Grid { Style = (Style)FindResource("SettingRow") };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+
+            var label = new TextBlock { Text = entry.Description };
+            Grid.SetColumn(label, 0);
+            row.Children.Add(label);
+
+            var combo = new ComboBox();
+            combo.Items.Add(KeyOffLabel);
+
+            // Every letter is offered, not only the free ones: a swap - moving tags from T to S and the
+            // clipboard from S to T - is a perfectly reasonable thing to want, and it passes through an
+            // intermediate state where two actions share a letter. Refusing at the combo would make that
+            // impossible to type, so the clash is caught by PasteKeyMap.Validate on OK instead, where it can
+            // name both actions.
+            for (var letter = 'A'; letter <= 'Z'; letter++)
+            {
+                combo.Items.Add(letter.ToString());
+            }
+
+            Grid.SetColumn(combo, 1);
+            row.Children.Add(combo);
+            _pasteKeyCombos[entry.Name] = combo;
+
+            // The fixed alias, shown read-only. It is what makes switching a letter off safe rather than
+            // lossy: turn pin off and Space still pins.
+            if (entry.FixedAlias is { } alias)
+            {
+                var aliasText = new TextBlock
+                {
+                    Text = "also " + alias,
+                    Style = (Style)FindResource("SettingHelp"),
+                    Margin = new Thickness(10, 0, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+
+                Grid.SetColumn(aliasText, 2);
+                row.Children.Add(aliasText);
+            }
+
+            PasteKeyRows.Children.Add(row);
+        }
+    }
+
+    /// <summary>Reads the Keys tab into the shape <see cref="PasteKeyMap"/> validates and builds from.</summary>
+    private Dictionary<string, char?> ReadPasteKeyChoices()
+    {
+        var choices = new Dictionary<string, char?>();
+
+        foreach (var entry in PasteKeyMap.Entries)
+        {
+            var selected = _pasteKeyCombos[entry.Name].SelectedItem as string;
+
+            choices[entry.Name] = selected is { Length: 1 } letter ? letter[0] : null;
+        }
+
+        return choices;
+    }
+
+    /// <summary>
+    /// Says how many letters are left for the trigger, because moving an action off a letter is what frees one -
+    /// and the connection between the two tabs is not otherwise visible.
+    /// </summary>
+    private void UpdatePasteKeysHint(PasteKeyMap map)
+    {
+        var free = TriggerKey.AvailableFor(map).Count;
+
+        PasteKeysHintText.Text =
+            $"{free} letters are free, and any of them could be the paste-mode trigger under Paste Mode.";
+    }
+
+    /// <summary>
+    /// Brings the tab holding a control to the front, so a refusal is shown next to the control that caused it
+    /// rather than leaving the user to find it.
+    /// </summary>
+    private void SelectTabContaining(DependencyObject control)
+    {
+        for (DependencyObject? node = control; node is not null; node = System.Windows.Media.VisualTreeHelper.GetParent(node))
+        {
+            if (node is TabItem tab)
+            {
+                tab.IsSelected = true;
+                return;
+            }
         }
     }
 
@@ -1252,6 +1378,21 @@ public partial class SettingsWindow : Window
         settings.PasteModeTriggerKey = TriggerKey
             .Normalise(TriggerKeyCombo.SelectedItem as string)
             .ToString();
+
+        var keyChoices = ReadPasteKeyChoices();
+        var keyError = PasteKeyMap.Validate(keyChoices, TriggerKey.Normalise(settings.PasteModeTriggerKey));
+
+        if (keyError is not null)
+        {
+            // Refused rather than resolved. Two actions on one letter is not a preference half of which could be
+            // honoured - whichever the lookup wrote last would win, silently - so the clash is named and the
+            // dialog stays open on the tab that owns it.
+            MessageDialog.Warn(keyError, owner: this, headline: "Those paste-mode keys clash");
+            SelectTabContaining(PasteKeyRows);
+            return false;
+        }
+
+        settings.PasteModeKeys = PasteKeyMap.FromChoices(keyChoices).ToSettingsString();
 
         // Canonicalised on the way in, so "control+shift+h" is stored the same way the combo would render
         // it and the Advanced tab does not report a spurious difference from the default.

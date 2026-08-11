@@ -380,6 +380,34 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- ==================================================== Keys -->
+            <!--
+                Its own tab rather than more rows on Paste Mode, which is already long. The rows are built in
+                code from PasteKeyMap.Entries rather than written out here, so a new action appears on this tab
+                without anyone remembering to add it - the same bargain the Advanced tab strikes with reflection.
+            -->
+            <TabItem Header="_Keys">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Margin="0,0,0,10"
+                                   Text="Which letter fires each action while the overlay is up. Choose (off) to switch an action off. Only letters can be moved: the arrows, Home, End, Delete, Enter, Esc and F1 stay as they are, so no set of keys can leave you unable to step through the stack or get out of it." />
+
+                        <StackPanel x:Name="PasteKeyRows" />
+
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Margin="0,10,0,0"
+                                   Text="An action switched off does nothing while the overlay is up — its key is still held back from the application underneath, because the gesture owns the keyboard until you release Ctrl." />
+
+                        <TextBlock x:Name="PasteKeysHintText"
+                                   Style="{StaticResource SettingHelp}"
+                                   Margin="0,6,0,0" />
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ==================================================== Excluded apps -->
             <TabItem Header="E_xcluded Apps">
                 <Grid>

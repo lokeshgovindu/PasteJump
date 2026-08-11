@@ -25,11 +25,23 @@ public static class VirtualKeyTranslator
     /// fall through to <see cref="GestureKey.None"/> so it can be typed into the search box like any other
     /// unbound letter.
     /// </param>
-    public static GestureKey ToGestureKey(int virtualKey, int triggerVirtualKey)
+    /// <param name="keyMap">
+    /// The letter bindings, which the user can change. Null means the defaults. Physical keys are not in it and
+    /// never move - see <see cref="PasteKeyMap"/> for why that is a safety property rather than a shortcut.
+    /// </param>
+    public static GestureKey ToGestureKey(int virtualKey, int triggerVirtualKey, PasteKeyMap? keyMap = null)
     {
         if (virtualKey == triggerVirtualKey)
         {
             return GestureKey.Paste;
+        }
+
+        // Letters first, from the map. Checked before the physical table so a letter the user has unbound falls
+        // through to GestureKey.None and can be typed into the search box, exactly as an unbound letter always
+        // could.
+        if (virtualKey is >= 0x41 and <= 0x5A)
+        {
+            return (keyMap ?? PasteKeyMap.Default).ForLetter((char)virtualKey);
         }
 
         return Map(virtualKey);
@@ -90,28 +102,10 @@ public static class VirtualKeyTranslator
         NativeConstants.VK_SHIFT or NativeConstants.VK_LSHIFT or NativeConstants.VK_RSHIFT
             => GestureKey.Shift,
 
-        NativeConstants.VK_C => GestureKey.Back,
-        NativeConstants.VK_X => GestureKey.CycleCommitMode,
-        NativeConstants.VK_A => GestureKey.JumpToNewest,
-        NativeConstants.VK_Q => GestureKey.PromoteToFront,
-        NativeConstants.VK_F => GestureKey.ToggleSearch,
-        NativeConstants.VK_Z => GestureKey.CycleFormatter,
-        // P and M are aliases, added because Space and Q are the only two actions that were both unmemorable and
-        // unreachable by an obvious physical key - the arrows, Home, End and Delete cover the others. Both
-        // originals keep working; the cost is two fewer letters available as the trigger.
-        NativeConstants.VK_SPACE or NativeConstants.VK_P => GestureKey.TogglePin,
-        NativeConstants.VK_M => GestureKey.PromoteToFront,
-        NativeConstants.VK_T => GestureKey.EditTags,
-        NativeConstants.VK_S => GestureKey.PushToClipboard,
-
-        NativeConstants.VK_O => GestureKey.EditClip,
-
-        // H was Clipjump's key for "open the clip in an editor", which read as Help to everyone who met it. It
-        // gained O as a mnemonic alias and has now given the letter up altogether, because H for History is the
-        // mnemonic that made the original confusing. Nothing was lost: the editor answers to O.
-        NativeConstants.VK_H => GestureKey.ShowHistory,
-
-        NativeConstants.VK_E => GestureKey.ExportClip,
+        // No letters here any more - they come from PasteKeyMap, because the user can move them. What is left is
+        // the fixed half of the layout: keys whose meaning is not in question and which no set of bindings can
+        // take away, so a session can always be stepped through and always closed.
+        NativeConstants.VK_SPACE => GestureKey.TogglePin,
         NativeConstants.VK_RETURN => GestureKey.Commit,
         NativeConstants.VK_F1 => GestureKey.Help,
         NativeConstants.VK_OEM_MINUS or NativeConstants.VK_SUBTRACT => GestureKey.ToggleJumpDirection,

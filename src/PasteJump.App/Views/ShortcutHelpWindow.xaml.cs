@@ -20,12 +20,35 @@ public partial class ShortcutHelpWindow : Window
     /// is to show the window as a release build shows it rather than as an uninstalled build does.
     /// </para>
     /// </param>
-    public ShortcutHelpWindow(char triggerKey = TriggerKey.Default, Action? onOpenManual = null)
+    /// <param name="keyMap">
+    /// The letter bindings in force, or null for the defaults. Read rather than assumed, because the letters are
+    /// the user's to move and a reference card confidently naming <c>Z</c> when the user has moved the format
+    /// cycle elsewhere is worse than no card - the same reasoning as the trigger letter above.
+    /// </param>
+    public ShortcutHelpWindow(
+        char triggerKey = TriggerKey.Default,
+        Action? onOpenManual = null,
+        PasteKeyMap? keyMap = null)
     {
         InitializeComponent();
 
         var key = char.ToUpperInvariant(triggerKey);
         var chord = TriggerKey.Describe(key);
+
+        var map = keyMap ?? PasteKeyMap.Default;
+
+        KeyBack.Text = Keys(map, "back");
+        KeyNewest.Text = Keys(map, "newest");
+        KeySearch.Text = Keys(map, "search");
+        KeyPin.Text = Keys(map, "pin");
+        KeyFront.Text = Keys(map, "front");
+        KeyFormat.Text = Keys(map, "format");
+        KeyTags.Text = Keys(map, "tags");
+        KeyClipboard.Text = Keys(map, "clipboard");
+        KeyEditor.Text = Keys(map, "editor");
+        KeyHistory.Text = Keys(map, "history");
+        KeyExport.Text = Keys(map, "export");
+        KeyCommit.Text = Keys(map, "commit");
 
         Title = $"PasteJump - Paste-mode keys ({chord})";
 
@@ -51,6 +74,22 @@ public partial class ShortcutHelpWindow : Window
         // height from the content and undoes any vertical resize the user makes, so the window would appear
         // resizable and then silently snap back.
         Loaded += (_, _) => SizeToContent = SizeToContent.Manual;
+    }
+
+    /// <summary>
+    /// How one action's keys read in the card: the configured letter, then any key that fires it regardless.
+    /// <para>
+    /// A switched-off action is shown as "off" beside whatever still reaches it, rather than being hidden. The
+    /// row is what tells the reader the action exists at all, and one they have turned off is exactly the one
+    /// they may later wonder about.
+    /// </para>
+    /// </summary>
+    private static string Keys(PasteKeyMap map, string name)
+    {
+        var entry = PasteKeyMap.Entries.First(e => e.Name == name);
+        var letter = map.LetterFor(name) is { } value ? value.ToString() : "off";
+
+        return entry.FixedAlias is { } alias ? $"{letter}  {alias}" : letter;
     }
 
     private readonly Action? _onOpenManual;

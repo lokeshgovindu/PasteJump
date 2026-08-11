@@ -130,6 +130,18 @@ public sealed class PasteJumpSettings
     public string PasteModeTriggerKey { get; set; } = PasteMode.TriggerKey.Default.ToString();
 
     /// <summary>
+    /// Which letter fires which paste-mode action, as <c>name=letter</c> pairs: <c>back=C;newest=A;pin=P</c>. An
+    /// empty letter switches that action off.
+    /// <para>
+    /// A string rather than a dictionary for two reasons that both bite: the Advanced tab decides whether a row
+    /// differs from its default by comparing values, which a dictionary does not do usefully, and the same tab
+    /// has to render it as one readable line. See <see cref="PasteMode.PasteKeyMap"/> for the format and for why
+    /// only letters are configurable.
+    /// </para>
+    /// </summary>
+    public string PasteModeKeys { get; set; } = PasteMode.PasteKeyMap.Default.ToSettingsString();
+
+    /// <summary>
     /// Fixed overlay position in physical pixels. Null means "follow the caret, else the cursor".
     /// <para>
     /// Both halves must be set for either to apply: half a position would move the overlay in one axis and
@@ -299,6 +311,10 @@ public sealed class PasteJumpSettings
 
         // Coerced to a usable letter rather than rejected, since a hand-edited file could hold anything.
         PasteModeTriggerKey = PasteMode.TriggerKey.Normalise(PasteModeTriggerKey).ToString();
+
+        // Re-rendered through the parser, which drops unknown names and restores anything unparseable to its
+        // default - so a hand-edited file cannot leave an action bound to nothing without saying so.
+        PasteModeKeys = PasteMode.PasteKeyMap.Parse(PasteModeKeys).ToSettingsString();
 
         // Re-rendered through the parser, so a hand-typed "control + shift + h" becomes the canonical
         // "Ctrl+Shift+H" and anything unparseable becomes empty rather than sitting there looking valid.

@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 644 passing (`dotnet test`) - 599 in Core.Tests, 45 in Interop.Tests |
+| Tests | 668 passing (`dotnet test`) - 618 in Core.Tests, 50 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,8 +93,8 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      599 tests.
-tests/PasteJump.Interop.Tests   45 tests. Interop logic needing no message loop or live keyboard.
+tests/PasteJump.Core.Tests      618 tests.
+tests/PasteJump.Interop.Tests   50 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -234,6 +234,39 @@ that immediately caught two real bugs. Expect to do the same again.
   Note the second-order effect: an invariant test used `Handle(PasteAction.Help)` as one of its "many
   intermediate keys", so ending the session there silently made every later key in that test a no-op — it still
   passed, while proving nothing. If you make an action end the session, grep the tests for it.
+- **The letters are configurable and live in `PasteKeyMap` (`Core`); the physical keys are not, and that is a
+  safety property.** The bindings were a `switch` in `VirtualKeyTranslator`; the letter half is now data the user
+  owns, and `ToGestureKey` checks the map for `A`–`Z` **before** the physical table so an unbound letter falls
+  through to `GestureKey.None` and can still be typed into search. Arrows, `Home`, `End`, `Delete`, `Enter`,
+  `Esc`, `F1` and the digits stay in the switch deliberately: **no set of bindings can leave a session
+  unsteppable or unclosable.** Things to keep:
+  - **Lookup is a 26-entry array, not a dictionary.** This is read inside the hook callback, once per keystroke.
+    `App` parses the string once per settings change into `_keyMap` for the same reason `_triggerVirtualKey` is
+    resolved once.
+  - **`TriggerKey.Reserved` now *derives* from the map**, which retires an invariant CLAUDE.md used to ask a
+    human to maintain — the list and the table had to be kept in step by hand. A frozen list would also be wrong
+    now that the letters move. `AvailableFor(map)` is what the dialog offers, so freeing a letter offers it to
+    the trigger in the same sitting.
+  - **A clash is refused on OK, not prevented in the combo.** Every letter is offered in every row, because
+    swapping two actions over passes through a state where both hold one letter; `PasteKeyMap.Validate` catches
+    it at the end and names both actions. Two actions on one letter is not half-honourable — whichever the
+    rebuild wrote last would win, silently.
+  - **A *fixed alias* is claimed as firmly as a configurable letter.** `Q` still moves a clip to the front and
+    `Space` still pins whatever the letters say, which is what makes "off" safe rather than lossy — and means a
+    letter cannot be moved onto `Q`.
+  - **`Parse` is silent on rubbish and falls back to defaults**, unlike most of this codebase, because it runs
+    during start-up before there is a window to report in. `Validate` is where a bad set is refused, against what
+    the user typed.
+  - **The `F1` card reads the map.** It took the trigger letter as a constructor argument for exactly this
+    reason; it now takes the map too, or it would confidently name `Z` after the user had moved the format cycle.
+  - **`IdleKeyboardTests.The_promise_holds_for_any_bindings`** re-runs the whole-keyboard sweep against awkward
+    custom maps. Without it, "only the trigger is swallowed when idle" would only ever have been proven for the
+    defaults.
+- **Adding a settings tab renumbers every shot after it, and `update-help-images.ps1` maps by index.** The
+  harness names a settings shot `SettingsWindow-<index>-<Tab>`, so inserting *Keys* at position 3 shifted four
+  mappings; each one silently stops matching and the help keeps the **previous** image, now documenting the wrong
+  tab. The script warns ("produced no shot for"), which is the signal to renumber — a clean run copying one more
+  image than before is the confirmation.
 - **`GestureKey.Paste` is the key that *opens* a session, so nothing may ever be aliased onto it.** This was
   shipped and reported within a day: the Down and Right arrows were mapped to `Paste`, and entry is
   `key == GestureKey.Paste && IsControlDown && !IsActive` (`PasteGestureRecognizer.cs:223`), so **`Ctrl+Right`
@@ -786,7 +819,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 644 tests
+dotnet test                                         # 668 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

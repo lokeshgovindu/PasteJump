@@ -36,20 +36,26 @@ $imageDirectory = Join-Path $repoRoot 'docs\help\images'
 
 # Source shot name (without the theme prefix) -> name the help refers to. Keeping the mapping here rather
 # than referring to harness names in the HTML means a rename in the harness is a one-line change.
+#
+# WATCH THE NUMBERS. The harness names a settings shot by the tab's index, so inserting a tab renumbers every
+# one after it and each of those mappings silently stops matching - the script warns, but the help quietly keeps
+# the previous image, which then documents the wrong tab. Adding the Keys tab shifted four of these. If a
+# "produced no shot for" warning appears below, this is almost certainly why.
 $wanted = [ordered]@{
     'HistoryWindow'             = 'history-window.png'
     'HistoryWindow-Clips'       = 'clips-view.png'
     'SettingsWindow-0-Capture'  = 'settings-capture.png'
     'SettingsWindow-1-History'  = 'settings-history.png'
     'SettingsWindow-2-PasteMode' = 'settings-paste-mode.png'
-    'SettingsWindow-3-ExcludedApps' = 'settings-excluded-apps.png'
-    'SettingsWindow-4-Appearance' = 'settings-appearance.png'
-    'SettingsWindow-5-System'   = 'settings-system.png'
-    'SettingsWindow-6-Advanced' = 'settings-advanced.png'
+    'SettingsWindow-3-Keys'     = 'settings-keys.png'
+    'SettingsWindow-4-ExcludedApps' = 'settings-excluded-apps.png'
+    'SettingsWindow-5-Appearance' = 'settings-appearance.png'
+    'SettingsWindow-6-System'   = 'settings-system.png'
+    'SettingsWindow-7-Advanced' = 'settings-advanced.png'
 
     # The System tab again with both halves on a custom folder, which is the only state that shows the path box
     # and its Browse button - a collapsed row is not rendered, so the shot above cannot document it.
-    'SettingsWindow-CustomFolder-5-System' = 'settings-custom-folder.png'
+    'SettingsWindow-CustomFolder-6-System' = 'settings-custom-folder.png'
 
     # Reached from Excluded Apps, and worth a picture because what it lists is not obvious from the button.
     'RunningAppPicker'          = 'running-app-picker.png'

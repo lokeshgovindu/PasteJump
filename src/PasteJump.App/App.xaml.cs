@@ -61,6 +61,13 @@ public partial class App : Application
     /// </summary>
     private int _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Default);
 
+    /// <summary>
+    /// The configured letter bindings, parsed once per settings change for the same reason as
+    /// <see cref="_triggerVirtualKey"/>: <see cref="OnKeyEvent"/> runs in the hook callback and must not parse
+    /// anything. Lookup inside it is one array index - see <see cref="PasteKeyMap"/>.
+    /// </summary>
+    private PasteKeyMap _keyMap = PasteKeyMap.Default;
+
     private SelfWriteGuard _selfWrites = null!;
     private FormatterRegistry _formatters = null!;
     private PasteModeController _controller = null!;
@@ -275,6 +282,7 @@ public partial class App : Application
         StartupTrace.Mark("services, capture and clipboard monitor");
 
         _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
+        _keyMap = PasteKeyMap.Parse(_settings.PasteModeKeys);
 
         _keyboardHook = new LowLevelKeyboardHook(OnKeyEvent);
         _keyboardHook.Install();
@@ -480,7 +488,7 @@ public partial class App : Application
         _recognizer.WinHeld = VirtualKeyTranslator.IsWinDown();
         _recognizer.ShiftHeld = VirtualKeyTranslator.IsShiftDown();
 
-        var key = VirtualKeyTranslator.ToGestureKey(e.VirtualKey, _triggerVirtualKey);
+        var key = VirtualKeyTranslator.ToGestureKey(e.VirtualKey, _triggerVirtualKey, _keyMap);
 
         if (key != GestureKey.None && _recognizer.Handle(key, e.IsKeyDown))
         {
@@ -1055,7 +1063,8 @@ public partial class App : Application
             // window so the window stays ignorant of where the manual lives.
             _helpWindow = Themed(new ShortcutHelpWindow(
                 TriggerKey.Normalise(_settings.PasteModeTriggerKey),
-                HelpDocument.Locate() is null ? null : OpenUserManual));
+                HelpDocument.Locate() is null ? null : OpenUserManual,
+                _keyMap));
             _helpWindow.Closed += (_, _) => _helpWindow = null;
             _helpWindow.Show();
             return;
@@ -1080,6 +1089,7 @@ public partial class App : Application
         _pasteHost.SetKeyHint(_settings.ShowOverlayKeyHint, TriggerKey.Normalise(_settings.PasteModeTriggerKey));
 
         _triggerVirtualKey = TriggerKey.ToVirtualKey(TriggerKey.Normalise(_settings.PasteModeTriggerKey));
+        _keyMap = PasteKeyMap.Parse(_settings.PasteModeKeys);
         ApplyHistoryHotkey(announceFailure: true);
 
         // The help window lists the trigger key by name, so a change to it makes an open copy wrong.

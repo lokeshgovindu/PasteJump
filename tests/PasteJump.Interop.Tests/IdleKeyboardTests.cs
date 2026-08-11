@@ -58,6 +58,61 @@ public class IdleKeyboardTests
         Assert.Equal([VkV], swallowed);
     }
 
+    /// <summary>
+    /// And it holds for the user's own bindings, not only the defaults. This is the promise that had to survive
+    /// making the letters configurable: whatever anyone binds, an idle PasteJump consumes one chord.
+    /// <para>
+    /// The maps here are deliberately awkward - letters moved onto each other's old keys, actions switched off,
+    /// and a reconfigured trigger - because the interesting failure is a binding table that claims a letter it
+    /// should have released.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("pin=K;format=;tags=Z", 0x56)]                  // moved, switched off, trigger V
+    [InlineData("back=;newest=;search=;pin=;front=", 0x56)]     // half of them off
+    [InlineData("history=V", 0x42)]                             // V is free because the trigger moved to B
+    public void The_promise_holds_for_any_bindings(string stored, int triggerVk)
+    {
+        var map = PasteKeyMap.Parse(stored);
+        var swallowed = new List<int>();
+
+        for (var vk = 0; vk < 256; vk++)
+        {
+            var (recognizer, _) = Build();
+            recognizer.Handle(GestureKey.Control, isDown: true);
+
+            if (recognizer.Handle(VirtualKeyTranslator.ToGestureKey(vk, triggerVk, map), isDown: true))
+            {
+                swallowed.Add(vk);
+            }
+        }
+
+        Assert.Equal([triggerVk], swallowed);
+    }
+
+    /// <summary>
+    /// A letter switched off must fall through to nothing, so it reaches the search box like any unbound letter.
+    /// Its fixed alias is unaffected - that is what makes switching one off safe rather than lossy.
+    /// </summary>
+    [Fact]
+    public void A_letter_switched_off_stops_firing_its_action()
+    {
+        var map = PasteKeyMap.Parse("pin=");
+
+        Assert.Equal(GestureKey.None, VirtualKeyTranslator.ToGestureKey(0x50, VkV, map));      // VK_P
+        Assert.Equal(GestureKey.TogglePin, VirtualKeyTranslator.ToGestureKey(0x20, VkV, map)); // VK_SPACE
+    }
+
+    /// <summary>A moved letter fires at its new home and no longer at its old one.</summary>
+    [Fact]
+    public void A_moved_letter_fires_where_it_was_moved_to()
+    {
+        var map = PasteKeyMap.Parse("tags=K");
+
+        Assert.Equal(GestureKey.EditTags, VirtualKeyTranslator.ToGestureKey(0x4B, VkV, map)); // VK_K
+        Assert.Equal(GestureKey.None, VirtualKeyTranslator.ToGestureKey(0x54, VkV, map));     // VK_T
+    }
+
     /// <summary>And no key opens a session either, which is the other half of the same promise.</summary>
     [Fact]
     public void With_no_session_open_only_the_trigger_chord_starts_one()

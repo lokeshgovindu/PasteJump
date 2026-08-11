@@ -166,6 +166,11 @@ While Ctrl is down:
 | <kbd>Shift</kbd> pressed *after* the overlay opens | Paste, then delete the clip ("paste popping") |
 | <kbd>Esc</kbd> | Cancel and restore the previous clipboard |
 
+**The letters are yours to move.** *Settings → Keys* binds any action to any letter, or switches it off. The
+physical keys — arrows, <kbd>Home</kbd>, <kbd>End</kbd>, <kbd>Delete</kbd>, <kbd>Enter</kbd>, <kbd>Esc</kbd>,
+<kbd>F1</kbd> — stay put on purpose, so no set of bindings can leave you unable to step through the stack or get
+out of it. <kbd>F1</kbd>'s key card shows your letters, not the defaults.
+
 Where two keys are listed, both work. The letters are Clipjump's layout and are not going away; the arrows,
 <kbd>Home</kbd>/<kbd>End</kbd>, <kbd>Delete</kbd>, <kbd>O</kbd>, <kbd>P</kbd> and <kbd>M</kbd> were added beside
 them. <kbd>H</kbd> is the one key that changed meaning: it opened the editor in Clipjump, which read as "help",

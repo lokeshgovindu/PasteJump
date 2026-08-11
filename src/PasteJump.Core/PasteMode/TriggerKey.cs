@@ -22,31 +22,31 @@ public static class TriggerKey
     public const char Default = 'V';
 
     /// <summary>
-    /// Letters bound to other paste-mode actions, which the trigger therefore cannot use. Mirrors the map
-    /// in <c>VirtualKeyTranslator</c>; if a binding is added there, add it here too or the two disagree
-    /// and the new action becomes silently stealable.
+    /// Letters bound to other paste-mode actions, which the trigger therefore cannot use.
+    /// <para>
+    /// Derived from <see cref="PasteKeyMap"/> rather than listed here, which retires an invariant this file used
+    /// to ask a human to maintain: the list and the key table had to be kept in step by hand, and a binding added
+    /// to one but not the other made that action silently stealable by the trigger. One definition now - and
+    /// since the letters are the user's to move, a reserved list frozen at compile time would be wrong anyway.
+    /// </para>
     /// </summary>
-    private static readonly Dictionary<char, string> Reserved = new()
+    private static IReadOnlyDictionary<char, string> Reserved => PasteKeyMap.Default.ClaimedLetters();
+
+    /// <summary>Letters the trigger may use with the default bindings, in alphabetical order.</summary>
+    public static IReadOnlyList<char> Available => AvailableFor(PasteKeyMap.Default);
+
+    /// <summary>
+    /// Letters the trigger may use given a particular set of bindings. What the settings dialog offers, so
+    /// moving an action off a letter frees that letter for the trigger in the same sitting.
+    /// </summary>
+    public static IReadOnlyList<char> AvailableFor(PasteKeyMap map)
     {
-        ['C'] = "step to a newer clip",
-        ['X'] = "cycle what release does",
-        ['A'] = "jump to the newest clip",
-        ['Q'] = "move the clip to the front",
-        ['M'] = "move the clip to the front",
-        ['P'] = "pin or unpin the clip",
-        ['F'] = "open search",
-        ['Z'] = "cycle the paste format",
-        ['T'] = "edit tags",
-        ['S'] = "put the clip on the clipboard",
+        ArgumentNullException.ThrowIfNull(map);
 
-        ['O'] = "open the clip in an editor",
-        ['H'] = "show the clipboard history",
-        ['E'] = "export the clip",
-    };
+        var claimed = map.ClaimedLetters();
 
-    /// <summary>Letters the trigger may use, in alphabetical order.</summary>
-    public static IReadOnlyList<char> Available { get; } =
-        [.. Enumerable.Range('A', 26).Select(static c => (char)c).Where(IsAvailable)];
+        return [.. Enumerable.Range('A', 26).Select(static c => (char)c).Where(c => !claimed.ContainsKey(c))];
+    }
 
     /// <summary>True when <paramref name="key"/> is a letter not already bound to another action.</summary>
     public static bool IsAvailable(char key)
