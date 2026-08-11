@@ -79,6 +79,42 @@ public sealed class ClipboardPaster
         => _settleDelay = TimeSpan.FromMilliseconds(Math.Clamp(milliseconds, 0, 500));
 
     /// <summary>
+    /// Per-application overrides for that gap, and the way to identify the application.
+    /// <para>
+    /// Both together, because one without the other does nothing: the table is keyed by executable name and
+    /// <paramref name="foreground"/> is what supplies it. Null for either restores the single global delay.
+    /// </para>
+    /// </summary>
+    public void SetPerAppSettleDelays(PerAppSettleDelays? delays, IForegroundWindowInfo? foreground)
+    {
+        _perApp = delays;
+        _foreground = foreground;
+    }
+
+    private PerAppSettleDelays? _perApp;
+    private IForegroundWindowInfo? _foreground;
+
+    /// <summary>
+    /// The delay for this paste.
+    /// <para>
+    /// Resolved per paste rather than cached, because the target application changes between pastes - that is the
+    /// entire point of the feature. The foreground window at this moment is the one being pasted into: the overlay
+    /// is <c>WS_EX_NOACTIVATE</c> and never takes focus, so it is never itself the answer.
+    /// </para>
+    /// </summary>
+    private TimeSpan ResolveSettleDelay()
+    {
+        if (_perApp is null || _perApp.Count == 0 || _foreground is null)
+        {
+            return _settleDelay;
+        }
+
+        var fallback = (int)_settleDelay.TotalMilliseconds;
+
+        return TimeSpan.FromMilliseconds(_perApp.For(_foreground.GetForegroundProcessName(), fallback));
+    }
+
+    /// <summary>
     /// Chord used to make the target application paste. See <see cref="PasteKeystroke"/> for why this is
     /// not simply always Ctrl+V.
     /// </summary>
@@ -122,7 +158,7 @@ public sealed class ClipboardPaster
 
             if (thenPaste)
             {
-                _schedule(_settleDelay, () => SendPaste());
+                _schedule(ResolveSettleDelay(), () => SendPaste());
             }
 
             return;

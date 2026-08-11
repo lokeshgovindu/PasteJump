@@ -8,6 +8,7 @@ using System.Windows.Input;
 using PasteJump.App.Services;
 using PasteJump.Core;
 using PasteJump.Core.Formatting;
+using PasteJump.Core.Paste;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 
@@ -261,6 +262,10 @@ public partial class SettingsWindow : Window
 
         BuildPasteKeyRows();
 
+        // Bound once here rather than in XAML: the collection is a field, and a DataGrid whose ItemsSource is
+        // reassigned loses any cell edit in progress.
+        PasteDelayGrid.ItemsSource = _pasteDelays;
+
         foreach (var choice in ThemeChoices)
         {
             ThemeCombo.Items.Add(choice.Label);
@@ -365,6 +370,18 @@ public partial class SettingsWindow : Window
         ShowCopyNotificationCheck.IsChecked = source.ShowCopyNotification;
         CopyNotificationMsBox.Text = source.CopyNotificationMs.ToString(CultureInfo.CurrentCulture);
         PasteSettleDelayBox.Text = source.PasteSettleDelayMs.ToString(CultureInfo.CurrentCulture);
+
+        // Rebuilt rather than merged, so a Reset genuinely clears the rows instead of leaving the old ones.
+        _pasteDelays.Clear();
+
+        foreach (var (process, milliseconds) in PerAppSettleDelays.Parse(source.PasteSettleDelayPerApp).Entries)
+        {
+            _pasteDelays.Add(new PasteDelayRow
+            {
+                Process = process,
+                Milliseconds = milliseconds.ToString(CultureInfo.CurrentCulture),
+            });
+        }
 
         BeepOnCopyCheck.IsChecked = source.BeepOnCopy;
         BeepFrequencyBox.Text = source.BeepFrequencyHz.ToString(CultureInfo.CurrentCulture);
@@ -886,6 +903,108 @@ public partial class SettingsWindow : Window
         // would tint every other control using it.
         fade.Completed += (_, _) => row.Background = null;
         brush.BeginAnimation(System.Windows.Media.Brush.OpacityProperty, fade);
+    }
+
+    // ------------------------------------------------------------- per-application paste delays
+
+    /// <summary>
+    /// One editable row of the per-application delay grid.
+    /// <para>
+    /// A mutable class with <see cref="INotifyPropertyChanged"/> rather than a record: the grid edits these in
+    /// place, and a record's <c>init</c> properties cannot be written back from a cell. The delay is a string so a
+    /// half-typed value is held rather than rejected mid-keystroke - it is parsed and refused on OK, like every
+    /// other number in this dialog.
+    /// </para>
+    /// </summary>
+    public sealed class PasteDelayRow : System.ComponentModel.INotifyPropertyChanged
+    {
+        private string _process = string.Empty;
+        private string _milliseconds = string.Empty;
+
+        public string Process
+        {
+            get => _process;
+            set { _process = value; Raise(nameof(Process)); }
+        }
+
+        public string Milliseconds
+        {
+            get => _milliseconds;
+            set { _milliseconds = value; Raise(nameof(Milliseconds)); }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        private void Raise(string name)
+            => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
+    }
+
+    private readonly ObservableCollection<PasteDelayRow> _pasteDelays = [];
+
+    private void OnAddPasteDelayClicked(object sender, RoutedEventArgs e)
+    {
+        // Seeded with the global delay rather than something arbitrary: the row is a starting point to edit, and
+        // the current value is the only defensible starting point.
+        var current = PasteSettleDelayBox.Text;
+
+        var chosen = RunningAppPicker.Choose(this, _pasteDelays.Select(static row => row.Process));
+
+        foreach (var process in chosen)
+        {
+            _pasteDelays.Add(new PasteDelayRow { Process = process, Milliseconds = current });
+        }
+
+        RefreshApplyState();
+    }
+
+    private void OnRemovePasteDelayClicked(object sender, RoutedEventArgs e)
+    {
+        foreach (var row in PasteDelayGrid.SelectedItems.OfType<PasteDelayRow>().ToList())
+        {
+            _pasteDelays.Remove(row);
+        }
+
+        RefreshApplyState();
+    }
+
+    /// <summary>
+    /// Reads the grid, refusing anything unusable.
+    /// <para>
+    /// Blank rows are dropped rather than refused: the grid cannot add rows itself, but a row whose program was
+    /// deleted by hand is plainly abandoned rather than a mistake worth stopping OK for.
+    /// </para>
+    /// </summary>
+    private bool TryReadPasteDelays(out PerAppSettleDelays delays, out string error)
+    {
+        var entries = new List<(string Process, int Milliseconds)>();
+
+        foreach (var row in _pasteDelays)
+        {
+            if (string.IsNullOrWhiteSpace(row.Process) && string.IsNullOrWhiteSpace(row.Milliseconds))
+            {
+                continue;
+            }
+
+            if (!int.TryParse(row.Milliseconds, NumberStyles.Integer, CultureInfo.CurrentCulture, out var ms))
+            {
+                delays = PerAppSettleDelays.Empty;
+                error = $"\"{row.Milliseconds}\" is not a number of milliseconds for {row.Process}.";
+                return false;
+            }
+
+            entries.Add((row.Process, ms));
+        }
+
+        if (PerAppSettleDelays.Validate(entries) is { } refusal)
+        {
+            delays = PerAppSettleDelays.Empty;
+            error = refusal;
+            return false;
+        }
+
+        delays = PerAppSettleDelays.FromEntries(entries);
+        error = string.Empty;
+        return true;
     }
 
     // ------------------------------------------------------------- export and import
@@ -1917,6 +2036,14 @@ public partial class SettingsWindow : Window
         settings.TrayLeftClick = TrayLeftClickChoices
             .FirstOrDefault(c => string.Equals(c.Label, trayLabel, StringComparison.Ordinal))
             .Action;
+
+        if (!TryReadPasteDelays(out var perAppDelays, out var delayError))
+        {
+            error = delayError;
+            return false;
+        }
+
+        settings.PasteSettleDelayPerApp = perAppDelays.ToSettingsString();
 
         settings.RunAtLogon = RunAtLogonCheck.IsChecked == true;
         settings.TextEditor = TextEditorBox.Text;

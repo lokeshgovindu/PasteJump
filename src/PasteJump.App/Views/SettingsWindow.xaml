@@ -752,7 +752,45 @@
                             <TextBox x:Name="PasteSettleDelayBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
+                                   Margin="0,3,0,4"
                                    Text="The gap between putting your clip on the clipboard and pressing paste. Raise it if one particular application pastes the previous clip instead of the chosen one — Office and Electron apps hold a cached copy of the clipboard for a moment. 0 to 500." />
+
+                        <!--
+                            Per-application overrides. The delay is a property of the program being pasted into
+                            rather than of PasteJump, so a single global value meant curing Word by slowing every
+                            paste everywhere. Editable in place: two columns is not worth a dialog.
+                        -->
+                        <TextBlock Text="Longer for particular programs" Style="{StaticResource SectionHeading}" />
+
+                        <DataGrid x:Name="PasteDelayGrid"
+                                  Height="116"
+                                  Margin="0,6,0,0"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserSortColumns="False"
+                                  HeadersVisibility="Column"
+                                  SelectionMode="Extended">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Program"
+                                                    Binding="{Binding Process, UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="*" />
+                                <DataGridTextColumn Header="Delay (ms)"
+                                                    Binding="{Binding Milliseconds, UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="110" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                            <Button Content="Add from ru_nning programs…"
+                                    Click="OnAddPasteDelayClicked"
+                                    ToolTip="Pick a program that currently has a window. It is added with the current global delay, which you can then edit." />
+                            <Button Content="Remo_ve"
+                                    Click="OnRemovePasteDelayClicked"
+                                    ToolTip="Remove the selected rows, so those programs go back to the global delay." />
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Text="Matched on the executable name, so it applies wherever that program runs. Anything not listed uses the delay above." />
 
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>

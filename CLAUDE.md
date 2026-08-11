@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 740 passing (`dotnet test`) - 688 in Core.Tests, 52 in Interop.Tests |
+| Tests | 762 passing (`dotnet test`) - 710 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      688 tests.
+tests/PasteJump.Core.Tests      710 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -473,6 +473,14 @@ that immediately caught two real bugs. Expect to do the same again.
     every settings-bearing tab contributes (64 settings across 6 tabs today) and runs three queries, one of which
     (`electron`) matches only inline help — proving the help text is indexed. Writing that check found my own wrong
     assumption: the paste-delay help says *Office and Electron*, not Excel.
+- **The paste settle delay is per application now, and it is resolved per paste rather than cached.** The delay
+  belongs to the program being pasted *into* - Office, Electron and RDP clients cache the clipboard - so one global
+  value meant curing Word by slowing every paste everywhere. `PerAppSettleDelays` lives in `Core` and
+  `ClipboardPaster.ResolveSettleDelay` asks `IForegroundWindowInfo` at the moment of each paste, because the target
+  changes between pastes and that is the whole point. **The foreground window at that moment is the target**: the
+  overlay is `WS_EX_NOACTIVATE` and never takes focus, so it can never be the answer. A null process name is real -
+  a secure desktop gives one - and takes the global delay rather than matching anything. Keyed on the executable
+  name through `ExcludedApps.Normalise`, so a name typed into the ignore list is recognised here too.
 - **An exported settings file deliberately carries no data locations, and no legacy-import flag.** `SettingsTransfer`
   shares `SettingsStore`'s serializer options so an export is byte-shaped like `PasteJump.json` and can be dropped
   in by hand. Two exclusions matter: **`ClipsLocation`/`SettingsLocation` are in `data-location.json`, not in
@@ -900,7 +908,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 740 tests
+dotnet test                                         # 762 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

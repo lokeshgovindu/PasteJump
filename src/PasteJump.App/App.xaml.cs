@@ -68,6 +68,9 @@ public partial class App : Application
     /// </summary>
     private PasteKeyMap _keyMap = PasteKeyMap.Default;
 
+    /// <summary>Identifies the window being pasted into. Used for the per-application paste delay.</summary>
+    private ForegroundWindowInfo _foreground = new();
+
     private SelfWriteGuard _selfWrites = null!;
     private FormatterRegistry _formatters = null!;
     private PasteModeController _controller = null!;
@@ -208,7 +211,10 @@ public partial class App : Application
 
         StartupTrace.Mark($"compact blobs (converted {compacted})");
 
-        var foreground = new ForegroundWindowInfo();
+        // Field, not a local: OnSettingsApplied re-resolves the per-app paste delays and needs the same
+        // provider. Stateless, so one instance for the process is right.
+        _foreground = new ForegroundWindowInfo();
+        var foreground = _foreground;
         _clipboard = new Win32ClipboardAccess(foreground);
         _selfWrites = new SelfWriteGuard();
         _formatters = new FormatterRegistry();
@@ -236,6 +242,7 @@ public partial class App : Application
         _pasteHost.TransientMessage += OnTransientMessage;
         _pasteHost.DeleteAllConfirmationRequested += OnDeleteAllConfirmationRequested;
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
+        _pasteHost.Paster.SetPerAppSettleDelays(PerAppSettleDelays.Parse(_settings.PasteSettleDelayPerApp), foreground);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
@@ -1111,6 +1118,7 @@ public partial class App : Application
 
         _theme.Apply(_settings.Theme);
         _pasteHost.Paster.SetSettleDelay(_settings.PasteSettleDelayMs);
+        _pasteHost.Paster.SetPerAppSettleDelays(PerAppSettleDelays.Parse(_settings.PasteSettleDelayPerApp), _foreground);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);

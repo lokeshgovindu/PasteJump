@@ -172,6 +172,16 @@ public sealed class PasteJumpSettings
     public int PasteSettleDelayMs { get; set; } = 25;
 
     /// <summary>
+    /// Per-application overrides for <see cref="PasteSettleDelayMs"/>, as <c>name=ms</c> pairs:
+    /// <c>winword.exe=80;ms-teams.exe=100</c>. Empty by default.
+    /// <para>
+    /// The delay is a property of the application being pasted into, not of PasteJump, so a single global value
+    /// meant fixing Word by slowing every paste everywhere. See <see cref="Paste.PerAppSettleDelays"/>.
+    /// </para>
+    /// </summary>
+    public string PasteSettleDelayPerApp { get; set; } = string.Empty;
+
+    /// <summary>
     /// Chord sent to make the target application paste. See <see cref="Settings.PasteKeystroke"/> - the
     /// short version is that another clipboard manager's keyboard hook can swallow Ctrl+V before the
     /// target window sees it, and Shift+Insert is the way out.
@@ -365,6 +375,10 @@ public sealed class PasteJumpSettings
         OverlayPreviewChars = Math.Clamp(OverlayPreviewChars, SettingsBounds.OverlayPreviewChars.Min, SettingsBounds.OverlayPreviewChars.Max);
 
         PasteSettleDelayMs = Math.Clamp(PasteSettleDelayMs, SettingsBounds.PasteSettleDelayMs.Min, SettingsBounds.PasteSettleDelayMs.Max);
+
+        // Re-rendered through the parser, which drops unparseable entries and clamps out-of-range ones, so a
+        // hand-edited file cannot leave a delay that says one thing and behaves as another.
+        PasteSettleDelayPerApp = Paste.PerAppSettleDelays.Parse(PasteSettleDelayPerApp).ToSettingsString();
         // Floor of 1, not 250. The old floor silently overrode anyone who asked for something shorter, and there
         // is no reason to: the toast fades on its own timer, so a tiny value gives a brief flash rather than
         // anything broken. 0 is excluded because that reads as "off", and off is ShowCopyNotification's job -
