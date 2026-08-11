@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 634 passing (`dotnet test`) - 598 in Core.Tests, 36 in Interop.Tests |
+| Tests | 641 passing (`dotnet test`) - 598 in Core.Tests, 43 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -94,7 +94,7 @@ src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-wi
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
 tests/PasteJump.Core.Tests      598 tests.
-tests/PasteJump.Interop.Tests   36 tests. Interop logic needing no message loop or live keyboard.
+tests/PasteJump.Interop.Tests   43 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -255,6 +255,16 @@ that immediately caught two real bugs. Expect to do the same again.
   Two more invariants moved out of prose and into that project: every letter bound to an action **is** in
   `TriggerKey.Reserved`, and every reserved letter **is** really bound. The first is the rule CLAUDE.md had been
   asking a human to maintain; it is what catches an alias added on one side only.
+- **`IdleKeyboardTests` is the guard on the property that matters most: which keystrokes this application takes
+  away from everyone else.** The hook sees every key on the machine, so the rule is that **with no session open,
+  exactly one chord is consumed and no other** — and that is now swept over all 256 virtual keys in four states:
+  Ctrl held (only the trigger), no modifier (nothing, so an ordinary `V` is never eaten while typing), and Alt /
+  Win / Shift also held (nothing, since AltGr is Ctrl+Alt, Win belongs to the shell and `Ctrl+Shift+V` is how
+  terminals paste). It drives the **real key table and the real recogniser together**, which is the seam
+  `Ctrl+Right` fell through: the table said "step to an older clip", the recogniser read the same enum value as
+  "open a session", and neither component was wrong when looked at on its own. A fresh recogniser per key,
+  because one key wrongly opening a session would make every key after it swallowed too and the failure would
+  name the wrong culprit. Verified by reintroducing the arrow defect: 7 tests fail.
 - **The paste-mode keys are additive from here on: nothing that works may stop working.** The physical keys
   (`↓`/`→` and `↑`/`←` for stepping, `Home`, `End`, `Delete`) were added *beside* Clipjump's letters, not instead
   of them, and `O` for "open in an editor" is an **alias** of `H` rather than a replacement — `H` reads as Help,
@@ -764,7 +774,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 634 tests
+dotnet test                                         # 641 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
