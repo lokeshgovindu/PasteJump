@@ -781,6 +781,14 @@
                         </DataGrid>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                            <!--
+                                Offered rather than applied. Prefilling these silently would change how every paste
+                                into a dozen programs behaves on the strength of a guess about someone else's
+                                machine - so it is a button, the rows are editable, and nothing is written until OK.
+                            -->
+                            <Button Content="Add known slow pro_grams"
+                                    Click="OnAddKnownSlowProgramsClicked"
+                                    ToolTip="Adds Office, Teams, Slack, VS Code, Remote Desktop and the like with a conservative starting delay. Starting points, not measurements — edit them to suit your machine. Programs already listed are left alone." />
                             <Button Content="Add from ru_nning programs…"
                                     Click="OnAddPasteDelayClicked"
                                     ToolTip="Pick a program that currently has a window. It is added with the current global delay, which you can then edit." />

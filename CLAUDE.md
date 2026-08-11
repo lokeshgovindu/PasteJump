@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 762 passing (`dotnet test`) - 710 in Core.Tests, 52 in Interop.Tests |
+| Tests | 769 passing (`dotnet test`) - 717 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -58,6 +58,31 @@ likely to be reintroduced.
 wide range of applications, the Excel round-trip, and **whether `Shift+Insert` actually pastes in every
 application you care about** — it is the documented way to coexist with another clipboard manager, but it
 is a different chord and a few applications bind it elsewhere.
+
+### Asked for, not yet built
+
+In the order they were requested. All three came out of a feature review against Ditto and CopyQ.
+
+1. **Join several clips into one paste.** Select rows in the history window, or mark clips during the gesture, and
+   paste them concatenated with a chosen separator. Distinct from `Enter`, which pastes them one after another.
+2. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
+   mine:** a DPAPI key ties the store to one Windows account, which ends "copy the exe to a USB stick and it takes
+   its history with it" — the property the portable ZIP exists for. A passphrase keeps portability but has to be
+   typed at every logon, which is intolerable for a resident app, and a key file beside the data is security
+   theatre. Put that choice to the user before writing any of it.
+3. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
+   `Application.Resources.MergedDictionaries[0]` and `AppTheme` has exactly three values. A user-authored theme
+   means the palette becomes data — a file of named colours — rather than a compiled `ResourceDictionary`, so:
+   every key in `Light.xaml`/`Dark.xaml` becomes a contract that a theme file must satisfy (a missing key
+   resolves to *nothing* and the control renders unstyled, silently — the trap this file already warns about
+   twice), `AppTheme` stops being an enum, and the DWM title-bar and border calls need re-pushing per theme as
+   `RefreshThemedBorders` already does. Deciding what happens to a theme file that omits keys, or names a colour
+   that will not parse, is the design question.
+
+Explicitly **rejected** in that same review, so they do not need revisiting: LAN peer-to-peer sync (fights the
+single-writer SQLite model — two machines on one folder corrupt the store), scripting and plugins, cloud accounts,
+and CopyQ-style tabs (channels were dropped deliberately). Content-based exclusion of sensitive clips was offered
+and not chosen.
 
 ### The immediate next task
 
@@ -93,7 +118,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      710 tests.
+tests/PasteJump.Core.Tests      717 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -908,7 +933,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 762 tests
+dotnet test                                         # 769 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

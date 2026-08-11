@@ -957,6 +957,40 @@ public partial class SettingsWindow : Window
         RefreshApplyState();
     }
 
+    /// <summary>
+    /// Fills the grid with the applications known to cache the clipboard.
+    /// <para>
+    /// Programs already listed are skipped rather than overwritten - a value someone has tuned for their machine is
+    /// worth more than the suggestion, and it makes pressing the button twice harmless.
+    /// </para>
+    /// </summary>
+    private void OnAddKnownSlowProgramsClicked(object sender, RoutedEventArgs e)
+    {
+        var added = KnownSlowPasteTargets.NotAlreadyListed(_pasteDelays.Select(static row => row.Process));
+
+        foreach (var target in added)
+        {
+            _pasteDelays.Add(new PasteDelayRow
+            {
+                Process = target.Process,
+                Milliseconds = target.Milliseconds.ToString(CultureInfo.CurrentCulture),
+            });
+        }
+
+        // AppliedText, not ValidationText: that one is DangerBrush red, so a cheerful "added 13 programs" would
+        // have read as an error. This is the dialog's neutral line for saying what just happened.
+        //
+        // Said out loud including the nothing-to-do case, because a button that appears to do nothing reads as
+        // broken and "they are all already there" is the answer worth giving.
+        AppliedText.Text = added.Count == 0
+            ? "Every known slow program is already listed."
+            : $"Added {added.Count} program{(added.Count == 1 ? string.Empty : "s")} with a starting delay — "
+                + "edit the numbers to suit your machine. Nothing is saved until you press OK or Apply.";
+
+        AppliedText.Visibility = Visibility.Visible;
+        RefreshApplyState();
+    }
+
     private void OnRemovePasteDelayClicked(object sender, RoutedEventArgs e)
     {
         foreach (var row in PasteDelayGrid.SelectedItems.OfType<PasteDelayRow>().ToList())

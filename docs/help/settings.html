@@ -256,7 +256,12 @@ is the way back from any choice made here.</td></tr>
 is a property of the program you are pasting <i>into</i> rather than of PasteJump, so raising the global value to
 cure one application slowed every paste everywhere. Add a program with <b>Add from running programs…</b> and edit
 its number in place; anything not listed uses the global delay. Matched on the executable name, so it applies
-wherever that program runs.</td></tr>
+wherever that program runs.
+<p><b>Add known slow programs</b> fills the table with the usual suspects &mdash; Word, Excel, PowerPoint, Outlook,
+OneNote, Teams, Slack, Discord, VS Code, Remote Desktop and Citrix &mdash; at a conservative starting delay. They
+are <i>starting points, not measurements</i>: the right number depends on your machine, so raise one until the wrong
+clip stops appearing. Programs you have already listed are left alone, so a value you have tuned is never
+overwritten and pressing the button twice does nothing the second time.</p></td></tr>
 <tr><td class="name">Pause Before Pasting (ms)</td><td>The gap between putting a clip on the clipboard and
 sending the paste keystroke. Raise it if a particular application pastes the <i>previous</i> clip: Office,
 Electron shells and remote-desktop clients cache the clipboard, and a keystroke arriving too early can be
