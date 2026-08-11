@@ -40,6 +40,88 @@ public sealed class HistoryDeduplicationTests : IDisposable
         }
     }
 
+    // ------------------------------------------------------- ignoring the timestamp
+
+    /// <summary>
+    /// The same text copied on different days is one entry when the timestamp is ignored, and the survivor is the
+    /// <em>newest</em> - the opposite of the ordinary sweep, deliberately. With the timestamp in the key every row
+    /// of a group was copied at the same instant and they are interchangeable; without it they are not, and the
+    /// most recent is the one whose date tells you something true.
+    /// </summary>
+    [Fact]
+    public void Ignoring_the_timestamp_collapses_copies_made_at_different_times_and_keeps_the_newest()
+    {
+        _store.AddHistory(Moment, ClipKind.Text, "recurring", null, 9);
+        _store.AddHistory(Moment.AddDays(1), ClipKind.Text, "recurring", null, 9);
+        _store.AddHistory(Moment.AddDays(2), ClipKind.Text, "recurring", null, 9);
+
+        Assert.Equal(3, _store.HistoryCount);
+        Assert.Equal(2, _store.DeduplicateHistory(ignoreTimestamp: true));
+
+        var survivor = Assert.Single(_store.SearchHistory(null));
+        Assert.Equal("recurring", survivor.Preview);
+        Assert.Equal(Moment.AddDays(2), survivor.CapturedUtc);
+    }
+
+    /// <summary>
+    /// And the ordinary sweep leaves them alone, which is what makes the option worth having: without it, three
+    /// copies of the same phrase on three days are three different facts about when it was copied.
+    /// </summary>
+    [Fact]
+    public void The_ordinary_sweep_keeps_copies_made_at_different_times()
+    {
+        _store.AddHistory(Moment, ClipKind.Text, "recurring", null, 9);
+        _store.AddHistory(Moment.AddDays(1), ClipKind.Text, "recurring", null, 9);
+
+        Assert.Equal(0, _store.DeduplicateHistory());
+        Assert.Equal(2, _store.HistoryCount);
+    }
+
+    /// <summary>
+    /// Kind still separates. Two entries previewing the same text but stored as different kinds are not the same
+    /// copy, and collapsing them would throw one away.
+    /// </summary>
+    [Fact]
+    public void Ignoring_the_timestamp_still_separates_by_kind()
+    {
+        _store.AddHistory(Moment, ClipKind.Text, "[image]", null, 4);
+        _store.AddHistory(Moment.AddDays(1), ClipKind.Image, "[image]", null, 4);
+
+        Assert.Equal(0, _store.DeduplicateHistory(ignoreTimestamp: true));
+        Assert.Equal(2, _store.HistoryCount);
+    }
+
+    /// <summary>
+    /// And the image hash still separates, which is the case that would lose data silently: every image previews
+    /// as the literal "[image]", so two different screenshots are indistinguishable without it.
+    /// </summary>
+    [Fact]
+    public void Ignoring_the_timestamp_still_separates_different_images()
+    {
+        _store.AddHistory(Moment, ClipKind.Image, "[image]", Encoding.UTF8.GetBytes("first"), 5);
+        _store.AddHistory(Moment.AddDays(1), ClipKind.Image, "[image]", Encoding.UTF8.GetBytes("second"), 6);
+        _store.AddHistory(Moment.AddDays(2), ClipKind.Image, "[image]", Encoding.UTF8.GetBytes("first"), 5);
+
+        // The two "first" screenshots collapse; the different one survives.
+        Assert.Equal(1, _store.DeduplicateHistory(ignoreTimestamp: true));
+        Assert.Equal(2, _store.HistoryCount);
+    }
+
+    /// <summary>
+    /// Text rows carry no blob hash at all, so the grouping has to treat NULL as equal to NULL - which
+    /// PARTITION BY does and <c>=</c> famously does not. If this ever regressed, nothing textual would collapse
+    /// and the option would look like it did nothing.
+    /// </summary>
+    [Fact]
+    public void Rows_with_no_blob_still_group_together()
+    {
+        _store.AddHistory(Moment, ClipKind.Text, "no blob here", null, 12);
+        _store.AddHistory(Moment.AddHours(1), ClipKind.Text, "no blob here", null, 12);
+
+        Assert.Equal(1, _store.DeduplicateHistory(ignoreTimestamp: true));
+        Assert.Equal(1, _store.HistoryCount);
+    }
+
     // ------------------------------------------------------- AddHistoryIfAbsent
 
     [Fact]

@@ -146,6 +146,20 @@ public partial class SettingsWindow : Window
         _excluded.CollectionChanged += (_, _) => RefreshApplyState();
 
         RefreshApplyState();
+
+        // Focus lands in the search box, with the caret at the start. Typing is the fastest way to reach a
+        // setting in a dialog with eight tabs, and a search box you have to click first is one most people never
+        // notice at all.
+        //
+        // On Loaded rather than here: focus set in a constructor is discarded, because the window has no
+        // presentation source yet and WPF assigns initial focus itself once it does. CaretIndex is set explicitly
+        // rather than left alone - an empty box puts it at 0 anyway, but this dialog is reopened with whatever
+        // text was there before once the box remembers it, and "focused, at the start" is the intent.
+        Loaded += (_, _) =>
+        {
+            SearchBox.Focus();
+            SearchBox.CaretIndex = 0;
+        };
     }
 
     private void OnAnyEdit(object sender, RoutedEventArgs e) => RefreshApplyState();

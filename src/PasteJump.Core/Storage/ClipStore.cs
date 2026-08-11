@@ -640,21 +640,54 @@ public sealed class ClipStore : IDisposable
     /// the size that provokes it - tens of thousands of rows.
     /// </para>
     /// </summary>
-    public int DeduplicateHistory()
+    /// <param name="ignoreTimestamp">
+    /// Match on content alone, ignoring when each copy happened - and keep the <em>newest</em> of each group
+    /// rather than the oldest.
+    /// <para>
+    /// Off by default, and the asymmetry in which row survives is the point rather than an oversight. With the
+    /// timestamp in the key, every row of a group was copied at the same instant, so they are genuinely
+    /// interchangeable and keeping the earliest id merely makes the result stable across runs. Without it, a group
+    /// is the same text copied on Monday and again today: they are not interchangeable, and the useful survivor is
+    /// the most recent one, because that is what the entry's date then tells you.
+    /// </para>
+    /// <para>
+    /// This is a much broader sweep - it collapses a phrase you paste every day into a single entry - so it is
+    /// something to ask for rather than the default. It is also the only mode that helps when the copies were
+    /// genuinely made at different times, which an import cannot produce but ordinary use does constantly.
+    /// </para>
+    /// </param>
+    public int DeduplicateHistory(bool ignoreTimestamp = false)
     {
         lock (_gate)
         {
             using var cmd = _connection.CreateCommand();
 
+            // Two shapes rather than one parameterised query, because the survivor differs as well as the key:
+            // oldest when the timestamp is part of the match, newest when it is not. See the parameter note.
+            //
             // MIN(id) keeps the earliest row of each group, so ids stay stable for whatever was imported first
             // rather than the survivor changing on every run.
-            cmd.CommandText = """
-                DELETE FROM history
-                WHERE id NOT IN (
-                    SELECT MIN(id) FROM history
-                    GROUP BY captured_utc, kind, preview, blob_hash
-                );
-                """;
+            cmd.CommandText = ignoreTimestamp
+                ? """
+                    DELETE FROM history
+                    WHERE id NOT IN (
+                        SELECT id FROM (
+                            SELECT id, ROW_NUMBER() OVER (
+                                PARTITION BY kind, preview, blob_hash
+                                ORDER BY captured_utc DESC, id DESC
+                            ) AS rank_in_group
+                            FROM history
+                        )
+                        WHERE rank_in_group = 1
+                    );
+                    """
+                : """
+                    DELETE FROM history
+                    WHERE id NOT IN (
+                        SELECT MIN(id) FROM history
+                        GROUP BY captured_utc, kind, preview, blob_hash
+                    );
+                    """;
 
             return cmd.ExecuteNonQuery();
         }

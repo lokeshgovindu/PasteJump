@@ -190,12 +190,19 @@
                      PreviewKeyDown="OnSearchKeyDown"
                      ToolTip="Find a setting on any tab by its name or its description" />
 
-            <!-- Cue text over the empty box, as on the Advanced tab. IsHitTestVisible so it cannot steal a click. -->
+            <!--
+                Cue text over the empty box. IsHitTestVisible="False" so it cannot steal a click.
+
+                Margin 6, not 7: the themed TextBox insets its text by Padding 5 plus a 1px border, so 7 put the
+                placeholder one pixel right of where typing actually starts and the text appeared to shift as you
+                began. Whatever this is, it must equal the TextBox's own text origin - a placeholder that does not
+                sit exactly where the text will reads as a stray indent.
+            -->
             <TextBlock x:Name="SearchCue"
                        Grid.Column="0"
                        Text="Search settings…"
                        Foreground="{DynamicResource MutedTextBrush}"
-                       Margin="7,0,0,0"
+                       Margin="6,0,0,0"
                        VerticalAlignment="Center"
                        IsHitTestVisible="False" />
 
@@ -658,7 +665,7 @@
                             <TextBox x:Name="CopyNotificationMsBox" Grid.Column="1" />
                         </Grid>
                         <TextBlock Style="{StaticResource CheckHelp}"
-                                   Text="Between 250 and 10000 milliseconds. 1200 is about right for a glance." />
+                                   Text="Between 1 and 10000 milliseconds. 500 is long enough to read the clip count and gone before it is in the way; raise it if you want to read the preview." />
 
                         <CheckBox x:Name="BeepOnCopyCheck" Content="Beep" />
                         <TextBlock Style="{StaticResource CheckHelp}"

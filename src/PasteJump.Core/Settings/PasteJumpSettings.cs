@@ -187,8 +187,16 @@ public sealed class PasteJumpSettings
 
     // ------------------------------------------------------------ appearance
 
-    /// <summary>Colour scheme. Light by default.</summary>
-    public AppTheme Theme { get; set; } = AppTheme.Light;
+    /// <summary>
+    /// Colour scheme. Follows Windows by default.
+    /// <para>
+    /// Following the system is the right default for a utility that lives in the notification area: it has no
+    /// branding to assert and no reason to be the one light window on a dark desktop. Note this is
+    /// <see cref="AppTheme.System"/> = 2 rather than the enum's zero, so a settings file that spells out
+    /// <c>"Theme": 0</c> still gets Light - only an absent property picks this up.
+    /// </para>
+    /// </summary>
+    public AppTheme Theme { get; set; } = AppTheme.System;
 
     /// <summary>Row spacing in the history list. Cozy by default.</summary>
     public GridDensity GridDensity { get; set; } = GridDensity.Cozy;
@@ -230,8 +238,16 @@ public sealed class PasteJumpSettings
     /// <summary>Show a brief notification near the cursor after each copy, as Clipjump did.</summary>
     public bool ShowCopyNotification { get; set; } = true;
 
-    /// <summary>How long the copy notification stays on screen, in milliseconds.</summary>
-    public int CopyNotificationMs { get; set; } = 1200;
+    /// <summary>
+    /// How long the copy notification stays on screen, in milliseconds.
+    /// <para>
+    /// 500 rather than 1,200. This fires on every copy, so it is the most frequently seen thing in the product,
+    /// and at over a second it was still on screen while the user got on with what they were doing - a
+    /// confirmation that outlasts the doubt it answers becomes clutter. Long enough to read the clip count,
+    /// short enough to be gone before it is in the way.
+    /// </para>
+    /// </summary>
+    public int CopyNotificationMs { get; set; } = 500;
 
     /// <summary>
     /// Sound a short tone on each capture. Original: <c>CopyBeep</c>, off by default there too.
@@ -345,7 +361,11 @@ public sealed class PasteJumpSettings
         OverlayPreviewChars = Math.Clamp(OverlayPreviewChars, 40, 4_000);
 
         PasteSettleDelayMs = Math.Clamp(PasteSettleDelayMs, 0, 500);
-        CopyNotificationMs = Math.Clamp(CopyNotificationMs, 250, 10_000);
+        // Floor of 1, not 250. The old floor silently overrode anyone who asked for something shorter, and there
+        // is no reason to: the toast fades on its own timer, so a tiny value gives a brief flash rather than
+        // anything broken. 0 is excluded because that reads as "off", and off is ShowCopyNotification's job -
+        // two ways to express the same state is how they end up contradicting each other.
+        CopyNotificationMs = Math.Clamp(CopyNotificationMs, 1, 10_000);
 
         // Floors are low enough to be useful for someone who wants the overlay out of the way, and the ceilings
         // are what a 1080p screen can show without the overlay becoming the thing being looked at rather than

@@ -405,6 +405,10 @@ public partial class HistoryWindow : Window
         ClearButton.Content = ShowingClips ? "Clear _Clips" : "Clear _History";
         PinButton.Visibility = ShowingClips ? Visibility.Visible : Visibility.Collapsed;
 
+        // Disabled rather than hidden in the Clips view: a clip is judged by content alone already, so the option
+        // has nothing to change there, and a control that disappears invites the question of where it went.
+        IgnoreTimestampCheck.IsEnabled = !ShowingClips;
+
         // The cue names the store being searched. It said "history" in both views, which is the same confusion
         // between the two stores that the view switch exists to dispel.
         SearchCue.Text = ShowingClips ? "Search clips…  (Ctrl+K)" : "Search history…  (Ctrl+K)";
@@ -1007,15 +1011,25 @@ public partial class HistoryWindow : Window
         var clips = ShowingClips;
         var before = clips ? _store.Count : _store.HistoryCount;
 
+        // Only history honours it; a clip is judged by content already. The check box is disabled in the Clips
+        // view, but read defensively rather than trusted - IsEnabled is presentation, and this deletes rows.
+        var ignoreTimestamp = !clips && IgnoreTimestampCheck.IsChecked == true;
+
         var accepted = MessageDialog.Show(
             "Entries that are an exact duplicate of another are removed, keeping one of each. Nothing that "
                 + "differs in any way is touched.\n\n"
                 + (clips
                     ? "A clip is judged by its content, which is the same test the gesture uses to recognise a "
                         + "re-copy. The newest of each set is kept, and a pinned one always wins."
-                    : "An entry is judged by its timestamp, its kind, its text and its image, so two "
-                        + "screenshots taken in the same second are not mistaken for one. The oldest of each "
-                        + "set is kept.")
+                    : ignoreTimestamp
+                        // Spelled out at length because it is the destructive one: it collapses a phrase copied
+                        // every day for a year into a single entry, and the prompt is the last chance to say so.
+                        ? "Ignore time is ticked, so an entry is judged by its kind, its text and its image "
+                            + "only - the same thing copied on different days counts as one, and the most "
+                            + "recent is kept. This removes far more than the ordinary sweep does."
+                        : "An entry is judged by its timestamp, its kind, its text and its image, so two "
+                            + "screenshots taken in the same second are not mistaken for one. The oldest of each "
+                            + "set is kept.")
                 + "\n\nThis cannot be undone.",
             headline: clips ? "Remove duplicate clips?" : "Remove duplicate history entries?",
             kind: DialogKind.Warning,
@@ -1027,7 +1041,7 @@ public partial class HistoryWindow : Window
             return;
         }
 
-        var removed = clips ? _store.DeduplicateClips() : _store.DeduplicateHistory();
+        var removed = clips ? _store.DeduplicateClips() : _store.DeduplicateHistory(ignoreTimestamp);
 
         if (removed > 0)
         {

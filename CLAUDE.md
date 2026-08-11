@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 685 passing (`dotnet test`) - 633 in Core.Tests, 52 in Interop.Tests |
+| Tests | 700 passing (`dotnet test`) - 648 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      633 tests.
+tests/PasteJump.Core.Tests      648 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -447,6 +447,14 @@ that immediately caught two real bugs. Expect to do the same again.
   a callback that blocks all keyboard input machine-wide. `MOD_NOREPEAT` is not optional — without it,
   holding the chord opens the window dozens of times. A refused registration means another process owns the
   chord and must be reported, or the symptom is a hotkey that silently does nothing.
+- **`DeduplicateHistory(ignoreTimestamp: true)` keeps the *newest* of each group; the ordinary sweep keeps the
+  oldest. The asymmetry is the point.** With the timestamp in the key every row of a group was copied at the same
+  instant, so they are interchangeable and `MIN(id)` merely makes the survivor stable across runs. Without it a
+  group is the same text copied on Monday and again today - not interchangeable, and the useful survivor is the
+  recent one, because that is what the entry's date then tells you. Two things to keep: **`PARTITION BY` treats
+  NULL as equal to NULL**, which is what makes text rows (no `blob_hash`) collapse at all - the `IS`-not-`=` trap
+  from the insert-time check, in its other form; and the blob hash stays in the key, because every image previews
+  as `[image]` and dropping it would collapse two different screenshots into one.
 - **The settings search indexes the dialog by walking the LOGICAL tree, and that is the whole trick.** A
   `TabControl` applies the template for the **selected tab only**, so a visual-tree walk finds the first tab's
   controls and nothing else — and the search would silently cover one tab in eight while looking like it worked,
@@ -865,7 +873,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 685 tests
+dotnet test                                         # 700 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
