@@ -11,8 +11,12 @@ namespace PasteJump.Interop;
 public static class VirtualKeyTranslator
 {
     /// <summary>
-    /// The key bindings, matching the original Clipjump layout minus the channel keys (Up / Down /
-    /// PitSwap), which have no meaning without channels.
+    /// The key bindings: the original Clipjump layout, minus its channel keys (Up / Down / PitSwap) which have
+    /// no meaning without channels, plus the physical navigation keys it never used.
+    /// <para>
+    /// Every Clipjump letter still does what it did. The additions are aliases or previously unbound keys, so
+    /// a hand that learned the original layout is never wrong - see the arrow-key and Home notes below.
+    /// </para>
     /// </summary>
     /// <param name="triggerVirtualKey">
     /// Virtual key of the configurable trigger - the key that opens a session and, once open, steps to an
@@ -95,14 +99,32 @@ public static class VirtualKeyTranslator
         NativeConstants.VK_SPACE => GestureKey.TogglePin,
         NativeConstants.VK_T => GestureKey.EditTags,
         NativeConstants.VK_S => GestureKey.PushToClipboard,
-        NativeConstants.VK_H => GestureKey.EditClip,
+
+        // O is the mnemonic one - H reads as Help, which is what made someone press F1 in the first place -
+        // but H is kept as an alias rather than moved. Nothing that already works may stop working, and the
+        // cost of the alias is one letter fewer available as the trigger.
+        NativeConstants.VK_O or NativeConstants.VK_H => GestureKey.EditClip,
+
         NativeConstants.VK_E => GestureKey.ExportClip,
         NativeConstants.VK_RETURN => GestureKey.Commit,
         NativeConstants.VK_F1 => GestureKey.Help,
         NativeConstants.VK_OEM_MINUS or NativeConstants.VK_SUBTRACT => GestureKey.ToggleJumpDirection,
         NativeConstants.VK_ESCAPE => GestureKey.Escape,
-        NativeConstants.VK_HOME => GestureKey.Escape,
         NativeConstants.VK_BACK => GestureKey.Backspace,
+
+        // The physical navigation keys, all additive. Down/Right and Up/Left simply duplicate the trigger and
+        // C, so a hand that already knows those loses nothing; they exist because stepping through a list with
+        // an arrow key needs no learning at all. Clipjump binds Up and Down to its channel keys
+        // (Clipjump.ahk:222) - channels are out of scope here, so nothing of ours was using them.
+        NativeConstants.VK_DOWN or NativeConstants.VK_RIGHT => GestureKey.Paste,
+        NativeConstants.VK_UP or NativeConstants.VK_LEFT => GestureKey.Back,
+
+        // Home was a second Escape until now, which was our own invention rather than the original's and
+        // appeared in no help text, card or footer - so no documented behaviour changes here. Cancel is
+        // untouched on Esc.
+        NativeConstants.VK_HOME => GestureKey.JumpToNewest,
+        NativeConstants.VK_END => GestureKey.JumpToOldest,
+        NativeConstants.VK_DELETE => GestureKey.DeleteCurrent,
 
         >= 0x31 and <= 0x39 => GestureKey.Digit1 + (virtualKey - 0x31),
 

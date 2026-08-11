@@ -23,13 +23,17 @@ use it &mdash; it is there so you can, not because you must.</p>
 
 <table>
 <tr><th>Key</th><th>Action</th></tr>
-<tr><td class="key">V</td><td>Step to an older clip. Tap again to keep going back.</td></tr>
-<tr><td class="key">C</td><td>Step back towards a newer clip.</td></tr>
-<tr><td class="key">A</td><td>Jump straight back to the newest clip. This is the way out of "I have tapped
-<code>V</code> two hundred times and cannot get back" &mdash; one key, however deep you are.</td></tr>
+<tr><td class="key">V<br>&darr; &rarr;</td><td>Step to an older clip. Tap again to keep going back.</td></tr>
+<tr><td class="key">C<br>&uarr; &larr;</td><td>Step back towards a newer clip.</td></tr>
+<tr><td class="key">A<br>Home</td><td>Jump straight back to the newest clip. This is the way out of "I have
+tapped <code>V</code> two hundred times and cannot get back" &mdash; one key, however deep you are.</td></tr>
+<tr><td class="key">End</td><td>Jump to the oldest clip in the stack.</td></tr>
 <tr><td class="key">1 &ndash; 9</td><td>Jump that many clips at once.</td></tr>
 <tr><td class="key">&minus;</td><td>Reverse the direction the number keys jump in.</td></tr>
 </table>
+
+<p>The arrow keys and <code>Home</code> are alternatives, not replacements: the letters are the original
+Clipjump layout and they are not going anywhere. Use whichever your hand reaches for.</p>
 
 <h2>Pasting</h2>
 
@@ -67,17 +71,24 @@ layouts, which is how people type a character.</li>
 <tr><td class="key">Q</td><td>Move this clip to the front of the stack, so it is what the next
 <code>Ctrl</code>+<code>V</code> offers first.</td></tr>
 <tr><td class="key">T</td><td>Edit tags. Tags are searchable during the gesture.</td></tr>
-<tr><td class="key">H</td><td>Open the clip in an external editor. Text and images use separate editors,
-both set under <a href="settings.html">Settings, System</a>.</td></tr>
+<tr><td class="key">O<br>H</td><td>Open the clip in an external editor. Text and images use separate editors,
+both set under <a href="settings.html">Settings, System</a>. <code>H</code> was the original key for this and
+still works; <code>O</code> was added because <code>H</code> reads as "help".</td></tr>
 <tr><td class="key">E</td><td>Export the clip to a file.</td></tr>
-<tr><td class="key">F1</td><td>Show the key list in a window.</td></tr>
+<tr><td class="key">F1</td><td>Show the key list in a window. This <b>ends the gesture</b> &mdash; see
+below.</td></tr>
 </table>
 
 <div class="shot">
 <img src="images/shortcut-help.png" alt="The paste-mode key list window">
 <p><code>F1</code> during the gesture, or Paste-mode keys on the tray menu. It names the trigger letter
-you have configured rather than assuming <code>V</code>.</p>
+you have configured rather than assuming <code>V</code>, and it has a button through to this manual.</p>
 </div>
+
+<p><code>F1</code> closes the overlay and restores the clipboard before the list appears. It has to: the
+list is a real window that takes the keyboard, and while the overlay is up the gesture is swallowing keys
+&mdash; including the ones the list is busy explaining. So read it, close it, and press
+<code>Ctrl</code>+<code>V</code> again.</p>
 
 <h2>Search</h2>
 
@@ -102,11 +113,19 @@ commit, so you can type a query at your own pace.</p>
 
 <table>
 <tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">Delete</td><td>Delete the clip being shown, straight away, and carry on browsing. Nothing
+is pasted and the overlay stays up, so a run of presses walks forward through the stack clearing as it
+goes.</td></tr>
 <tr><td class="key">X</td><td>Cycle what releasing <code>Ctrl</code> will do: Cancel, then Delete this
 clip, then Delete All. A coloured banner shows the current mode. Pressing <code>X</code> repeatedly
 cycles those three and never returns to pasting.</td></tr>
 <tr><td class="key">Esc</td><td>Cancel immediately and restore the previous clipboard.</td></tr>
 </table>
+
+<p><code>Delete</code> and <code>X</code> are different in kind. <code>Delete</code> acts at once;
+<code>X</code> only <i>arms</i> something for the moment you release <code>Ctrl</code>. Pressing
+<code>Delete</code> leaves what releasing <code>Ctrl</code> does entirely alone, so it will still paste
+whatever the overlay has moved on to.</p>
 
 <div class="shot shot-inline">
 <img src="images/overlay-delete-all.png" alt="The overlay with the DELETE ALL banner showing">
@@ -167,10 +186,9 @@ key yourself.</p>
 <code>A</code> back to the newest, stepping, delete, cancel, and <code>F1</code> for the full list. Turn it
 off under <b>Settings, Appearance</b> once the gesture is in your fingers.</p>
 
-<p>The overlay never takes focus, so your typing target is untouched &mdash; and neither does the
-<code>F1</code> key list, which is why you can read it with <code>Ctrl</code> still held and then carry on
-where you left off. How large an image preview may be, how much text is shown, and whether the overlay
-follows the caret or sits at a fixed position are all under <b>Settings, Appearance</b>.</p>
+<p>The overlay never takes focus, so your typing target is untouched. How large an image preview may be, how
+much text is shown, and whether the overlay follows the caret or sits at a fixed position are all under
+<b>Settings, Appearance</b>.</p>
 
 </body>
 </html>

@@ -714,6 +714,7 @@ public partial class App : Application
             onAbout: ShowAbout,
             onHistory: ShowHistory,
             onSettings: ShowSettings,
+            onManual: OpenUserManual,
             onHelp: ShowShortcutHelp,
             onCheckForUpdates: CheckForUpdates,
             onPauseToggle: TogglePaused,
@@ -1004,12 +1005,56 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Opens the compiled manual, or says why it cannot.
+    /// <para>
+    /// Both failure paths are reported rather than swallowed. A menu item that does nothing at all is the worst
+    /// outcome here: the user has just asked for help, so silence is the one answer guaranteed to be unhelpful.
+    /// </para>
+    /// </summary>
+    private static void OpenUserManual()
+    {
+        var path = HelpDocument.Locate();
+
+        if (path is null)
+        {
+            MessageDialog.Warn(
+                $"{HelpDocument.FileName} is not in the PasteJump folder. It ships with the release download; "
+                    + "a build made from source does not include it.",
+                headline: "The manual is not installed");
+            return;
+        }
+
+        // Warned before opening, not after. Once hh.exe is up with an empty topic pane the user has no reason
+        // to suspect the file is merely blocked, and every page will look broken.
+        if (HelpDocument.IsBlockedByZoneIdentifier(path))
+        {
+            MessageDialog.Warn(
+                "Windows has marked the manual as downloaded from the internet, so its pages may open blank. "
+                    + $"To fix it: right-click {HelpDocument.FileName} in the PasteJump folder, choose "
+                    + "Properties, and tick Unblock.",
+                headline: "The manual may open blank");
+        }
+
+        try
+        {
+            HelpDocument.Open(path);
+        }
+        catch (Exception ex)
+        {
+            MessageDialog.Warn(ex.Message, headline: "Could not open the manual");
+        }
+    }
+
     private void ShowShortcutHelp()
     {
         if (_helpWindow is null)
         {
+            // Null when there is no .chm to open, which hides the button. Decided here rather than inside the
+            // window so the window stays ignorant of where the manual lives.
             _helpWindow = Themed(new ShortcutHelpWindow(
-                TriggerKey.Normalise(_settings.PasteModeTriggerKey)));
+                TriggerKey.Normalise(_settings.PasteModeTriggerKey),
+                HelpDocument.Locate() is null ? null : OpenUserManual));
             _helpWindow.Closed += (_, _) => _helpWindow = null;
             _helpWindow.Show();
             return;

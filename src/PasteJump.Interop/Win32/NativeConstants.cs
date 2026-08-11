@@ -105,10 +105,12 @@ internal static class NativeConstants
     public const int VK_INSERT = 0x2D;
     public const int VK_RETURN = 0x0D;
     public const int VK_HOME = 0x24;
+    public const int VK_END = 0x23;
     public const int VK_LEFT = 0x25;
     public const int VK_UP = 0x26;
     public const int VK_RIGHT = 0x27;
     public const int VK_DOWN = 0x28;
+    public const int VK_DELETE = 0x2E;
     public const int VK_BACK = 0x08;
     public const int VK_F1 = 0x70;
     public const int VK_LCONTROL = 0xA2;
@@ -134,6 +136,7 @@ internal static class NativeConstants
     public const int VK_E = 0x45;
     public const int VK_F = 0x46;
     public const int VK_H = 0x48;
+    public const int VK_O = 0x4F;
     public const int VK_Q = 0x51;
     public const int VK_S = 0x53;
     public const int VK_T = 0x54;

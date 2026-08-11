@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 581 passing (`dotnet test`) |
+| Tests | 591 passing (`dotnet test`) |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -93,7 +93,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      581 tests.
+tests/PasteJump.Core.Tests      591 tests.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -224,6 +224,41 @@ that immediately caught two real bugs. Expect to do the same again.
   themselves, and **the Ctrl release that commits** — that must fire whatever else is held, or letting go of
   Ctrl while Alt happens to be down would leave a session open with a live hook swallowing keys and no way to
   close it. There is a test for exactly that.
+- **Anything in paste mode that opens a window must end the session first, and `F1` was the exception that
+  proved it.** `EndAndDelegate` exists for exactly this — restore the clipboard, `EndSession`, *then* hand over —
+  and the tag editor, clip editor and export all went through it while `PasteAction.Help` called
+  `_host.ShowShortcutHelp()` and `break`. So the key card appeared over a live overlay, and the gesture went on
+  swallowing every key the card was explaining; the help even documented this as a feature ("you can read it
+  with Ctrl still held"). Help needs its own path rather than `EndAndDelegate` only because it needs no clip.
+  Note the second-order effect: an invariant test used `Handle(PasteAction.Help)` as one of its "many
+  intermediate keys", so ending the session there silently made every later key in that test a no-op — it still
+  passed, while proving nothing. If you make an action end the session, grep the tests for it.
+- **The paste-mode keys are additive from here on: nothing that works may stop working.** The physical keys
+  (`↓`/`→` and `↑`/`←` for stepping, `Home`, `End`, `Delete`) were added *beside* Clipjump's letters, not instead
+  of them, and `O` for "open in an editor" is an **alias** of `H` rather than a replacement — `H` reads as Help,
+  which is what sent someone to `F1` in the first place. Two consequences that bite:
+  **an alias must be reserved in `TriggerKey.Reserved` just as firmly as the primary** (a trigger on `H` would
+  steal the editor from anyone still pressing it, and the count assertion in
+  `TriggerKeyAndHotkeyTests` is what catches a missed one), and **`Up`/`Down` were free only because channels
+  are out of scope** — they are Clipjump's channel keys (`Clipjump.ahk:222`), so nothing of ours was using them.
+  `Home` did change meaning, from a second `Escape` to "newest clip"; that was safe because the `Escape` alias
+  was our own invention and appeared in no card, footer, README or help page. Check that before repurposing
+  another one.
+- **`Delete` acts, `X` arms — and they must stay independent.** `PasteAction.DeleteCurrentClip` deletes now and
+  leaves the session open, returning `PasteCommitKind.None` (not `Deleted`, which reports a *committed* session
+  and would have the caller believe the gesture had finished). It deliberately does not touch `CommitMode`: a
+  Delete key that also rearmed what releasing Ctrl does would take a second clip the user never chose.
+- **The manual is reachable from the app now, and it shipped for months without being.** `PasteJump.chm` was in
+  the ZIP with no code anywhere that could open it. `HelpDocument` probes beside the exe and then
+  `AppContext.BaseDirectory` — the same two-candidate shape as `AppPaths.AssetsDirectory`, and for the same
+  reason — and returns null rather than throwing, because a development build genuinely has no `.chm` (it is
+  built by `tools/build-help.ps1`, not by the compiler). The caller passes `null` for the card's manual button
+  in that case, which hides it; the window itself knows nothing about where the file lives, which is what lets
+  the UI smoke harness render the button for the screenshot. Two things worth keeping: the tray item's
+  accelerator is **L** (`He_lp…`) because `Clipboard _History` already owns H, and **a `.chm` carrying
+  mark-of-the-web opens with every page blank** ("Navigation to the webpage was canceled") — detected by probing
+  the `Zone.Identifier` alternate data stream and *reported*, not stripped, because silently removing a Windows
+  security marker is not this application's business.
 - **The trigger key is configurable, so nothing may hard-code `V` or "Ctrl+V".** `TriggerKey` in `Core`
   owns the rules; `VirtualKeyTranslator.ToGestureKey` takes the trigger VK and checks it *first*, and `V` is
   deliberately absent from the binding table so it falls through to search input when it is not the
@@ -344,6 +379,24 @@ that immediately caught two real bugs. Expect to do the same again.
   because a ContextMenu captures the keyboard and could swallow a keystroke. Getting below ~30 ms would mean
   replacing the WPF menu with `TrackPopupMenu`, which trades away theming — a Win32 menu cannot follow the
   palette, which is why `MessageBox` was already abandoned.
+- **The `ContextMenu` is cached too, not just its owner — and caching only the owner was reported as a visible
+  glitch on repeated right-clicks.** `ShowTrayMenu` called `TrayMenuBuilder.Build` per click, so every click
+  produced a new `ContextMenu`, and a new `ContextMenu` carries a new `Popup`: a new HWND with nothing rendered
+  in it, whose first frame can reach the screen unpainted. It is the same lesson as the 365 ms above, one layer
+  up. `Compose` now runs once and `Build` only rewrites the two state-dependent headers. Consequence to respect:
+  **the menu outlives the call that built it, so the click handlers must resolve their actions from a field at
+  click time** rather than closing over the delegates of the first `Build` — captured handlers would silently
+  ignore every later set. Same reason `Closed` is subscribed once in `Compose` instead of per show.
+- **The deferred `_owner.Hide()` must check that no newer menu is open.** `OnMenuClosed` queues the hide (it has
+  to — hiding synchronously from `Closed` tears down a visual tree the menu is still using), and on a quick
+  second right-click that queued work could run *after* the next `ShowAt` had shown the owner and opened a menu
+  on it. Hiding a live menu's owner is a menu that flashes up and vanishes, which is precisely how it was
+  reported. `_openMenu` is set **before** `IsOpen = true` and checked **twice** — in `Closed` and again inside
+  the queued work — because a new show can land in the gap between the two.
+  Both of these were found by reading rather than by watching: an agent's process is refused input injection, so
+  the tray icon cannot be clicked from here. If a tray glitch is reported again, ask what it looks like first —
+  flash-and-vanish, an unpainted rectangle, the menu jumping position, and the window behind flickering are four
+  different causes, and the last one is `owner.Activate()` doing its job.
 - **`Console.Beep` is synchronous.** It returns only when the tone has finished, so the copy beep goes
   through `CopyBeep.Play`, which hops to the thread pool. Called inline it would freeze the UI for 150 ms
   per copy, and the capture path is reachable from the hook, where that is halfway to `LowLevelHooksTimeout`.
@@ -689,7 +742,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 581 tests
+dotnet test                                         # 591 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

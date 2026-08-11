@@ -80,8 +80,28 @@ public enum PasteAction
     /// <summary><c>X</c> - cycle Cancel / Delete / DeleteAll.</summary>
     CycleCommitMode,
 
-    /// <summary><c>A</c> - jump to the newest clip.</summary>
+    /// <summary>
+    /// <c>Delete</c> - remove the current clip immediately and carry on browsing.
+    /// <para>
+    /// Distinct from <see cref="CycleCommitMode"/>, which only <em>arms</em> a deletion for the moment Ctrl
+    /// is released. This acts at once and leaves the session open, which is what the key means everywhere
+    /// else in Windows. It deliberately does not touch <see cref="PasteCommitMode"/>: a Delete key that
+    /// silently rearmed what releasing Ctrl would do could delete a second clip the user never chose.
+    /// </para>
+    /// </summary>
+    DeleteCurrentClip,
+
+    /// <summary><c>A</c> or <c>Home</c> - jump to the newest clip.</summary>
     JumpToNewest,
+
+    /// <summary>
+    /// <c>End</c> - jump to the oldest clip in the window.
+    /// <para>
+    /// No Clipjump equivalent. It exists because Home now means "newest", and a Home with no End is a
+    /// half-finished idea: the far end of the stack was otherwise reachable only by holding the trigger.
+    /// </para>
+    /// </summary>
+    JumpToOldest,
 
     /// <summary><c>Q</c> - move the current clip to the front of the stack.</summary>
     PromoteToFront,
@@ -101,7 +121,7 @@ public enum PasteAction
     /// <summary><c>S</c> - put the clip on the Windows clipboard without pasting.</summary>
     PushToClipboard,
 
-    /// <summary><c>H</c> - open the clip in an editor.</summary>
+    /// <summary><c>O</c> - open the clip in an editor.</summary>
     EditClip,
 
     /// <summary><c>E</c> - export the clip to a file.</summary>
@@ -110,7 +130,14 @@ public enum PasteAction
     /// <summary><c>Enter</c> - paste but keep the session open.</summary>
     Multipaste,
 
-    /// <summary><c>F1</c> - show the key list.</summary>
+    /// <summary>
+    /// <c>F1</c> - show the key list.
+    /// <para>
+    /// Ends the session first, like the other actions that open a window. It did not, and that was reported:
+    /// the card appeared over a live overlay, so the keys it was describing were still being swallowed by the
+    /// gesture rather than reaching the window the user was now reading.
+    /// </para>
+    /// </summary>
     Help,
 
     /// <summary><c>-</c> - flip the direction that digit jumps move in.</summary>

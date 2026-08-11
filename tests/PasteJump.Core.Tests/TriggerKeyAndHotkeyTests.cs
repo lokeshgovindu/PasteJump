@@ -57,8 +57,14 @@ public sealed class TriggerKeyAndHotkeyTests
         Assert.Contains('V', TriggerKey.Available);
         Assert.DoesNotContain('C', TriggerKey.Available);
 
-        // 26 letters minus the 10 bound to other actions.
-        Assert.Equal(16, TriggerKey.Available.Count);
+        // Both letters that open the clip in an editor. O is the one the help names and H is the original
+        // binding kept working beside it, so an alias has to be reserved as firmly as the primary - a trigger
+        // on either would steal the action from whichever letter the user still presses.
+        Assert.DoesNotContain('O', TriggerKey.Available);
+        Assert.DoesNotContain('H', TriggerKey.Available);
+
+        // 26 letters minus the 11 bound to other actions - 10 actions, one of which answers to two letters.
+        Assert.Equal(15, TriggerKey.Available.Count);
     }
 
     [Theory]

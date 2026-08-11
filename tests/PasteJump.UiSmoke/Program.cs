@@ -137,7 +137,10 @@ internal static class Program
                         @"D:\PasteJumpData"),
                     CycleTabs);
 
-                Check("ShortcutHelpWindow", () => new ShortcutHelpWindow());
+                // A no-op manual action rather than null, so the shot shows the window the way a release build
+                // shows it. The button is hidden when there is no .chm to open, and there never is one beside
+                // this harness - the manual is compiled separately by tools/build-help.ps1.
+                Check("ShortcutHelpWindow", () => new ShortcutHelpWindow(TriggerKey.Default, static () => { }));
                 Check("AboutWindow", () => new AboutWindow());
 
                 // MessageDialog is normally shown modally, which would block this harness for ever - so it is

@@ -94,6 +94,21 @@ second keyboard hook and fight the first over the clipboard, so it exits quietly
 Also check <b>Watch the Clipboard</b> under <b>Settings, Capture</b>, and whether the application you are
 copying from is on the <b>Excluded Apps</b> list.</p>
 
+<h2>This manual opens with every page blank</h2>
+
+<p>Windows has marked the file as downloaded from the internet, and blocks compiled help files from that
+source: every topic shows "Navigation to the webpage was canceled" and nothing else. Right-click
+<code>PasteJump.chm</code> in the PasteJump folder, choose <b>Properties</b>, tick <b>Unblock</b> at the
+bottom of the General tab, and press OK. PasteJump warns about this before opening the file, but only when it
+can tell &mdash; the mark is on the file, so unzipping the download without unblocking it first is the usual
+way to get here.</p>
+
+<h2>Help on the tray menu does nothing</h2>
+
+<p><code>PasteJump.chm</code> is not beside the executable. It ships in the release download; a copy built
+from source does not include it, because the manual is compiled separately. The key list under <b>Paste-mode
+keys</b> is built into the program and always available.</p>
+
 <h2>Where the data is</h2>
 
 <p><code>data\pastejump.db</code> and <code>data\blobs</code>, beside the executable by default, or under

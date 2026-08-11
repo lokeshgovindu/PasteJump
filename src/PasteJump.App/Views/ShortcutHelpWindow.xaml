@@ -34,7 +34,18 @@
         </Style>
     </Window.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <!--
+        The buttons are OUTSIDE the ScrollViewer, in their own row. The list now exceeds MaxHeight, so with
+        everything in one scrolling StackPanel the window opened with no Close button in sight - the reader had
+        to scroll to the end of a reference card to find the way out of it.
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="16">
 
             <!-- Text set in code-behind: the trigger key is configurable, so it cannot be literal here. -->
@@ -56,23 +67,28 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
+                <!-- Both key columns are set in code-behind here, because each names the configurable trigger. -->
                 <TextBlock x:Name="TriggerKeyText" Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Step to an older clip" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="C" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="C  ↑  ←" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Step back to a newer clip" />
 
-                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="A" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="A  Home" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Jump to the newest clip" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="1 – 9" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Jump that many clips" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="End" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Jump to the oldest clip" />
 
-                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="–" />
-                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Reverse the direction the number keys jump in" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="1 – 9" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Jump that many clips" />
+
+                <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="–" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Reverse the direction the number keys jump in" />
             </Grid>
 
             <TextBlock Style="{StaticResource SectionStyle}" Text="PASTING" />
@@ -132,8 +148,8 @@
                 <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="T" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Edit tags" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="H" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clip in an external editor" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="O  H" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open the clip in an external editor. H still works, and always will" />
 
                 <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="E" />
                 <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Export the clip to a file" />
@@ -181,37 +197,56 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition /><RowDefinition />
+                    <RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="X" />
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Delete" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}"
+                           Text="Delete this clip straight away and carry on browsing. Nothing is pasted, and releasing Ctrl still does whatever it was going to." />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="X" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}"
                            Text="Cycle what releasing Ctrl will do: Cancel, then Delete this clip, then Delete All. A banner shows the current mode. Pressing X repeatedly cycles between those three and never returns to pasting." />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Esc" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cancel immediately and restore the previous clipboard" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Esc" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cancel immediately and restore the previous clipboard" />
             </Grid>
 
             <TextBlock Foreground="{DynamicResource MutedTextBrush}"
                        FontSize="11"
                        TextWrapping="Wrap"
                        Margin="0,16,0,0"
-                       Text="Channels, plugins and Action Mode from Clipjump are not implemented. Because of that, the channel keys (Up, Down, PitSwap) are absent, and the X cycle has no Move or Copy stages." />
-
-            <!--
-                Click handler as well as IsCancel. IsCancel alone closes nothing here: it sets DialogResult,
-                which only exists for a window shown with ShowDialog, and this one is shown with Show. So the
-                button and the Esc key both did nothing at all. IsCancel is kept because it is what routes Esc
-                to this button in the first place.
-            -->
-            <Button Content="_Close"
-                    Click="OnCloseClicked"
-                    IsCancel="True"
-                    IsDefault="True"
-                    HorizontalAlignment="Right"
-                    MinWidth="84"
-                    Padding="14,5"
-                    Margin="0,16,0,0" />
+                       Text="Clipjump's channels, plugins and Action Mode are not implemented, so its PitSwap key is absent and the X cycle has no Move or Copy stages. Its Up and Down channel keys step through clips here instead." />
         </StackPanel>
     </ScrollViewer>
+
+    <!--
+        Click handler as well as IsCancel on Close. IsCancel alone closes nothing here: it sets DialogResult,
+        which only exists for a window shown with ShowDialog, and this one is shown with Show. So the button and
+        the Esc key both did nothing at all. IsCancel is kept because it is what routes Esc to this button in
+        the first place.
+    -->
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="16,8,16,16">
+
+        <!--
+            The route from "which key was it" to the full manual. F1 lands here rather than on the manual, so
+            this button is what makes the longer document reachable without going to the tray - and the caller
+            passes null to hide it when there is no .chm, because a button that can only ever apologise is
+            worse than no button.
+        -->
+        <Button x:Name="ManualButton"
+                Content="Open the Full _Manual"
+                Click="OnManualClicked"
+                MinWidth="84"
+                Padding="14,5"
+                Margin="0,0,8,0" />
+
+        <Button Content="_Close"
+                Click="OnCloseClicked"
+                IsCancel="True"
+                IsDefault="True"
+                MinWidth="84"
+                Padding="14,5" />
+    </StackPanel>
+    </Grid>
 </Window>

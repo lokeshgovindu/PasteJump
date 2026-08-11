@@ -156,6 +156,16 @@ public sealed class PasteModeController
                 Render();
                 break;
 
+            case PasteAction.JumpToOldest:
+                // Clamped rather than assumed: the window is empty when a search matches nothing, and -1
+                // would then be handed to Current.
+                _cursor = Math.Max(0, _window.Count - 1);
+                Render();
+                break;
+
+            case PasteAction.DeleteCurrentClip:
+                return DeleteCurrent();
+
             case PasteAction.PromoteToFront:
                 return PromoteToFront();
 
@@ -200,8 +210,13 @@ public sealed class PasteModeController
                 return Multipaste();
 
             case PasteAction.Help:
+                // Ends the session, like the tag and clip editors: the card is a real window that takes
+                // focus, and leaving the overlay up meant the gesture went on swallowing every key the card
+                // was busy explaining. No clip is needed, hence its own path rather than EndAndDelegate.
+                _host.RestoreExistingClipboard();
+                EndSession();
                 _host.ShowShortcutHelp();
-                break;
+                return PasteCommitKind.Cancelled;
 
             case PasteAction.ToggleJumpDirection:
                 _jumpDirection = -_jumpDirection;
@@ -403,6 +418,35 @@ public sealed class PasteModeController
         RefreshWindow();
         RestoreCursorTo(current.Id);
         Render();
+        return PasteCommitKind.None;
+    }
+
+    /// <summary>
+    /// The Delete key: remove this clip now and keep browsing.
+    /// <para>
+    /// The cursor is deliberately left where it is rather than following the clip that was there, which is
+    /// what a file list does - so a run of Delete presses walks forward through the stack instead of stopping.
+    /// It is clamped afterwards because deleting the last clip in the window would otherwise leave the cursor
+    /// past the end, and clamped to a possibly empty window, which <c>Current</c> already answers null for.
+    /// </para>
+    /// </summary>
+    private PasteCommitKind DeleteCurrent()
+    {
+        var current = Current;
+
+        if (current is null)
+        {
+            return PasteCommitKind.None;
+        }
+
+        _catalog.Delete(current.Id);
+        RefreshWindow();
+
+        _cursor = _window.Count == 0 ? 0 : Math.Clamp(_cursor, 0, _window.Count - 1);
+        Render();
+
+        // Not PasteCommitKind.Deleted: that reports a committed session, and this one is still open. The
+        // caller must not treat it as the gesture having finished.
         return PasteCommitKind.None;
     }
 

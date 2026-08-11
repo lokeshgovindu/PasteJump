@@ -57,7 +57,11 @@ public class PasteModeInvariantTests
         controller.Handle(PasteAction.Advance);
         controller.Handle(PasteAction.CycleFormatter);
         controller.Handle(PasteAction.Back);
-        controller.Handle(PasteAction.Help);
+
+        // Deliberately not Help, which was here once: Help now ends the session, so it would leave every key
+        // after it a no-op and the test would pass while proving nothing about "many intermediate keys".
+        // Help's own behaviour is covered by Help_ends_the_session_before_showing_the_card.
+        controller.Handle(PasteAction.TogglePin);
         controller.HandleDigit(3);
         controller.Handle(PasteAction.ToggleJumpDirection);
         controller.HandleDigit(2);

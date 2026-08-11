@@ -143,25 +143,30 @@ While Ctrl is down:
 
 | Key | Action |
 |---|---|
-| <kbd>V</kbd> | Step to an older clip |
-| <kbd>C</kbd> | Step back to a newer clip |
-| <kbd>A</kbd> | Jump to the newest clip |
+| <kbd>V</kbd> · <kbd>↓</kbd> <kbd>→</kbd> | Step to an older clip |
+| <kbd>C</kbd> · <kbd>↑</kbd> <kbd>←</kbd> | Step back to a newer clip |
+| <kbd>A</kbd> · <kbd>Home</kbd> | Jump to the newest clip |
+| <kbd>End</kbd> | Jump to the oldest clip |
 | <kbd>1</kbd>–<kbd>9</kbd> | Jump that many clips |
 | <kbd>-</kbd> | Reverse the direction the number keys jump |
+| <kbd>Delete</kbd> | Delete this clip now and carry on browsing |
 | <kbd>X</kbd> | Cycle what release will do: Cancel → Delete → Delete All |
 | <kbd>Space</kbd> | Pin / unpin (pinned clips sort first and survive Delete All) |
 | <kbd>Q</kbd> | Move this clip to the front of the stack |
 | <kbd>Z</kbd> | Cycle paste format |
 | <kbd>T</kbd> | Edit tags |
 | <kbd>S</kbd> | Put the clip on the Windows clipboard *without* pasting |
-| <kbd>H</kbd> | Open the clip in an external editor |
+| <kbd>O</kbd> · <kbd>H</kbd> | Open the clip in an external editor |
 | <kbd>E</kbd> | Export the clip to a file |
 | <kbd>F</kbd> | Open incremental search |
 | <kbd>Enter</kbd> | Paste and stay open, for pasting several clips in a row |
-| <kbd>F1</kbd> | Show this list |
+| <kbd>F1</kbd> | Show this list — this ends the gesture, since the window takes the keyboard |
 | release <kbd>Ctrl</kbd> | Paste |
 | <kbd>Shift</kbd> pressed *after* the overlay opens | Paste, then delete the clip ("paste popping") |
 | <kbd>Esc</kbd> | Cancel and restore the previous clipboard |
+
+Where two keys are listed, both work. The letters are Clipjump's layout and are not going away; the arrows,
+<kbd>Home</kbd>/<kbd>End</kbd>, <kbd>Delete</kbd> and <kbd>O</kbd> were added beside them.
 
 **Only <kbd>Ctrl</kbd>+<kbd>V</kbd> starts the gesture.** Any extra modifier passes straight through, because
 each one belongs to somebody else: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> is how terminals paste and how
