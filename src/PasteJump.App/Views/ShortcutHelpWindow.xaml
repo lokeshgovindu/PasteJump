@@ -173,20 +173,23 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Name="KeySearch" Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Open search. Ctrl can be released - just type to filter by content or tag" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste the match" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Backspace" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Delete a character from the query" />
 
-                <TextBlock x:Name="SearchStepText" Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" />
-                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Move between matches while searching" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Enter" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Paste the match" />
 
-                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Esc" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cancel" />
+                <TextBlock x:Name="SearchStepText" Grid.Row="3" Grid.Column="0" Style="{StaticResource KeyStyle}" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Move between matches while searching" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Esc" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Cancel" />
             </Grid>
 
             <TextBlock Style="{StaticResource SectionStyle}" Text="DELETING" />

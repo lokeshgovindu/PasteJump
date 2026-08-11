@@ -64,15 +64,22 @@ public sealed class PasteKeyMap
     ];
 
     /// <summary>
-    /// The actions that have no letter, and the keys that fire them.
+    /// <b>Every</b> key that cannot be moved, and what it does.
     /// <para>
-    /// Listed so the Keys tab is a complete map of the gesture rather than only its configurable half. It was
-    /// not, and that read as an omission: <c>End</c> and <c>Delete</c> appeared nowhere at all, while
-    /// <c>Home</c> showed up only as an aside on another row.
+    /// The complete list, deliberately - including the keys that also appear as an "also ..." note beside a
+    /// letter's row. The first attempt listed only the actions with no letter of their own, which left
+    /// <c>Home</c>, <c>Space</c>, <c>Q</c> and the arrows out of a block headed "these cannot be changed" while
+    /// they cannot be changed either. Anyone reading it to learn what is fixed got a wrong answer, and it was
+    /// reported as such. The duplication with those notes is the point: one says "what else fires this action",
+    /// this says "what no set of bindings can take away".
     /// </para>
     /// <para>
-    /// These cannot be moved, and that is the safety property the whole design rests on - see the note on this
-    /// class. <c>Esc</c> above all: a session that could not be cancelled would be a dead keyboard.
+    /// It also caught three that were documented nowhere at all: the numpad digits, numpad minus, and
+    /// <c>Backspace</c> in the search box.
+    /// </para>
+    /// <para>
+    /// That these cannot move is the safety property the whole design rests on - see the note on this class.
+    /// <c>Esc</c> above all: a session that could not be cancelled would be a dead keyboard.
     /// </para>
     /// <para>
     /// Display text rather than key codes, because <c>Core</c> has no business knowing Windows virtual keys.
@@ -83,11 +90,18 @@ public sealed class PasteKeyMap
     /// </summary>
     public static IReadOnlyList<(string Keys, string Description)> FixedActions { get; } =
     [
-        ("Delete", "Delete this clip now and carry on browsing"),
+        ("Down / Right", "Step to an older clip"),
+        ("Up / Left", "Step back to a newer clip"),
+        ("Home", "Jump to the newest clip"),
         ("End", "Jump to the oldest clip"),
-        ("1 - 9", "Jump that many clips at once"),
-        ("-", "Reverse the direction the number keys jump in"),
+        ("1 - 9", "Jump that many clips at once, numpad included"),
+        ("-", "Reverse the direction the number keys jump in, numpad included"),
+        ("Space", "Pin or unpin the clip"),
+        ("Q", "Move the clip to the front of the stack"),
+        ("Delete", "Delete this clip now and carry on browsing"),
         ("Enter", "Paste and stay open, to paste several clips in a row"),
+        ("Backspace", "Delete a character while searching"),
+        ("Shift", "Hold it, then release Ctrl, to delete the clip after pasting"),
         ("Esc", "Cancel and restore the previous clipboard"),
         ("F1", "Show the key list"),
     ];

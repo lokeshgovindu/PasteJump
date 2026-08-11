@@ -147,8 +147,8 @@ While Ctrl is down:
 | <kbd>C</kbd> · <kbd>↑</kbd> <kbd>←</kbd> | Step back to a newer clip |
 | <kbd>A</kbd> · <kbd>Home</kbd> | Jump to the newest clip |
 | <kbd>End</kbd> | Jump to the oldest clip |
-| <kbd>1</kbd>–<kbd>9</kbd> | Jump that many clips |
-| <kbd>-</kbd> | Reverse the direction the number keys jump |
+| <kbd>1</kbd>–<kbd>9</kbd> | Jump that many clips (numpad too) |
+| <kbd>-</kbd> | Reverse the direction the number keys jump (numpad too) |
 | <kbd>Delete</kbd> | Delete this clip now and carry on browsing |
 | <kbd>X</kbd> | Cycle what release will do: Cancel → Delete → Delete All |
 | <kbd>P</kbd> · <kbd>Space</kbd> | Pin / unpin (pinned clips sort first and survive Delete All) |
@@ -160,6 +160,7 @@ While Ctrl is down:
 | <kbd>H</kbd> | Open the clipboard history window - this ends the gesture |
 | <kbd>E</kbd> | Export the clip to a file |
 | <kbd>F</kbd> | Open incremental search |
+| <kbd>Backspace</kbd> | Delete a character from the search query |
 | <kbd>Enter</kbd> | Paste and stay open, for pasting several clips in a row |
 | <kbd>F1</kbd> | Show this list — this ends the gesture, since the window takes the keyboard |
 | release <kbd>Ctrl</kbd> | Paste |

@@ -160,14 +160,23 @@ public class VirtualKeyTranslatorTests
     [Fact]
     public void Every_key_documented_as_fixed_actually_does_something()
     {
-        // Display text -> the virtual key a user would press. "1 - 9" is checked at both ends of its range.
+        // Display text -> every virtual key it claims. Ranges are checked at both ends, and each key that has a
+        // numpad twin is checked on both, which is what caught the numpad digits and numpad minus being
+        // documented nowhere.
         var expected = new Dictionary<string, int[]>
         {
-            ["Delete"] = [0x2E],
+            ["Down / Right"] = [0x28, 0x27],
+            ["Up / Left"] = [0x26, 0x25],
+            ["Home"] = [0x24],
             ["End"] = [0x23],
-            ["1 - 9"] = [0x31, 0x39],
-            ["-"] = [0xBD],
+            ["1 - 9"] = [0x31, 0x39, 0x61, 0x69],
+            ["-"] = [0xBD, 0x6D],
+            ["Space"] = [0x20],
+            ["Q"] = [0x51],
+            ["Delete"] = [0x2E],
             ["Enter"] = [0x0D],
+            ["Backspace"] = [0x08],
+            ["Shift"] = [0x10],
             ["Esc"] = [0x1B],
             ["F1"] = [0x70],
         };
