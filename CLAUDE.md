@@ -61,16 +61,27 @@ is a different chord and a few applications bind it elsewhere.
 
 ### Asked for, not yet built
 
-In the order they were requested. All three came out of a feature review against Ditto and CopyQ.
+The first is next, by agreement; the rest are in the order they were requested, and 2–4 all came out of one
+feature review against Ditto and CopyQ.
 
-1. **Join several clips into one paste.** Select rows in the history window, or mark clips during the gesture, and
+1. **Embed the three tray icons and delete `Assets\`.** Agreed 2026-08-11, to start the next day. They are loose
+   files *only* because `TrayIcon.SetIconFromFile` uses `LoadImage(LR_LOADFROMFILE)` — the one call that returns
+   an icon at the shell's current small-icon metric, 24 px at 150% scaling, where `ExtractIconEx` can only give
+   32 or 16 and would be upscaled. `CreateIconFromResourceEx` takes an explicit size over raw `.ico` bytes, so
+   the frames can be embedded: parse the ICONDIR to pick the frame nearest the requested size (pure bytes, so
+   `Core`, with tests) and make the HICON in `Interop`. Two things not to break: **`ApplicationIcon` stays** —
+   that PE-header copy is a different mechanism serving Explorer, the taskbar, Alt+Tab and every window, and is
+   not reachable by file path; and `pastejump-256.png` is already a compiled `Resource`, so it is not involved.
+   The gain is not the 54 KB: a portable copy unzipped without `Assets\` currently loses its tray icon, and with
+   no main window that leaves no way to reach the application at all.
+2. **Join several clips into one paste.** Select rows in the history window, or mark clips during the gesture, and
    paste them concatenated with a chosen separator. Distinct from `Enter`, which pastes them one after another.
-2. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
+3. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
    mine:** a DPAPI key ties the store to one Windows account, which ends "copy the exe to a USB stick and it takes
    its history with it" — the property the portable ZIP exists for. A passphrase keeps portability but has to be
    typed at every logon, which is intolerable for a resident app, and a key file beside the data is security
    theatre. Put that choice to the user before writing any of it.
-3. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
+4. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
    `Application.Resources.MergedDictionaries[0]` and `AppTheme` has exactly three values. A user-authored theme
    means the palette becomes data — a file of named colours — rather than a compiled `ResourceDictionary`, so:
    every key in `Light.xaml`/`Dark.xaml` becomes a contract that a theme file must satisfy (a missing key
