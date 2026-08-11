@@ -122,6 +122,8 @@ internal static class Program
                         // throws here rather than in front of the user.
                         ((SettingsWindow)window).ExerciseResetsForSmokeTest();
                         Drain();
+
+                        VerifySearchIndex((SettingsWindow)window);
                     });
                 // The same dialog with both halves on a custom folder, which is the only way the path box and
                 // its Browse button are realised at all - a collapsed row's template is never applied, so the
@@ -287,6 +289,64 @@ internal static class Program
         IsEmpty = false,
         SourceExecutable = "chrome.exe",
     };
+
+    /// <summary>
+    /// Checks the settings search reaches every tab, and says what it found.
+    /// <para>
+    /// This is the one assumption the search rests on and the one that cannot be checked from a unit test: a
+    /// TabControl applies the template for the selected tab only, so the index is built by walking the LOGICAL
+    /// tree. If that ever stopped reaching unselected tabs, the search would quietly cover the first tab and
+    /// nothing else - and still look like it worked, because the tab you were on would always be found.
+    /// </para>
+    /// <para>
+    /// Advanced is excluded from the requirement: it holds a grid rather than labelled rows, so it has no
+    /// searchable settings of its own by design - everything on it is reachable through the tab that owns it.
+    /// </para>
+    /// </summary>
+    private static void VerifySearchIndex(SettingsWindow window)
+    {
+        var index = window.SearchIndexForSmokeTest();
+        var byTab = index.GroupBy(static entry => entry.TabName).ToDictionary(static g => g.Key, static g => g.Count());
+
+        Console.WriteLine($"  search index: {index.Count} settings across {byTab.Count} tabs");
+
+        foreach (var pair in byTab.OrderBy(static p => p.Key, StringComparer.Ordinal))
+        {
+            Console.WriteLine($"      {pair.Key,-16} {pair.Value}");
+        }
+
+        var expected = new[] { "Capture", "History", "Paste Mode", "Keys", "Appearance", "System" };
+        var missing = expected.Where(t => !byTab.ContainsKey(t)).ToList();
+
+        if (missing.Count > 0)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  search index found nothing on: {string.Join(", ", missing)}");
+        }
+
+        // Three queries covering the three ways a match can happen. "electron" is the interesting one: it appears
+        // nowhere in a label, only in the paste-delay explanation, so it proves the inline help is searched -
+        // which is most of why this search is worth having over reading the tab titles.
+        ExpectSearchHit(window, "tray", "Left-Clicking the Tray Icon");
+        ExpectSearchHit(window, "store images", "Store Images");
+        ExpectSearchHit(window, "electron", "Pause Before Pasting (ms)");
+    }
+
+    private static void ExpectSearchHit(SettingsWindow window, string query, string expectedLabel)
+    {
+        var hits = window.SearchForSmokeTest(query);
+
+        if (hits.Any(h => h.Label.Contains(expectedLabel, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        _failures++;
+
+        Console.WriteLine(
+            $"  FAIL  searching \"{query}\" did not find \"{expectedLabel}\" "
+                + $"(got: {(hits.Count == 0 ? "nothing" : string.Join(", ", hits.Take(3).Select(h => h.Label)))})");
+    }
 
     /// <summary>
     /// Invented programs for the published screenshot. Ordinary Windows applications with plausible titles, and

@@ -447,6 +447,24 @@ that immediately caught two real bugs. Expect to do the same again.
   a callback that blocks all keyboard input machine-wide. `MOD_NOREPEAT` is not optional — without it,
   holding the chord opens the window dozens of times. A refused registration means another process owns the
   chord and must be reported, or the symptom is a hotkey that silently does nothing.
+- **The settings search indexes the dialog by walking the LOGICAL tree, and that is the whole trick.** A
+  `TabControl` applies the template for the **selected tab only**, so a visual-tree walk finds the first tab's
+  controls and nothing else — and the search would silently cover one tab in eight while looking like it worked,
+  because whichever tab you were on would always be found. Every `TabItem`'s *content* is nevertheless constructed
+  when the XAML is parsed, so `LogicalTreeHelper` reaches all of it without selecting anything. Consequences:
+  - **Nothing in `SettingsSearch` may ask about size or position** — no layout has run for unselected tabs.
+  - **`GoTo` must defer the scroll and the flash** to `DispatcherPriority.Loaded`. Selecting a tab applies its
+    template for the first time, so until a layout pass has happened the control has no position and
+    `BringIntoView` does nothing at all.
+  - A row is identified by **reference equality against the `SettingRow` style**, passed in from the window rather
+    than resolved from the element: exact, where a structural guess would also match layout grids, and resolving a
+    resource from an element whose tab was never selected is not something to rely on.
+  - The index is built from the dialog's own labels and inline help, so **a new row is searchable the moment it is
+    added** — the same bargain the Advanced tab strikes with reflection, and for the same reason.
+  - **`VerifySearchIndex` in the UI smoke harness is the only thing that can catch this breaking.** It asserts
+    every settings-bearing tab contributes (64 settings across 6 tabs today) and runs three queries, one of which
+    (`electron`) matches only inline help — proving the help text is indexed. Writing that check found my own wrong
+    assumption: the paste-delay help says *Office and Electron*, not Excel.
 - **Everything the app uses must appear on the Advanced tab.** Reflection over `PasteJumpSettings` gives
   that for free, so a new setting belongs on that class rather than in a field somewhere. The two data
   locations are the exception — they are in `data-location.json` — so `SettingsInspector.Describe` takes

@@ -11,6 +11,32 @@
 timing value can be nudged and its effect watched; it stays disabled until something actually
 changes.</p>
 
+<h2>Finding a setting</h2>
+
+<p>The box above the tabs searches all of them. Type a word or two and a list drops down naming each match and
+the tab it lives on; press <code>Enter</code>, or click it, and PasteJump switches to that tab, scrolls the
+control into view and flashes it.</p>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">Down</td><td>Move into the list of matches.</td></tr>
+<tr><td class="key">Enter</td><td>Go to the highlighted match.</td></tr>
+<tr><td class="key">Esc</td><td>Close the list, leaving the text alone.</td></tr>
+</table>
+
+<p><b>It searches the explanations as well as the labels</b>, which is most of the point. If you remember that
+some setting mentioned Electron applications but not which one it was, typing <code>electron</code> finds it.
+Every word you type has to appear somewhere in the setting, so two words narrow rather than widen.</p>
+
+<p>Matches whose <i>label</i> contains what you typed are listed first, so searching <code>theme</code> offers
+the Theme control ahead of the settings whose descriptions merely mention it.</p>
+
+<div class="note">
+<p>This is not the same as the filter on the <b>Advanced</b> tab. That one lists every setting with its stored
+value and its default, and matches the internal property name; this one matches what you read on the tabs and
+takes you to the control you can actually change.</p>
+</div>
+
 <h2>Capture</h2>
 
 <div class="shot">

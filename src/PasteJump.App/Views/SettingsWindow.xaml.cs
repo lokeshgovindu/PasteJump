@@ -635,6 +635,188 @@ public partial class SettingsWindow : Window
         return combo;
     }
 
+    // ------------------------------------------------------------- search
+
+    /// <summary>
+    /// Every searchable setting, indexed once from the dialog's own controls.
+    /// <para>
+    /// Built lazily on the first keystroke rather than in the constructor: the index is only wanted if someone
+    /// searches, and the dialog's start-up cost is paid every time it opens.
+    /// </para>
+    /// </summary>
+    private List<SettingsSearchHit>? _searchIndex;
+
+    /// <summary>
+    /// The search index, for the UI smoke harness.
+    /// <para>
+    /// Exposed because the assumption this feature rests on cannot be checked any other way: a
+    /// <see cref="TabControl"/> only realises the selected tab, so if the logical-tree walk ever stopped reaching
+    /// unselected ones the search would silently cover one tab in eight and still look like it worked. The harness
+    /// asserts every tab contributes.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<(string Label, string TabName)> SearchIndexForSmokeTest()
+        => [.. SettingsSearch.Build(Tabs, (Style)FindResource("SettingRow")).Select(h => (h.Label, h.TabName))];
+
+    /// <summary>Runs a query against the index, for the UI smoke harness. Results in the order the popup shows.</summary>
+    public IReadOnlyList<(string Label, string TabName)> SearchForSmokeTest(string query)
+    {
+        _searchIndex ??= SettingsSearch.Build(Tabs, (Style)FindResource("SettingRow"));
+
+        return [.. SettingsSearch.Filter(_searchIndex, query).Select(h => (h.Label, h.TabName))];
+    }
+
+    private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
+    {
+        SearchCue.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        _searchIndex ??= SettingsSearch.Build(Tabs, (Style)FindResource("SettingRow"));
+
+        var hits = SettingsSearch.Filter(_searchIndex, SearchBox.Text);
+
+        SearchResults.ItemsSource = hits;
+        SearchCount.Text = SearchBox.Text.Length == 0
+            ? string.Empty
+            : hits.Count switch
+            {
+                0 => "no matches",
+                1 => "1 match",
+                _ => $"{hits.Count} matches",
+            };
+
+        // Opened only when there is something to show, so an unmatched query leaves an empty box rather than an
+        // empty list hanging under it.
+        SearchPopup.IsOpen = hits.Count > 0;
+
+        if (hits.Count > 0)
+        {
+            SearchResults.SelectedIndex = 0;
+        }
+    }
+
+    /// <summary>
+    /// Down moves into the list, Enter takes the first match, Esc closes.
+    /// <para>
+    /// Handled on the box rather than the list, because the list never has focus while typing - moving focus to it
+    /// on every keystroke would make the box unusable.
+    /// </para>
+    /// </summary>
+    private void OnSearchKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Escape when SearchPopup.IsOpen:
+                SearchPopup.IsOpen = false;
+                e.Handled = true;
+                break;
+
+            case Key.Down when SearchPopup.IsOpen:
+                SearchResults.Focus();
+
+                if (SearchResults.ItemContainerGenerator.ContainerFromIndex(SearchResults.SelectedIndex)
+                    is ListBoxItem item)
+                {
+                    item.Focus();
+                }
+
+                e.Handled = true;
+                break;
+
+            case Key.Enter when SearchResults.SelectedItem is SettingsSearchHit hit:
+                GoTo(hit);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnSearchResultKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter when SearchResults.SelectedItem is SettingsSearchHit hit:
+                GoTo(hit);
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                SearchPopup.IsOpen = false;
+                SearchBox.Focus();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnSearchResultClicked(object sender, MouseButtonEventArgs e)
+    {
+        if (SearchResults.SelectedItem is SettingsSearchHit hit)
+        {
+            GoTo(hit);
+        }
+    }
+
+    /// <summary>
+    /// Selects the setting's tab, scrolls its control into view and flashes it.
+    /// <para>
+    /// The scroll and the flash are deferred to a later dispatcher pass, and that is not optional: selecting a tab
+    /// applies its template for the first time, so until a layout pass has run the control has no position to
+    /// scroll to and <c>BringIntoView</c> does nothing at all.
+    /// </para>
+    /// </summary>
+    private void GoTo(SettingsSearchHit hit)
+    {
+        SearchPopup.IsOpen = false;
+        hit.Tab.IsSelected = true;
+
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                hit.Target.BringIntoView();
+                Flash(hit.Target);
+                hit.Target.Focus();
+            }));
+    }
+
+    /// <summary>
+    /// A brief accent wash behind the control, so the eye lands on the right row.
+    /// <para>
+    /// Painted on the row rather than the control where possible - a highlight around a text box reads better than
+    /// one inside it. The brush is created per flash and animated to transparent, then removed: animating a shared
+    /// palette brush would tint every other use of it, and leaving the background set would make the row look
+    /// permanently selected.
+    /// </para>
+    /// </summary>
+    private static void Flash(FrameworkElement target)
+    {
+        // Only a SettingRow grid is washed. A check box's parent is the tab's StackPanel, and painting that would
+        // wash the entire page - so for those the focus WPF has just given the control is the whole signal. The
+        // grid is found by walking up rather than passed in, because "the row" is exactly "the grid the control
+        // sits in".
+        if (target.Parent is not Grid row)
+        {
+            return;
+        }
+
+        // Written as ARGB components rather than parsed from a string, so a typo is a compile error.
+        var brush = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromArgb(0x3F, 0x7F, 0xB4, 0xFF));
+
+        row.Background = brush;
+
+        // Held briefly, then faded. A wash that starts fading immediately is easy to miss if the tab was still
+        // rendering when it began.
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(1400))
+        {
+            BeginTime = TimeSpan.FromMilliseconds(400),
+        };
+
+        // Cleared afterwards, or the row keeps a transparent brush that reads as permanently selected the moment
+        // anything re-evaluates it. The brush is created per flash rather than shared: animating a palette brush
+        // would tint every other control using it.
+        fade.Completed += (_, _) => row.Background = null;
+        brush.BeginAnimation(System.Windows.Media.Brush.OpacityProperty, fade);
+    }
+
     /// <summary>Reads the Keys tab into the shape <see cref="PasteKeyMap"/> validates and builds from.</summary>
     private Dictionary<string, char?> ReadPasteKeyChoices()
     {
