@@ -1,3 +1,4 @@
+using PasteJump.Core.Model;
 using PasteJump.Core.Paste;
 using Xunit;
 
@@ -9,6 +10,43 @@ namespace PasteJump.Core.Tests;
 /// </summary>
 public class ClipJoinerTests
 {
+    [Theory]
+    [InlineData(ClipKind.Text, true)]
+    [InlineData(ClipKind.Files, true)]
+    [InlineData(ClipKind.Image, false)]
+    [InlineData(ClipKind.Other, false)]
+    public void Only_kinds_that_really_carry_text_may_contribute(ClipKind kind, bool expected)
+    {
+        Assert.Equal(expected, ClipJoiner.HasJoinableText(kind));
+    }
+
+    /// <summary>
+    /// A sweep rather than a list, so a ClipKind added later has to be considered here instead of defaulting into
+    /// the join. The failure this guards is specific: every kind has PREVIEW text even when it has no real text,
+    /// and that preview is a placeholder - "[image]", "[binary]" - so a kind admitted by accident pastes those
+    /// words as though the user had copied them.
+    /// </summary>
+    [Fact]
+    public void No_kind_beyond_text_and_files_is_admitted()
+    {
+        var admitted = Enum.GetValues<ClipKind>().Where(ClipJoiner.HasJoinableText).ToList();
+
+        Assert.Equal([ClipKind.Text, ClipKind.Files], admitted.OrderBy(k => k));
+    }
+
+    /// <summary>
+    /// An image between two text clips is the case that prompted this: it must cost one entry, not one entry and
+    /// a stray blank line, so a skipped entry contributes no separator either.
+    /// </summary>
+    [Fact]
+    public void A_skipped_entry_leaves_no_gap_between_its_neighbours()
+    {
+        var result = ClipJoiner.Join(["before", null, "after"], "\n");
+
+        Assert.Equal("before\nafter", result.Text);
+        Assert.DoesNotContain("\n\n", result.Text);
+    }
+
     [Fact]
     public void Clips_are_joined_in_the_order_given()
     {

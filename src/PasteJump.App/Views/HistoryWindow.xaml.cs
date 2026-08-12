@@ -912,7 +912,10 @@ public partial class HistoryWindow : Window
     /// </summary>
     private string? TryReadJoinableText(HistoryRow row)
     {
-        if (row.Kind == ClipKind.Image)
+        // By kind, not by whether any text turns up. A clip with no text still has PREVIEW text, and that preview
+        // is a placeholder - the literal "[image]" or "[binary]" - so anything falling back to it would paste
+        // those words as though they had been copied. That exact bug shipped once in Copy.
+        if (!ClipJoiner.HasJoinableText(row.Kind))
         {
             return null;
         }

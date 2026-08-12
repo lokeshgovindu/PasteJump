@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 809 passing (`dotnet test`) - 757 in Core.Tests, 52 in Interop.Tests |
+| Tests | 815 passing (`dotnet test`) - 763 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -121,7 +121,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      757 tests.
+tests/PasteJump.Core.Tests      763 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -453,10 +453,15 @@ that immediately caught two real bugs. Expect to do the same again.
   - **Display order, not click order.** `SelectedItems` is in the order rows joined the selection and a
     shift-click gives no meaningful order at all, so it is re-sorted by row index. "Top to bottom, as I see it"
     is the only rule that can be predicted before pressing the button.
-  - **Text only, and what is left out is counted.** Two images cannot be concatenated without inventing a
-    layout, so an image contributes nothing — and `ClipJoinResult.Skipped` exists so the status line can say
-    that, because five rows silently producing two lines reads as data lost. A **file list does join**, since
-    its text is its paths, which is one of the more useful cases.
+  - **What may contribute is decided by `ClipKind`, never by whether any text turned up.** `Text` and `Files`
+    only — a file list's text is its paths, one of the more useful cases. It is not "use whatever text we can
+    find" because **a clip with no text still has preview text, and that preview is a placeholder**: `[image]`,
+    or `[binary]` for anything else (`CaptureService.cs:288`). Falling back to it pastes those words as though
+    they had been copied — precisely the bug Copy shipped once. `ClipJoiner.HasJoinableText` is the gate, and a
+    test sweeps every `ClipKind` so one added later must be considered rather than defaulting in. What is left
+    out is **counted and reported**, because five rows silently producing two lines reads as data lost — and a
+    skipped entry emits no separator either, so an image between two text clips costs one entry rather than one
+    entry and a blank line.
   - **The full text is read, never the preview.** `preview` is capped at `PreviewMaxChars`, so joining previews
     would produce a paste truncated in the middle — worse than one that is obviously short. Same reason Copy
     reads the archived blob.
@@ -1025,7 +1030,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 809 tests
+dotnet test                                         # 815 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

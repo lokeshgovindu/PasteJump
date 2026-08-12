@@ -1,4 +1,5 @@
 using System.Text;
+using PasteJump.Core.Model;
 
 namespace PasteJump.Core.Paste;
 
@@ -94,8 +95,30 @@ public static class ClipJoiner
     };
 
     /// <summary>
+    /// Whether a clip of this kind has text of its own to contribute.
+    /// <para>
+    /// True for <see cref="ClipKind.Text"/> and <see cref="ClipKind.Files"/> only - a file list's text is its
+    /// paths, which is one of the more useful things to join. False for everything else, and the reason is the
+    /// trap this codebase has already fallen into twice: <strong>a clip with no text still has preview text</strong>,
+    /// and that preview is a placeholder. An image previews as the literal <c>[image]</c> and a binary clip as
+    /// <c>[binary]</c>, so a join that fell back to the preview column would paste those words as though the user
+    /// had copied them. Copying a picture from history put the word "[image]" on the clipboard for exactly this
+    /// reason before it was fixed.
+    /// </para>
+    /// <para>
+    /// Decided by kind here rather than by testing whether some text was found, so a format set that happens to
+    /// carry no <c>CF_UNICODETEXT</c> cannot silently promote a placeholder into the paste.
+    /// </para>
+    /// </summary>
+    public static bool HasJoinableText(ClipKind kind) => kind is ClipKind.Text or ClipKind.Files;
+
+    /// <summary>
     /// Joins in the order given, which the caller must have put in the order the user sees. Entries with no
     /// text are skipped and counted.
+    /// <para>
+    /// A skipped entry contributes no separator either, so an image between two text clips gives two lines
+    /// rather than three with a gap in the middle.
+    /// </para>
     /// </summary>
     /// <param name="texts">
     /// One entry per selected clip: its text, or null for a clip that has none. Nulls rather than a filtered
