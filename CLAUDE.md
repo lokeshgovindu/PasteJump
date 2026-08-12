@@ -977,6 +977,21 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ## Constraints, already decided
 
+- **.NET 10 stays, and lowering the target framework is settled as the wrong answer (2026-08-12).** The worry it
+  answers - "not everyone has the latest .NET" - is already answered by the *deployment shape*: two of the three
+  downloads are self-contained, so the runtime is inside the exe and the machine's own .NET is irrelevant. Only the
+  2.8 MB `net10` ZIP needs a runtime installed, and it exists for people who already have one. Three facts to save
+  re-deriving: Windows has **never** shipped a .NET Core runtime (only .NET Framework 4.8), so there is no version
+  "everyone has" to drop to; .NET 9 went out of support in May 2026 and **.NET 8 ends in November 2026**, so targeting
+  8 would mean shipping against a runtime losing security fixes this year, while .NET 10 is the current LTS to
+  November 2028; and .NET Framework 4.8 - the only universal target - would be a rewrite (records, collection
+  expressions, `ArgumentNullException.ThrowIfNull`, `Enum.GetValues<T>()`, spans, `Microsoft.Data.Sqlite` 10) buying
+  nothing a self-contained build has not already bought. The real floor is Windows 10 1607, x64.
+- **No ARM64 build until somebody asks for one (2026-08-12).** Windows-on-ARM runs the x64 build under emulation,
+  which works. Adding a fourth shape is a `RuntimeIdentifier` and a few lines in `pack-release.ps1`, so this is
+  deliberately deferred rather than dismissed - and a download nobody requested has a cost of its own, since the
+  evidence from AltTab's release figures is that people take the first asset in the list.
+
 - **There are three shapes of one build, not three products, and `pack-release.ps1` publishes all three.**
   Asked for after someone opened the deployed folder and found 257 files. "Do we really need all of them?"
   has a different answer per shape, and that is the point:
