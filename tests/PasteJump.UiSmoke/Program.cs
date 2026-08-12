@@ -481,6 +481,12 @@ internal static class Program
         ExpectSearchHit(window, "tray", "Left-Clicking the Tray Icon");
         ExpectSearchHit(window, "store images", "Store Images");
         ExpectSearchHit(window, "electron", "Pause Before Pasting (ms)");
+
+        // The per-kind overlay rows. Included because they are the shape the index is easiest to lose: a matrix of
+        // check boxes in a plain Grid is invisible to it, which is exactly what happened - 74 rows became 72 - and the
+        // count alone would not have said which two had gone.
+        ExpectSearchHit(window, "resolution", "The Clip's Own Details");
+        ExpectSearchHit(window, "size in bytes", "Size in Bytes");
     }
 
     /// <summary>

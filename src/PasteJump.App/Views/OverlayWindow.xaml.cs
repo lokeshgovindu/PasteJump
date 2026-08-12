@@ -298,7 +298,7 @@ public partial class OverlayWindow : Window
 
                 // Dimensions only. The clip's stored byte count is not on the model, and the decoded size of a
                 // DIB would be a different number from the one history reports for the same clip.
-                ShowImageFacts($"{bitmap.PixelWidth} × {bitmap.PixelHeight}", null);
+                ShowImageFacts(ClipKind.Image, $"{bitmap.PixelWidth} × {bitmap.PixelHeight}", null);
                 return;
             }
         }
@@ -319,7 +319,14 @@ public partial class OverlayWindow : Window
         {
             PreviewImage.Source = thumb.Bitmap;
             PreviewImage.Visibility = Visibility.Visible;
-            ShowImageFacts($"{thumb.PixelWidth} × {thumb.PixelHeight}", FormatBytes(thumb.FileBytes));
+            // An image FILE is both things at once: its dimensions are image details, its size is a file's size. Split
+            // that way because the questions answered in Settings were "do I want resolutions" and "do I want file
+            // sizes", and a picture on disk answers to both.
+            ShowImageFacts(
+                ClipKind.Image,
+                $"{thumb.PixelWidth} × {thumb.PixelHeight}",
+                FormatBytes(thumb.FileBytes),
+                sizeKind: ClipKind.Files);
             return;
         }
 
@@ -329,7 +336,7 @@ public partial class OverlayWindow : Window
         {
             PreviewFileText.Text = textFile.Text;
             PreviewFileText.Visibility = Visibility.Visible;
-            ShowImageFacts(textFile.Facts, FormatBytes(textFile.FileBytes));
+            ShowImageFacts(ClipKind.Files, textFile.Facts, FormatBytes(textFile.FileBytes));
             return;
         }
 
@@ -338,7 +345,7 @@ public partial class OverlayWindow : Window
         // actually stored - see PasteModeController.DescribeTextFacts.
         if (model.TextFacts is { Length: > 0 } facts)
         {
-            ShowImageFacts(facts, model.TotalBytes > 0 ? FormatBytes(model.TotalBytes) : null);
+            ShowImageFacts(model.Kind, facts, model.TotalBytes > 0 ? FormatBytes(model.TotalBytes) : null);
             return;
         }
 
@@ -353,10 +360,15 @@ public partial class OverlayWindow : Window
     /// while an overlay is up.
     /// </para>
     /// </summary>
-    private void ShowImageFacts(string dimensions, string? bytes)
+    /// <param name="kind">
+    /// Which set of switches governs this row. Not always <c>model.Kind</c>: a copied image file asks the image
+    /// switches about its dimensions and the file switches about its size.
+    /// </param>
+    /// <param name="sizeKind">The kind governing the size half, when it differs from <paramref name="kind"/>.</param>
+    private void ShowImageFacts(ClipKind kind, string dimensions, string? bytes, ClipKind? sizeKind = null)
     {
-        var showDetails = _parts.Details && dimensions.Length > 0;
-        var showSize = _parts.Size && !string.IsNullOrEmpty(bytes);
+        var showDetails = _parts.DetailsFor(kind) && dimensions.Length > 0;
+        var showSize = _parts.SizeFor(sizeKind ?? kind) && !string.IsNullOrEmpty(bytes);
 
         ImageDimensions.Text = showDetails ? dimensions : string.Empty;
         ImageBytes.Text = showSize ? bytes! : string.Empty;

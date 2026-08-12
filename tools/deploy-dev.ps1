@@ -145,8 +145,37 @@ if ($stale.Count -or $staleDirectories.Count) {
 Copy-Item "$publishDirectory\*" $Destination -Recurse -Force
 
 if ($Sign) {
-    & (Join-Path $PSScriptRoot 'sign-local.ps1') -Path (Join-Path $Destination 'PasteJump.exe') | Out-Null
-    Write-Host "Signed with the development certificate."
+    # Never fatal, and that is the lesson from the time it was. Signing happens AFTER the running copy has been
+    # stopped and the new files copied - it has to, since signtool rewrites the exe - so a failure here used to abort
+    # the script with the application shut down and no restart. The timestamp server being briefly unreachable left
+    # the machine with no PasteJump at all, over a signature that is only a development convenience.
+    #
+    # So: try it, then try it without the timestamp, then carry on regardless. The one thing that must always happen
+    # is the restart below.
+    $signer = Join-Path $PSScriptRoot 'sign-local.ps1'
+    $exe = Join-Path $Destination 'PasteJump.exe'
+
+    try
+    {
+        & $signer -Path $exe | Out-Null
+        Write-Host "Signed with the development certificate."
+    }
+    catch
+    {
+        Write-Warning "Signing failed ($($_.Exception.Message.Split([Environment]::NewLine)[0]))."
+
+        try
+        {
+            # Usually the timestamp server, which needs the network. A signature with no countersignature stops
+            # validating when the certificate expires - irrelevant for a build that lives for an hour.
+            & $signer -Path $exe -NoTimestamp | Out-Null
+            Write-Warning "Signed WITHOUT a timestamp. Fine for a development build, never for a release."
+        }
+        catch
+        {
+            Write-Warning "Left unsigned. Properties will show no Digital Signatures tab."
+        }
+    }
 }
 
 $landed = Get-ChildItem $Destination -File -Recurse | Where-Object { $_.FullName -notmatch '\\data\\' }

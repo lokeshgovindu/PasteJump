@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 890 passing (`dotnet test`) - 838 in Core.Tests, 52 in Interop.Tests |
+| Tests | 893 passing (`dotnet test`) - 841 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -113,7 +113,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      838 tests.
+tests/PasteJump.Core.Tests      841 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -840,9 +840,14 @@ that immediately caught two real bugs. Expect to do the same again.
 
 ### The overlay is customisable, within one hard line
 
-- **`OverlayParts` switches off the cosmetic parts of the overlay: position, details, size, format, tags, source,
-  pinned, key hint.** Seven new settings plus the existing `ShowOverlayKeyHint`, all defaulting to on, so nothing
-  moves for anyone who never opens them. `PasteJumpSettings.OverlayParts` is a computed `[JsonIgnore]` view over the
+- **`OverlayParts` switches off the cosmetic parts of the overlay**, and the facts under the preview are **per kind**:
+  `TextDetails`/`TextSize`, `ImageDetails`/`ImageSize`, `FileDetails`/`FileSize`, plus position, tags, source,
+  formatter, pinned and the key hint. Twelve settings, all defaulting to on, so nothing moves for anyone who never
+  opens them. It shipped first with ONE details/size pair for all three kinds and that was the wrong answer: the three
+  do not report the same thing - lines and characters, a resolution, a line count - so "resolution for pictures,
+  nothing for text" could not be expressed. A copied image FILE asks the image switches about its dimensions and the
+  file switches about its size, since it is both. `ClipKind.Other` follows the file pair rather than earning a row of
+  its own. `PasteJumpSettings.OverlayParts` is a computed `[JsonIgnore]` view over the
   flags, exactly as `PasteModeOptions` is - one definition, no second copy to fall out of step.
 - **The line is behaviour, not taste: `POP`, `JOIN`, the kind filter and the commit-mode banner can never be
   hidden**, because each changes what releasing Ctrl will do. A user who could hide those would not have tidied the
@@ -1006,6 +1011,11 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   other two publishes turn the single-file properties **off** on the command line rather than the csproj
   turning them on for one of them, so a plain `dotnet publish` still produces the portable exe the README
   describes — the shape someone reaching for that command wants.
+- **A failed signature must never leave the machine without a running app.** `deploy-dev.ps1` stops PasteJump, copies,
+  signs, restarts - and signing has to come after the stop, since signtool rewrites the exe. When the timestamp server
+  was briefly unreachable the script aborted mid-way and left nothing running, over a signature that is only a
+  development convenience. It now tries with a timestamp, then without one, then carries on unsigned, warning each
+  time; the restart always happens.
 - **The development deployment is the framework-dependent shape, and `tools/deploy-dev.ps1` is how it gets
   there.** Deploying the folder build left **257 files in the root beside `data\`**, which was reported, fairly:
   it makes the one irreplaceable thing in that directory hard to see. Framework-dependent is 15 files and 4 MB
@@ -1166,7 +1176,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 890 tests
+dotnet test                                         # 893 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

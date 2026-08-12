@@ -813,13 +813,69 @@
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="The &quot;Clip 3 of 41&quot; line. Switching it off still leaves &quot;No matching clips&quot; when a search finds nothing, since that is the only thing on screen in that case." />
 
-                        <CheckBox x:Name="ShowDetailsCheck" Content="The Clip's Own Details" />
+                        <!--
+                            Per kind, in a grid, because the three are not the same information: text reports lines
+                            and characters, an image its resolution, a file its line count. Six loose check boxes
+                            would say the same thing and be unreadable - a matrix lets someone find "resolution for
+                            pictures, nothing for text" in one glance, which is the request this answers.
+                        -->
                         <TextBlock Style="{StaticResource CheckHelp}"
-                                   Text="Lines and characters for text, pixel dimensions for an image, the line count for a copied text file — on the left of the row under the preview." />
+                                   Margin="0,10,0,2"
+                                   Text="The row under the preview, chosen per kind of clip — because the three do not report the same thing. A clip that is neither text nor an image follows the File column." />
 
-                        <CheckBox x:Name="ShowSizeCheck" Content="Size in Bytes" />
-                        <TextBlock Style="{StaticResource CheckHelp}"
-                                   Text="On the right of that same row. With both this and the details off, the row disappears rather than leaving an empty strip." />
+                        <!--
+                            Three grids sharing one set of column widths rather than one grid of three rows, and the
+                            reason is the settings search: it indexes a Grid carrying the SettingRow style, taking the
+                            first TextBlock as the label. A single matrix was one unlabelled Grid, so both settings
+                            vanished from the search - 74 rows became 72, which the smoke harness reported. Each row
+                            being its own SettingRow puts them back, and the check boxes stay unlabelled so they are
+                            not indexed a second time as "Text", "Image" and "File".
+                        -->
+                        <Grid Margin="0,2,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="82" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="1" Text="Text" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Image" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="File" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </Grid>
+
+                        <Grid Style="{StaticResource SettingRow}" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="82" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="The Clip's Own Details" />
+                            <CheckBox x:Name="TextDetailsCheck" Grid.Column="1" HorizontalAlignment="Center" Margin="0,0,0,0" ToolTip="Lines and characters, for a text clip" />
+                            <CheckBox x:Name="ImageDetailsCheck" Grid.Column="2" HorizontalAlignment="Center" Margin="0,0,0,0" ToolTip="Pixel dimensions, for an image or a copied image file" />
+                            <CheckBox x:Name="FileDetailsCheck" Grid.Column="3" HorizontalAlignment="Center" Margin="0,0,0,0" ToolTip="A copied text file's line count, and the like" />
+                        </Grid>
+                        <!-- Below the row, not above it: the search attaches help text to the setting it FOLLOWS, so a
+                             line placed above would make "resolution" find whatever setting came before. It did. -->
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Margin="0,3,0,0"
+                                   Text="Lines and characters for a text clip; the resolution, in pixels, for an image or a copied image file; the line count for a copied text file." />
+
+                        <Grid Style="{StaticResource SettingRow}" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="82" />
+                                <ColumnDefinition Width="82" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Size in Bytes" />
+                            <CheckBox x:Name="TextSizeCheck" Grid.Column="1" HorizontalAlignment="Center" Margin="0,0,0,0" />
+                            <CheckBox x:Name="ImageSizeCheck" Grid.Column="2" HorizontalAlignment="Center" Margin="0,0,0,0" />
+                            <CheckBox x:Name="FileSizeCheck" Grid.Column="3" HorizontalAlignment="Center" Margin="0,0,0,0" ToolTip="The file's size on disk" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Margin="0,3,0,0"
+                                   Text="On the right of that same row. With both boxes off for a kind, the row disappears for clips of that kind rather than leaving an empty strip." />
 
                         <CheckBox x:Name="ShowFormatterCheck" Content="Paste Format" />
                         <TextBlock Style="{StaticResource CheckHelp}"

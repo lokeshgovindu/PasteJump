@@ -280,14 +280,29 @@ public sealed class PasteJumpSettings
     /// <summary>Show the <c>Clip 3 of 41</c> line at the top of the overlay.</summary>
     public bool ShowOverlayPosition { get; set; } = true;
 
-    /// <summary>
-    /// Show the clip's own facts under the preview: lines and characters for text, pixel dimensions for an image,
-    /// the line count for a copied text file.
-    /// </summary>
-    public bool ShowOverlayDetails { get; set; } = true;
+    // The facts under the preview, per kind of clip - because they are not the same information. Text reports lines
+    // and characters, an image its pixel dimensions, a file copy its line count. One pair of switches for all three
+    // was how this shipped first and could not express "resolution for pictures, nothing for text".
+    //
+    // A binary clip follows the file switches; see OverlayParts.DetailsFor.
 
-    /// <summary>Show the size in bytes, on the right of the same row as <see cref="ShowOverlayDetails"/>.</summary>
-    public bool ShowOverlaySize { get; set; } = true;
+    /// <summary>Show lines and characters for a text clip.</summary>
+    public bool ShowOverlayTextDetails { get; set; } = true;
+
+    /// <summary>Show the byte count for a text clip.</summary>
+    public bool ShowOverlayTextSize { get; set; } = true;
+
+    /// <summary>Show pixel dimensions for an image, or for a copied image file.</summary>
+    public bool ShowOverlayImageDetails { get; set; } = true;
+
+    /// <summary>Show the byte count for an image.</summary>
+    public bool ShowOverlayImageSize { get; set; } = true;
+
+    /// <summary>Show a copied file's own details, such as the line count of a text file.</summary>
+    public bool ShowOverlayFileDetails { get; set; } = true;
+
+    /// <summary>Show the byte count for a file copy.</summary>
+    public bool ShowOverlayFileSize { get; set; } = true;
 
     /// <summary>Show the clip's tags.</summary>
     public bool ShowOverlayTags { get; set; } = true;
@@ -308,8 +323,12 @@ public sealed class PasteJumpSettings
     [JsonIgnore]
     public PasteMode.OverlayParts OverlayParts => new(
         ShowOverlayPosition,
-        ShowOverlayDetails,
-        ShowOverlaySize,
+        ShowOverlayTextDetails,
+        ShowOverlayTextSize,
+        ShowOverlayImageDetails,
+        ShowOverlayImageSize,
+        ShowOverlayFileDetails,
+        ShowOverlayFileSize,
         ShowOverlayTags,
         ShowOverlaySource,
         ShowOverlayFormatter,

@@ -487,8 +487,12 @@ public partial class SettingsWindow : Window
         ShowKeyHintCheck.IsChecked = source.ShowOverlayKeyHint;
 
         ShowPositionCheck.IsChecked = source.ShowOverlayPosition;
-        ShowDetailsCheck.IsChecked = source.ShowOverlayDetails;
-        ShowSizeCheck.IsChecked = source.ShowOverlaySize;
+        TextDetailsCheck.IsChecked = source.ShowOverlayTextDetails;
+        TextSizeCheck.IsChecked = source.ShowOverlayTextSize;
+        ImageDetailsCheck.IsChecked = source.ShowOverlayImageDetails;
+        ImageSizeCheck.IsChecked = source.ShowOverlayImageSize;
+        FileDetailsCheck.IsChecked = source.ShowOverlayFileDetails;
+        FileSizeCheck.IsChecked = source.ShowOverlayFileSize;
         ShowFormatterCheck.IsChecked = source.ShowOverlayFormatter;
         ShowTagsCheck.IsChecked = source.ShowOverlayTags;
         ShowSourceCheck.IsChecked = source.ShowOverlaySource;
@@ -2025,8 +2029,12 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.OverlayY)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayKeyHint)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayPosition)] = "Appearance",
-        [nameof(PasteJumpSettings.ShowOverlayDetails)] = "Appearance",
-        [nameof(PasteJumpSettings.ShowOverlaySize)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayTextDetails)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayTextSize)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayImageDetails)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayImageSize)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayFileDetails)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayFileSize)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayFormatter)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayTags)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlaySource)] = "Appearance",
@@ -2422,8 +2430,12 @@ public partial class SettingsWindow : Window
         settings.OverlayPreviewChars = overlayChars;
         settings.ShowOverlayKeyHint = ShowKeyHintCheck.IsChecked == true;
         settings.ShowOverlayPosition = ShowPositionCheck.IsChecked == true;
-        settings.ShowOverlayDetails = ShowDetailsCheck.IsChecked == true;
-        settings.ShowOverlaySize = ShowSizeCheck.IsChecked == true;
+        settings.ShowOverlayTextDetails = TextDetailsCheck.IsChecked == true;
+        settings.ShowOverlayTextSize = TextSizeCheck.IsChecked == true;
+        settings.ShowOverlayImageDetails = ImageDetailsCheck.IsChecked == true;
+        settings.ShowOverlayImageSize = ImageSizeCheck.IsChecked == true;
+        settings.ShowOverlayFileDetails = FileDetailsCheck.IsChecked == true;
+        settings.ShowOverlayFileSize = FileSizeCheck.IsChecked == true;
         settings.ShowOverlayFormatter = ShowFormatterCheck.IsChecked == true;
         settings.ShowOverlayTags = ShowTagsCheck.IsChecked == true;
         settings.ShowOverlaySource = ShowSourceCheck.IsChecked == true;
