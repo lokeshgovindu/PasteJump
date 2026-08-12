@@ -118,6 +118,35 @@
             <Setter Property="Margin" Value="0,10,0,0" />
         </Style>
 
+        <!--
+            A group of settings, drawn as a panel.
+
+            A bold heading with a 10px margin above it was all that separated one group from the next, and it was
+            reported as unreadable - which it was: a heading looks like a label for the row beneath it, not like the
+            start of a container, so a page of six settings and two headings reads as eight peers. A boxed group says
+            where it starts and where it stops.
+
+            Used only where a tab holds MORE than one group. The settings at the top of such a page stay unboxed and
+            belong to the tab itself - the tab header already names them, and boxing everything would leave a page of
+            nested rectangles with nothing outside them to contrast against.
+
+            The heading sits inside the box, so its own top margin is removed by SectionHeadingInGroup below.
+        -->
+        <Style x:Key="SettingGroup" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="Padding" Value="12,9,12,3" />
+            <Setter Property="Margin" Value="0,14,0,0" />
+        </Style>
+
+        <!-- The same heading, as a group's title: no margin above it, since the box supplies the space. -->
+        <Style x:Key="SectionHeadingInGroup" TargetType="TextBlock" BasedOn="{StaticResource SectionHeading}">
+            <Setter Property="Margin" Value="0,0,0,0" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+        </Style>
+
         <!-- Tab pages scroll. Inline help roughly doubles the height of every setting, and a page that
              silently cuts off its last control is worse than one you have to scroll. -->
         <!--
@@ -398,7 +427,9 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="What goes between clips when several rows are selected in the history window and copied as one. Write invisible characters as \n for a new line, \r\n, \t for a tab, and \\ for a backslash; anything else is used literally, so &quot;, &quot; or &quot; — &quot; work as typed. Emptying the box restores a new line, since joining with nothing runs the clips together." />
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Text="Import from Clipjump" />
+                        <Border Style="{StaticResource SettingGroup}">
+                        <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="Import from Clipjump" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Margin="0,3,0,8"
                                    Text="Copies Clipjump's history archive and its clip stack into PasteJump, so imported clips can be pasted with the gesture and not merely searched. Nothing in the Clipjump folder is modified. Entries already imported are skipped, so running it twice is harmless." />
@@ -422,6 +453,8 @@
                                 Margin="0,0,0,0"
                                 MinWidth="200"
                                 ToolTip="Finds an existing Clipjump installation, and lets you browse to one if the guess is wrong." />
+                        </StackPanel>
+                        </Border>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -488,7 +521,9 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="A system-wide shortcut that opens the clipboard history window, for example Ctrl+Shift+H. Leave it empty for none. It must include at least one of Ctrl, Alt, Shift or Win — a bare key would be taken away from every other program on the machine." />
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="During the Gesture" />
+                        <Border Style="{StaticResource SettingGroup}">
+                        <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="During the Gesture" />
 
                         <CheckBox x:Name="PreservePositionCheck" Content="Reopen on the Clip I Was Last On" />
                         <TextBlock Style="{StaticResource CheckHelp}"
@@ -517,6 +552,8 @@
                                   Content="Tell Me When Another Clipboard Manager Is Running" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Shows a brief notification at start-up if a manager known to claim Ctrl+V is running. It is only a hint — PasteJump cannot tell whether the other program's paste shortcut is actually switched on, so it says what to check rather than claiming anything is broken." />
+                        </StackPanel>
+                        </Border>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -708,7 +745,9 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="Row spacing in the history window. Compact fits the most rows on screen; Roomy is the easiest to hit with a mouse. An open history window follows the change without reopening." />
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="Paste Overlay" />
+                        <Border Style="{StaticResource SettingGroup}">
+                        <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="Paste Overlay" />
 
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
@@ -754,6 +793,8 @@
                         <CheckBox x:Name="ShowKeyHintCheck" Content="Show a Key Reminder Along the Bottom" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="One muted line naming the keys worth knowing when you have lost your place: A returns to the newest clip, X deletes, Esc cancels, and F1 opens the full list. Turn it off once the gesture is in your fingers." />
+                        </StackPanel>
+                        </Border>
 
                         <!--
                             What else the overlay says about a clip. All on by default, so nothing moves for anyone
@@ -764,7 +805,9 @@
                             releasing Ctrl will do, and hiding one would not tidy the overlay - it would arm a
                             deletion the user cannot see, which is the failure this overlay exists to prevent.
                         -->
-                        <TextBlock Style="{StaticResource SectionHeading}" Text="What the Overlay Shows" />
+                        <Border Style="{StaticResource SettingGroup}">
+                        <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="What the Overlay Shows" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Margin="0,3,0,4"
                                    Text="The preview itself is always shown, as is anything that changes what releasing Ctrl will do — the POP and JOIN chips, the kind filter, and the Cancel or Delete banner. Everything below is description, and yours to switch off." />
@@ -785,13 +828,19 @@
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="The chip naming Original, Plain text and so on. Worth keeping if you use Z to cycle formats, since nothing else says which one is in force." />
 
-                        <CheckBox x:Name="ShowTagsCheck" Content="Tags" />
-                        <CheckBox x:Name="ShowSourceCheck" Content="Application It Was Copied From" />
-                        <CheckBox x:Name="ShowPinnedCheck" Content="The PINNED Marker" />
+                        <!-- The three with no help line of their own still need the rhythm of the rest, or they
+                             bunch together and read as one control with three boxes. -->
+                        <CheckBox x:Name="ShowTagsCheck" Content="Tags" Margin="0,7,0,0" />
+                        <CheckBox x:Name="ShowSourceCheck" Content="Application It Was Copied From" Margin="0,7,0,0" />
+                        <CheckBox x:Name="ShowPinnedCheck" Content="The PINNED Marker" Margin="0,7,0,0" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Pinning itself is unaffected — this only hides the marker. A pinned clip still sorts first and still survives Delete All." />
+                        </StackPanel>
+                        </Border>
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="After Each Copy" />
+                        <Border Style="{StaticResource SettingGroup}">
+                        <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="After Each Copy" />
 
                         <CheckBox x:Name="ShowCopyNotificationCheck"
                                   Content="Show a Brief Notification" />
@@ -836,6 +885,8 @@
                         </Grid>
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Between 20 and 2000 milliseconds. 150 is Clipjump's, and about as long as a tone on every copy can be before it becomes the thing you notice." />
+                        </StackPanel>
+                        </Border>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -959,7 +1010,9 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="The same, for a clip that holds a picture. The clip is written to a temporary .bmp first. Text wins when a clip carries both, which is common — copying a table from a browser gives you text and a bitmap at once." />
 
-                        <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="Where Data Is Kept" />
+                        <Border Style="{StaticResource SettingGroup}">
+                        <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="Where Data Is Kept" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Margin="0,3,0,6"
                                    Text="These two are independent. Changing either needs a restart: PasteJump copies the data across and leaves the old copy behind for you to delete once you are satisfied." />
@@ -1029,7 +1082,10 @@
                                    ToolTip="Open this folder in File Explorer" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="PasteJump.json, holding everything on these tabs. Keeping it beside the program is what lets a portable copy carry its own configuration." />
+                        </StackPanel>
+                        </Border>
 
+                        <!-- The version line belongs to the page rather than to any group, so it sits outside. -->
                         <TextBlock x:Name="VersionText"
                                    Style="{StaticResource SettingHelp}"
                                    Margin="0,8,0,0" />
