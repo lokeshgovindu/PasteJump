@@ -1219,8 +1219,13 @@ public partial class HistoryWindow : Window
         var body = "Entries that are an exact duplicate of another are removed, keeping one of each. Nothing that "
             + "differs in any way is touched.\n\n"
             + (clips
-                ? "A clip is judged by its content, which is the same test the gesture uses to recognise a "
-                    + "re-copy. The newest of each set is kept, and a pinned one always wins."
+                // Says outright that time is not part of the test. The History prompt offers an "ignore the time"
+                // option and this one does not, which was asked about twice - the answer is that a clip's identity
+                // is its content and nothing else, so there is no timestamp here to ignore. Leaving that to be
+                // inferred from "judged by its content" was not enough.
+                ? "A clip is judged by its content alone - the same test the gesture uses to recognise a re-copy - "
+                    + "so the time it was copied plays no part and there is nothing to ignore. The newest of each "
+                    + "set is kept, and a pinned one always wins."
                 : "An entry is judged by its timestamp, its kind, its text and its image, so two screenshots "
                     + "taken in the same second are not mistaken for one. The oldest of each set is kept.")
             + "\n\nThis cannot be undone.";
