@@ -557,8 +557,11 @@ public partial class HistoryWindow : Window
 
                 break;
 
+            // Through the button's own handler rather than straight to CopySelectionToClipboard, so Enter joins
+            // when several rows are selected. Enter is documented as the keyboard equivalent of Copy, and a
+            // button reading "Copy Joined" while Enter quietly copied one row would make a liar of it.
             case Key.Enter when EntriesGrid.SelectedItem is not null && !SearchBox.IsKeyboardFocusWithin:
-                CopySelectionToClipboard();
+                OnCopyClicked(sender, new RoutedEventArgs());
                 e.Handled = true;
                 break;
 
@@ -804,6 +807,11 @@ public partial class HistoryWindow : Window
         }
     }
 
+    /// <summary>
+    /// Deliberately the single-entry path, unlike Enter and the button. A plain click collapses a multi-selection
+    /// to the row under the pointer, so by the time this fires there is exactly one row selected and it is the one
+    /// double-clicked - "join these" cannot be what was meant.
+    /// </summary>
     private void OnRowDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         => CopySelectionToClipboard();
 
