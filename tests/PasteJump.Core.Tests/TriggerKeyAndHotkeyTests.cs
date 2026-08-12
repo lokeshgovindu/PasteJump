@@ -44,7 +44,7 @@ public sealed class TriggerKeyAndHotkeyTests
     [InlineData('V')]
     [InlineData('B')]
     [InlineData('G')]
-    [InlineData('J')] // 'P' pins and 'K' filters by kind, so neither is free any more
+    [InlineData('I')] // 'P' pins, 'K' filters by kind and 'J' marks clips to join, so none of those is free
     public void An_unbound_letter_is_accepted(char key)
     {
         Assert.True(TriggerKey.IsAvailable(key));
@@ -65,8 +65,10 @@ public sealed class TriggerKeyAndHotkeyTests
         Assert.DoesNotContain('M', TriggerKey.Available); // beside Q, move to front
         Assert.DoesNotContain('P', TriggerKey.Available); // beside Space, pin
 
-        // 26 letters minus the 14 bound to an action.
-        Assert.Equal(12, TriggerKey.Available.Count);
+        Assert.DoesNotContain('J', TriggerKey.Available); // mark this clip to be pasted joined
+
+        // 26 letters minus the 15 bound to an action.
+        Assert.Equal(11, TriggerKey.Available.Count);
     }
 
     [Theory]

@@ -63,7 +63,9 @@ public class PasteKeyMapTests
     {
         var map = PasteKeyMap.Default;
 
-        foreach (var letter in "BDGIJLNRUWY")
+        // J is absent: it is bound to "mark to join". Kept as a literal list rather than derived from the map, so
+        // binding a new action forces a decision here about a letter someone may be typing into search.
+        foreach (var letter in "BDGILNRUWY")
         {
             Assert.Equal(GestureKey.None, map.ForLetter(letter));
         }
@@ -85,6 +87,33 @@ public class PasteKeyMapTests
         // report in, and refusing to start over one bad letter in a hand-edited file would be far worse.
         Assert.Equal(GestureKey.TogglePin, map.ForLetter('P'));
         Assert.Equal(GestureKey.Back, map.ForLetter('C'));
+    }
+
+    /// <summary>
+    /// A letter the user bound wins over an action that merely defaults to it, and the defaulted action is left
+    /// unbound rather than stealing it.
+    /// <para>
+    /// This is what stops an ADDED action breaking an existing configuration. "Mark to join" arrived with a default
+    /// of J, which was free - but free is not unused, and anyone who had moved pin to J would otherwise have lost
+    /// it silently, since the later entry wins when the table is rebuilt.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void A_stored_binding_beats_another_action_defaulting_to_the_same_letter()
+    {
+        var map = PasteKeyMap.Parse("pin=J");
+
+        Assert.Equal(GestureKey.TogglePin, map.ForLetter('J'));
+        Assert.Null(map.LetterFor("join"));
+    }
+
+    [Fact]
+    public void Defaults_are_left_alone_when_nothing_was_stored()
+    {
+        var map = PasteKeyMap.Default;
+
+        Assert.Equal(GestureKey.ToggleJoinMark, map.ForLetter('J'));
+        Assert.Equal(GestureKey.TogglePin, map.ForLetter('P'));
     }
 
     [Fact]

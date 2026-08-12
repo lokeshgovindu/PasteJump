@@ -53,6 +53,7 @@ public sealed class PasteKeyMap
         new(PasteAction.JumpToNewest, "newest", "Jump to the newest clip", 'A', "Home"),
         new(PasteAction.ToggleSearch, "search", "Open search", 'F'),
         new(PasteAction.TogglePin, "pin", "Pin or unpin the clip", 'P', "Space"),
+        new(PasteAction.ToggleJoinMark, "join", "Mark the clip to be pasted joined with the others", 'J'),
         new(PasteAction.PromoteToFront, "front", "Move the clip to the front of the stack", 'M', "Q"),
         new(PasteAction.CycleFormatter, "format", "Cycle the paste format", 'Z'),
         new(PasteAction.CycleKindFilter, "kind", "Show only one kind of clip: all, text, images, files", 'K'),
@@ -192,6 +193,10 @@ public sealed class PasteKeyMap
             map._letters[entry.Name] = entry.DefaultLetter;
         }
 
+        // Which actions the stored string actually named. Tracked because a saved binding must beat a default -
+        // see the loop after this one.
+        var explicitNames = new HashSet<string>(StringComparer.Ordinal);
+
         if (!string.IsNullOrWhiteSpace(stored))
         {
             foreach (var pair in stored.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -214,6 +219,37 @@ public sealed class PasteKeyMap
                 map._letters[name] = value.Length == 1 && char.IsAsciiLetter(value[0])
                     ? char.ToUpperInvariant(value[0])
                     : value.Length == 0 ? null : map._letters[name];
+
+                explicitNames.Add(name);
+            }
+        }
+
+        // An action the user has bound wins over one that merely defaults to the same letter, and the defaulted
+        // action is left unbound rather than allowed to steal it.
+        //
+        // This exists because of what happens when an action is ADDED. "Mark to join" arrived with a default of J,
+        // which was free - but free is not the same as unused: anyone who had moved pin to J would have had it
+        // silently taken away, since Rebuild lets the later entry win. Nothing that works may stop working, so the
+        // new action starts off instead, visible as "Off" in the Keys tab where it can be given a free letter.
+        //
+        // Only when there IS a stored string: a fresh install has no explicit bindings and its defaults do not
+        // clash with each other.
+        if (explicitNames.Count > 0)
+        {
+            var claimed = new HashSet<char>(
+                Entries
+                    .Where(entry => explicitNames.Contains(entry.Name))
+                    .Select(entry => map._letters[entry.Name])
+                    .OfType<char>());
+
+            foreach (var entry in Entries)
+            {
+                if (!explicitNames.Contains(entry.Name)
+                    && map._letters[entry.Name] is { } letter
+                    && claimed.Contains(letter))
+                {
+                    map._letters[entry.Name] = null;
+                }
             }
         }
 
@@ -350,6 +386,7 @@ public sealed class PasteKeyMap
         PasteAction.JumpToNewest => GestureKey.JumpToNewest,
         PasteAction.ToggleSearch => GestureKey.ToggleSearch,
         PasteAction.TogglePin => GestureKey.TogglePin,
+        PasteAction.ToggleJoinMark => GestureKey.ToggleJoinMark,
         PasteAction.PromoteToFront => GestureKey.PromoteToFront,
         PasteAction.CycleFormatter => GestureKey.CycleFormatter,
         PasteAction.CycleKindFilter => GestureKey.CycleKindFilter,
