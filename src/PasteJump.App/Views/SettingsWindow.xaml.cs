@@ -1912,9 +1912,11 @@ public partial class SettingsWindow : Window
         var filter = AdvancedFilterBox.Text;
 
         var rows = SettingsInspector.Describe(source, SelectedClipsLocation, SelectedSettingsLocation)
+            .Select(static r => r with { Where = TabFor(r.Key) })
             .Where(r => string.IsNullOrWhiteSpace(filter)
                 || r.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                || r.Value.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                || r.Value.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || r.Where.Contains(filter, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         AdvancedGrid.ItemsSource = rows;
@@ -1925,7 +1927,7 @@ public partial class SettingsWindow : Window
         // inventory count is always derivable from the grid itself.
         AdvancedStatus.Text = AdvancedStatusNote
             ?? $"{rows.Count} setting{(rows.Count == 1 ? string.Empty : "s")}, {modified} changed from default. "
-                + $"Values are read-only here - edit them on the other tabs, or in data\\{AppPaths.SettingsFileName} "
+                + $"Values are read-only here - change them on the tab named in Where, or in data\\{AppPaths.SettingsFileName} "
                 + $"while PasteJump is closed. Rows marked {DataLocationPointer.FileName} live in that file.";
 
         // One-shot: cleared as it is read, so the next filter keystroke or edit shows the inventory line again.
@@ -1939,6 +1941,95 @@ public partial class SettingsWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
     }
+
+    /// <summary>
+    /// Which tab holds the control for a setting, for the Advanced page's <b>Where</b> column.
+    /// <para>
+    /// The Advanced page lists every setting and can change none of them, so "edit it on the other tabs" left the
+    /// reader to find <em>which</em> of eight tabs among 43 rows. This answers that, and it is also what the filter
+    /// box searches - typing <c>appearance</c> lists everything that tab owns.
+    /// </para>
+    /// <para>
+    /// A hand-written table, which is normally the thing this codebase avoids. It cannot be derived: the mapping
+    /// from a property to its control is not a naming convention - <c>PasteSettleDelayMs</c> lives in
+    /// <c>PasteSettleDelayBox</c> and <c>HistoryPreviewMaxWidth</c> in <c>HistoryPreviewWidthBox</c> - and matching
+    /// on the prose labels would be worse. The drift a hand table invites is caught instead:
+    /// <c>VerifyEverySettingHasAControl</c> fails when a row has no entry here, so a new setting cannot be added
+    /// without one.
+    /// </para>
+    /// </summary>
+    private static readonly Dictionary<string, string> SettingTabs = new(StringComparer.Ordinal)
+    {
+        // Capture
+        [nameof(PasteJumpSettings.MonitorClipboard)] = "Capture",
+        [nameof(PasteJumpSettings.StoreImages)] = "Capture",
+        [nameof(PasteJumpSettings.AllowDuplicateClips)] = "Capture",
+        [nameof(PasteJumpSettings.LimitMaxClips)] = "Capture",
+        [nameof(PasteJumpSettings.MaxClips)] = "Capture",
+
+        // History
+        [nameof(PasteJumpSettings.RecordHistory)] = "History",
+        [nameof(PasteJumpSettings.HistoryRetentionDays)] = "History",
+        [nameof(PasteJumpSettings.PreviewMaxChars)] = "History",
+        [nameof(PasteJumpSettings.HistoryLoadLimit)] = "History",
+        [nameof(PasteJumpSettings.HistoryPreviewMaxWidth)] = "History",
+        [nameof(PasteJumpSettings.ClipJoinSeparator)] = "History",
+        [nameof(PasteJumpSettings.LegacyImportCompleted)] = "History",
+
+        // Paste Mode
+        [nameof(PasteJumpSettings.PreserveClipPosition)] = "Paste Mode",
+        [nameof(PasteJumpSettings.OpenSearchImmediately)] = "Paste Mode",
+        [nameof(PasteJumpSettings.ResetFormatterOnEntry)] = "Paste Mode",
+        [nameof(PasteJumpSettings.DefaultFormatterId)] = "Paste Mode",
+        [nameof(PasteJumpSettings.PasteKeystroke)] = "Paste Mode",
+        [nameof(PasteJumpSettings.WarnAboutClipboardManagerConflict)] = "Paste Mode",
+
+        // Keys
+        [nameof(PasteJumpSettings.PasteModeTriggerKey)] = "Keys",
+        [nameof(PasteJumpSettings.PasteModeKeys)] = "Keys",
+
+        // Excluded Apps
+        [nameof(PasteJumpSettings.IgnoredProcesses)] = "Excluded Apps",
+
+        // Appearance
+        [nameof(PasteJumpSettings.Theme)] = "Appearance",
+        [nameof(PasteJumpSettings.GridDensity)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayX)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayY)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayKeyHint)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowCopyNotification)] = "Appearance",
+        [nameof(PasteJumpSettings.CopyNotificationMs)] = "Appearance",
+        [nameof(PasteJumpSettings.BeepOnCopy)] = "Appearance",
+        [nameof(PasteJumpSettings.BeepFrequencyHz)] = "Appearance",
+        [nameof(PasteJumpSettings.BeepDurationMs)] = "Appearance",
+
+        // System
+        [nameof(PasteJumpSettings.RunAtLogon)] = "System",
+        [nameof(PasteJumpSettings.HistoryHotkey)] = "System",
+        [nameof(PasteJumpSettings.TrayLeftClick)] = "System",
+        [nameof(PasteJumpSettings.PasteSettleDelayMs)] = "System",
+        [nameof(PasteJumpSettings.PasteSettleDelayPerApp)] = "System",
+        [nameof(PasteJumpSettings.TextEditor)] = "System",
+        [nameof(PasteJumpSettings.ImageEditor)] = "System",
+
+        // The two data locations, which are not settings and live in their own file. Named by the tab that holds
+        // their controls all the same, since that is what the column is for.
+        ["ClipsLocation"] = "System",
+        ["SettingsLocation"] = "System",
+    };
+
+    /// <summary>
+    /// The tab that owns a setting, or empty when nothing has recorded one. Empty rather than a guess, so the
+    /// harness can tell the difference between "on the System tab" and "nobody said".
+    /// </summary>
+    private static string TabFor(string key)
+        => SettingTabs.TryGetValue(key, out var tab) ? tab : string.Empty;
+
+    /// <summary>Test hook: the tab recorded for each row, so the harness can insist every row has one.</summary>
+    public static string TabForSmokeTest(string key) => TabFor(key);
 
     private void OnAdvancedFilterChanged(object sender, TextChangedEventArgs e) => RefreshAdvanced();
 

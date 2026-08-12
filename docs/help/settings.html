@@ -318,11 +318,17 @@ safe either.</p>
 <p>Every setting with the value a fresh install would have. Changed rows are banded and carry a Reset button.</p>
 </div>
 
-<p>Every setting PasteJump has, with its current value and the value a fresh install would have. Rows that
-differ from their default are banded and marked, which is the first thing to check when behaviour is
-surprising. The filter box at the top matches on name or value.</p>
+<p>Every setting PasteJump has, with its current value and the value a fresh install would have &mdash; including
+the two data locations, which live in their own file and are labelled as such. Nothing is left out: if a setting
+exists, it is on this page. Rows that differ from their default are banded and marked, which is the first thing to
+check when behaviour is surprising.</p>
 
-<p>Values are read-only here &mdash; edit them on the other tabs, or in <code>PasteJump.json</code> while
+<p><b>Where</b> names the tab that holds the control for each setting, so the page that cannot change a value still
+tells you where to. The filter box matches on name, value <i>or</i> tab &mdash; so typing
+<code>appearance</code> lists everything that tab owns.</p>
+
+<p>Values are read-only here, deliberately: one place to edit each setting is what stops two editors disagreeing
+about what is valid. Change them on the tab named in <b>Where</b>, or in <code>PasteJump.json</code> while
 PasteJump is closed. Two things can be done from this page:</p>
 
 <ul>

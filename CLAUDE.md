@@ -606,7 +606,11 @@ that immediately caught two real bugs. Expect to do the same again.
   covered the moment it is added; only the few that cannot take arbitrary text are special-cased, and getting one of
   those wrong shows up as a false failure — `DefaultFormatterId` is `plain`, not `plaintext`, which the check caught.
   **41 settings, 0 lost.** Advanced stays read-only, deliberately: one place to edit each setting is what stops two
-  editors disagreeing.
+  editors disagreeing. It carries a **Where** column naming the tab that owns each setting, because a page that
+  lists 43 rows and can change none of them otherwise leaves the reader hunting through eight tabs; the filter box
+  searches it too. That mapping is the one hand-written table here - a property's control is not named after it
+  (`PasteSettleDelayMs` lives in `PasteSettleDelayBox`), so it cannot be derived - and the same harness check fails
+  when a row has no entry, which is what keeps it from drifting.
   The one thing this cannot catch is a setting **carried forward** from the baseline rather than read from a control,
   since the baseline is the object that was loaded. `LegacyImportCompleted` was the only one written that way — it
   now has a check box on History ("Ask about importing Clipjump history at start-up", inverted, because the stored

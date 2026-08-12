@@ -1050,7 +1050,7 @@
 
                             <DataGridTextColumn Header="Name"
                                                 Binding="{Binding Name}"
-                                                Width="1.4*"
+                                                Width="1.3*"
                                                 ElementStyle="{StaticResource CellText}" />
                             <DataGridTextColumn Header="Type"
                                                 Binding="{Binding TypeName}"
@@ -1062,7 +1062,17 @@
                                                 ElementStyle="{StaticResource ModifiedValueText}" />
                             <DataGridTextColumn Header="Default"
                                                 Binding="{Binding Default}"
-                                                Width="1.2*"
+                                                Width="1.05*"
+                                                ElementStyle="{StaticResource MutedValueText}" />
+
+                            <!--
+                                Where the control is. This page can change nothing, so without it "edit them on the
+                                other tabs" left the reader to find which of eight tabs, among 43 rows. Muted like
+                                the default column: it is a signpost, not a value.
+                            -->
+                            <DataGridTextColumn Header="Where"
+                                                Binding="{Binding Where}"
+                                                Width="1.15*"
                                                 ElementStyle="{StaticResource MutedValueText}" />
 
                             <!-- Per-setting reset. Nothing is written until OK or Apply, so this is a pending

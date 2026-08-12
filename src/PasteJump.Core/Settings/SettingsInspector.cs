@@ -22,7 +22,18 @@ public sealed record SettingRow(
     string Value,
     string Default,
     bool IsModified,
-    string Key);
+    string Key)
+{
+    /// <summary>
+    /// Which tab holds the control for this setting, for the page that cannot change it.
+    /// <para>
+    /// Filled in by the dialog rather than here, because it is a fact about that dialog's layout and
+    /// <c>Core</c> has no business knowing there are tabs at all. Empty until someone sets it - a row with no
+    /// answer is a setting whose control nobody has recorded, which the UI smoke harness treats as a failure.
+    /// </para>
+    /// </summary>
+    public string Where { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// Enumerates every setting with its current and default value.

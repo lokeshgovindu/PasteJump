@@ -610,6 +610,26 @@ internal static class Program
                 _failures++;
                 Console.WriteLine($"  FAIL  no working control for: {string.Join(", ", lost)}");
             }
+
+            // The Advanced page's Where column comes from a hand-written table - the one thing here that cannot be
+            // derived, since a property's control is not named after it. This is what stops the table drifting: a
+            // new setting with no entry says nothing in that column, and a signpost that is blank for some rows is
+            // worse than no signpost at all.
+            var unplaced = chosen.Keys
+                .Concat(["ClipsLocation", "SettingsLocation"])
+                .Where(static name => string.IsNullOrEmpty(SettingsWindow.TabForSmokeTest(name)))
+                .OrderBy(static name => name, StringComparer.Ordinal)
+                .ToList();
+
+            if (unplaced.Count > 0)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  no tab recorded for: {string.Join(", ", unplaced)}");
+            }
+            else
+            {
+                Console.WriteLine($"  advanced Where column: every row placed on a tab");
+            }
         }
         finally
         {
