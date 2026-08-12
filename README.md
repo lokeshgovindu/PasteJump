@@ -6,6 +6,8 @@
 -->
 <img src="src/PasteJump.App/Assets/pastejump-256.png" alt="PasteJump" width="112" align="right" />
 
+<!-- First because it is the only badge that reports something: the rest state facts that do not change. -->
+[![build](https://github.com/lokeshgovindu/PasteJump/actions/workflows/build.yml/badge.svg)](https://github.com/lokeshgovindu/PasteJump/actions/workflows/build.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#getting-started)
 [![Deployment](https://img.shields.io/badge/deployment-self--contained%20portable-success)](#run-it)

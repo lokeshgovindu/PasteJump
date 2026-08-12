@@ -1,0 +1,104 @@
+# Continuous integration: the checks that are cheap to run and easy to forget to run.
+#
+# It runs what the local flow runs - build, tests, the UI smoke harness - on a machine that has
+# nothing on it, and that last part is the whole point. A clean runner catches the file that only
+# builds here because it is still sitting in a working folder, the package that resolved out of a
+# local NuGet cache, and the tool that everyone assumed was part of the SDK.
+#
+# Releases are NOT built here. The note at the bottom of this file says why, so nobody spends an
+# afternoon rediscovering it.
+name: build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # So a run can be started by hand - useful when the thing being tested is this file.
+  workflow_dispatch:
+
+# A newer push makes an older run pointless before it finishes. Cancel it rather than reading two.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # WPF, and a third of the code is Win32. Nothing in this repository builds anywhere else.
+    runs-on: windows-latest
+
+    # A window that opens and never closes would otherwise hold a runner for the six-hour default.
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out, with the full history
+        uses: actions/checkout@v4
+        with:
+          # Not optional, and the failure is quiet rather than loud. The version's fourth part is the
+          # number of commits reachable from HEAD (ResolvePasteJumpRevision in Directory.Build.targets),
+          # so the default shallow clone would build 2026.1.0.1 - a version that goes backwards from
+          # everything already released.
+          fetch-depth: 0
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore PasteJump.slnx
+
+      - name: Report the version being built
+        # The same MSBuild target pack-release.ps1 uses, so a CI log and a release name cannot
+        # disagree about what a commit is called.
+        run: dotnet msbuild src/PasteJump.App/PasteJump.App.csproj -t:PrintPasteJumpVersion -nologo -v:m
+
+      - name: Build
+        # -warnaserror rather than a promise to read the log. The tree is at zero warnings today;
+        # this is the thing that keeps it there once someone else sends a pull request.
+        run: dotnet build PasteJump.slnx -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: dotnet test PasteJump.slnx -c Release --no-build
+
+      - name: UI smoke
+        # Opens every window for real, renders each one, and asserts the things no unit test can see:
+        # that each template still resolves, that every theme defines every palette key, that every
+        # setting has a control, that the F1 card lists every action that is bound.
+        #
+        # continue-on-error is deliberate and TEMPORARY. Whether a hosted runner's session can create
+        # WPF windows and render them is unverified - it works locally, and locally there is a desktop.
+        # Delete this line the first time the step passes, because a check that cannot fail is not a
+        # check. If it turns out it cannot pass here, move the step to a self-hosted runner instead of
+        # leaving it tolerated: a permanently yellow step is one nobody looks at.
+        continue-on-error: true
+        run: dotnet run --project tests/PasteJump.UiSmoke -c Release --no-build -- --shot artifacts/ci-shots
+
+      - name: Keep the screenshots
+        # Uploaded even after a failure, because a broken render is exactly the case where looking at
+        # the picture beats reading the log. They are also how a pull request that changes the UI can
+        # be reviewed without building it.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: window-shots
+          path: artifacts/ci-shots
+          if-no-files-found: warn
+
+# ---------------------------------------------------------------------------------------------------
+# Why there is no release job
+#
+# tools/pack-release.ps1 compiles the manual into PasteJump.chm, and that needs hhc.exe from HTML Help
+# Workshop - a deprecated download that is not on GitHub's Windows images and not installable from a
+# package manager in one line. Its fallback, packaging a previously built .chm, cannot help a runner
+# either: the .chm lives under artifacts/ and artifacts/ is not committed.
+#
+# So a tag-triggered release job would fail at step 3 of 5 today. Two ways to earn one, neither done:
+#
+#   - commit the built .chm, and have pack-release.ps1 prefer it when hhc.exe is absent; or
+#   - give pack-release.ps1 a documented switch that ships the ZIPs without the manual, and accept
+#     that a released ZIP would then differ from a locally built one.
+#
+# Until then releases are cut on a development machine, which is what has happened so far and what
+# the pre-release was built with.
+# ---------------------------------------------------------------------------------------------------
