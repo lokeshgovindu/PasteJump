@@ -43,9 +43,18 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 893 passing (`dotnet test`) - 841 in Core.Tests, 52 in Interop.Tests |
+| Tests | 893 in Debug (`dotnet test`) - 841 in Core.Tests, 52 in Interop.Tests; **891 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
+| CI | `.github/workflows/build.yml` — build, tests and the window renders on a clean `windows-latest` |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
+
+**The count differs by configuration, and that is the point rather than an oddity.** `StartupTrace.Mark` is
+`[Conditional("DEBUG")]`, and the attribute is honoured at the **call site** — including a call site in a test.
+So the four tests that record marks exist only under `#if DEBUG`, and Release compiles two different ones that
+assert the opposite: that nothing is recorded and that a null name cannot even throw, because the call is not
+there. Anything else in `Core` that gains a conditional method needs the same treatment. It passed locally for
+months because `dotnet test` defaults to Debug; **CI builds Release, because that is what ships**, and found it
+on its first run.
 
 A round of user testing found several real bugs — all fixed, all now covered by tests. They share one
 shape, and it is the thing to watch for here: **a plausible implementation of behaviour that was never
@@ -1201,7 +1210,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 893 tests
+dotnet test                                         # 893 tests (Debug)
+dotnet test -c Release                              # 891 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

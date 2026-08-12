@@ -31,8 +31,11 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # Action majors are the current ones deliberately: v4 of all three still targets Node 20, which the
+      # runners now force onto Node 24 and warn about on every single run. A warning nobody can act on is a
+      # warning everybody learns to scroll past.
       - name: Check out, with the full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Not optional, and the failure is quiet rather than loud. The version's fourth part is the
           # number of commits reachable from HEAD (ResolvePasteJumpRevision in Directory.Build.targets),
@@ -41,7 +44,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -79,7 +82,7 @@ jobs:
         # the picture beats reading the log. They are also how a pull request that changes the UI can
         # be reviewed without building it.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: window-shots
           path: artifacts/ci-shots
