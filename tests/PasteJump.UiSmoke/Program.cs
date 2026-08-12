@@ -286,6 +286,15 @@ internal static class Program
                 // user why most of their stack has gone, so a version of it that failed to render would be the
                 // one defect this feature could have.
                 Check("OverlayWindow-KindFilter", () => RenderOverlay(KindFilterFrame()));
+
+                // An image clip with an actual picture in it. The only case that renders the thumbnail branch, and it
+                // exists because that branch had never been drawn here: the picture was aligned left, which nobody
+                // could see. Deliberately narrower than the chips above it, since that is the case where the
+                // difference between left and centre shows.
+                Check("OverlayWindow-Image", () => RenderOverlay(
+                    ImageFrame(),
+                    imageBytes: SamplePng(),
+                    previewSize: (160, 120)));
                 Check("OverlayWindow-JoinMark", () => RenderOverlay(JoinMarkFrame()));
 
                 // The same frame with every cosmetic part switched off, which is the quietest overlay the settings
@@ -382,7 +391,22 @@ internal static class Program
     /// Which cosmetic parts to draw. Defaults to all of them, so every existing case renders what a fresh install
     /// shows; the minimal case passes the other extreme.
     /// </param>
-    private static OverlayWindow RenderOverlay(PasteOverlayModel frame, OverlayParts? parts = null)
+    /// <param name="imageBytes">
+    /// A decoded picture for an image clip. Until this existed no case rendered one at all - every frame was text, a
+    /// file, or an image clip with only its <c>[image]</c> placeholder - so the whole thumbnail branch of the overlay
+    /// went unseen, including the fact that the picture was aligned left rather than centred.
+    /// </param>
+    /// <param name="previewSize">
+    /// Caps the image preview, as the Appearance tab's setting does. The image case passes a small one deliberately:
+    /// the sample picture is 480px wide, which is wider than the header, so at full size the overlay sizes itself to
+    /// the picture and left, centre and right all look identical. A narrow picture is the only case where alignment is
+    /// visible at all.
+    /// </param>
+    private static OverlayWindow RenderOverlay(
+        PasteOverlayModel frame,
+        OverlayParts? parts = null,
+        byte[]? imageBytes = null,
+        (int Width, int Height)? previewSize = null)
     {
         var overlay = new OverlayWindow();
 
@@ -391,6 +415,12 @@ internal static class Program
             var chosen = parts ?? OverlayParts.All;
 
             overlay.ApplyParts(chosen);
+            overlay.SetImagePayload(imageBytes);
+
+            if (previewSize is { } size)
+            {
+                overlay.ApplyPreviewSize(size.Width, size.Height);
+            }
 
             // The hint is one of the parts, so it follows the same value rather than being hard-coded on - otherwise
             // the minimal case would render a "quietest possible" overlay with a row of key names along the bottom.
@@ -930,6 +960,28 @@ internal static class Program
         PopOnPaste = false,
         IsEmpty = false,
         KindFilter = PasteKindFilter.Images,
+        SourceExecutable = "SnippingTool.exe",
+    };
+
+    /// <summary>
+    /// An image clip. The preview text is the stored <c>[image]</c> placeholder, exactly as the real model carries it;
+    /// what makes a picture appear is the payload handed to <c>SetImagePayload</c>, not this.
+    /// </summary>
+    private static PasteOverlayModel ImageFrame() => new()
+    {
+        Position = 2,
+        Total = 41,
+        PreviewText = "[image]",
+        Kind = ClipKind.Image,
+        Pinned = false,
+        Tags = ["screenshot"],
+        FormatterName = "Original",
+        CommitMode = PasteCommitMode.Paste,
+        IsSearching = false,
+        MatchCount = 41,
+        PopOnPaste = false,
+        IsEmpty = false,
+        TotalBytes = 1_234_567,
         SourceExecutable = "SnippingTool.exe",
     };
 

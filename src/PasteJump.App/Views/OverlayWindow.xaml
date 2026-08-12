@@ -209,13 +209,19 @@
                            MaxHeight="400"
                            LineHeight="16" />
 
+                <!--
+                    Centred, not left-aligned. The overlay's width is set by whichever row is widest - the header with
+                    its chips, or the facts row underneath - so a picture narrower than those sat against the left edge
+                    with a gap beside it, which reads as a layout fault rather than as a small picture. Centring also
+                    suits the copied-image-file case, where the thumbnail sits under its path like a caption above it.
+                -->
                 <Image x:Name="PreviewImage"
                        Grid.Row="1"
                        MaxHeight="400"
                        MaxWidth="600"
                        Stretch="Uniform"
                        StretchDirection="DownOnly"
-                       HorizontalAlignment="Left"
+                       HorizontalAlignment="Center"
                        Visibility="Collapsed" />
 
                 <!--
