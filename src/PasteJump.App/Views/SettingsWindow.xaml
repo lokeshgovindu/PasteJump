@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PasteJump - Settings"
         Width="900"
-        Height="660"
+        Height="760"
         MinWidth="740"
-        MinHeight="500"
+        MinHeight="520"
         Background="{DynamicResource SurfaceBrush}"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display"
@@ -1030,9 +1030,16 @@
                                    IsHitTestVisible="False" />
                     </Grid>
 
+                    <!--
+                        Tighter rows than the history grid, and deliberately not following the density setting: this
+                        is an inventory of 43 rows to be scanned, not a list to be worked in, and at the shared row
+                        height only twelve of them fitted. 24px shows about half the list at the default window size
+                        and all of it maximised on a tall screen, which is what "see all the settings" needs.
+                    -->
                     <DataGrid x:Name="AdvancedGrid"
                               Grid.Row="1"
                               SelectionMode="Single"
+                              RowHeight="24"
                               EnableRowVirtualization="True"
                               VirtualizingPanel.IsVirtualizing="True"
                               VirtualizingPanel.VirtualizationMode="Recycling">
@@ -1048,13 +1055,19 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
+                            <!--
+                                Name gets the room, because it is the column anyone is reading: it is the key in
+                                PasteJump.json and what the filter matches. Type gives it up - "Boolean", "Integer"
+                                and "String" need almost none, and the enum rows that list their values were being
+                                truncated at any width worth giving them.
+                            -->
                             <DataGridTextColumn Header="Name"
                                                 Binding="{Binding Name}"
-                                                Width="1.3*"
+                                                Width="1.75*"
                                                 ElementStyle="{StaticResource CellText}" />
                             <DataGridTextColumn Header="Type"
                                                 Binding="{Binding TypeName}"
-                                                Width="1.1*"
+                                                Width="0.85*"
                                                 ElementStyle="{StaticResource CellText}" />
                             <DataGridTextColumn Header="Value"
                                                 Binding="{Binding Value}"
