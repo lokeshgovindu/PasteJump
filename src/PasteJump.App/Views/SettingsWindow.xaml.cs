@@ -172,6 +172,15 @@ public partial class SettingsWindow : Window
         // event fires for it.
         _excluded.CollectionChanged += (_, _) => RefreshApplyState();
 
+        // Live theme preview. Subscribed here rather than in XAML for the same reason as the handlers above: this
+        // runs after Load, so filling the combo does not itself fire a preview and repaint the application before
+        // the dialog is even on screen.
+        //
+        // A theme is the one setting whose effect cannot be judged from the dialog that sets it - every other
+        // control here describes something you go and look at afterwards, while this one changes the thing you are
+        // looking at. Applying on Apply only meant choosing blind.
+        ThemeCombo.SelectionChanged += OnThemeSelectionChanged;
+
         RefreshApplyState();
 
         // Focus lands in the search box, with the caret at the start. Typing is the fastest way to reach a
@@ -190,6 +199,35 @@ public partial class SettingsWindow : Window
     }
 
     private void OnAnyEdit(object sender, RoutedEventArgs e) => RefreshApplyState();
+
+    /// <summary>
+    /// Applies the highlighted theme at once, so it can be seen rather than imagined.
+    /// <para>
+    /// Nothing is saved: this is a preview, and Cancel or closing the window puts the previous theme back - the host
+    /// restores from the settings actually in force. Apply and OK make it permanent through the ordinary path, so
+    /// there is no second way for a theme to be persisted.
+    /// </para>
+    /// <para>
+    /// Cheap enough to do on every keyboard step through the combo: swapping the palette dictionary re-resolves the
+    /// <c>DynamicResource</c> references without rebuilding a single control template, which is the reason the
+    /// theming works this way at all.
+    /// </para>
+    /// </summary>
+    private void OnThemeSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ThemeCombo.SelectedIndex < 0 || ThemeCombo.SelectedIndex >= _themeNames.Count)
+        {
+            return;
+        }
+
+        ThemePreviewRequested?.Invoke(_themeNames[ThemeCombo.SelectedIndex]);
+    }
+
+    /// <summary>
+    /// Asks the host to apply a theme without saving it. Raised rather than applied here because the palette belongs
+    /// to the application, not to one window - the history window and the overlay have to follow it too.
+    /// </summary>
+    public event Action<string>? ThemePreviewRequested;
 
     /// <summary>
     /// Enables Apply only when something differs from what is currently in force.
@@ -308,11 +346,7 @@ public partial class SettingsWindow : Window
 
         // The only place a skipped theme file can be reported. The catalogue deliberately does not fail at start-up
         // over one, so without this a file with a typo in it would simply never appear and nothing would say why.
-        if (_themes is { Problems.Count: > 0 })
-        {
-            ThemeProblems.Text = "Some theme files were skipped - " + string.Join("; ", _themes.Problems);
-            ThemeProblems.Visibility = Visibility.Visible;
-        }
+        ShowThemeProblems();
 
         foreach (var choice in TrayLeftClickChoices)
         {
@@ -1443,6 +1477,112 @@ public partial class SettingsWindow : Window
 
         ThemeCreationRequested.Invoke($"{basedOnName} copy");
     }
+
+    /// <summary>
+    /// Opens the selected theme for editing, writing it out first when there is no file to open.
+    /// <para>
+    /// Three cases, and they differ in what "edit this" can honestly mean. A user theme has a file, so it is simply
+    /// opened. A shipped theme has none, so it is written out under <em>its own name</em> - the catalogue lets a user
+    /// file replace a shipped theme of the same name, which is exactly what editing one should do. Light, Dark and
+    /// "Same as Windows" cannot be edited in place at all: the parser refuses those names, and they are the bases
+    /// every other theme inherits from, so they are copied to a new name instead.
+    /// </para>
+    /// </summary>
+    private void OnEditThemeClicked(object sender, RoutedEventArgs e)
+    {
+        if (ThemeEditRequested is null || ThemeCombo.SelectedIndex < 0 || ThemeCombo.SelectedIndex >= _themeNames.Count)
+        {
+            return;
+        }
+
+        ThemeEditRequested.Invoke(_themeNames[ThemeCombo.SelectedIndex]);
+    }
+
+    private void OnReloadThemesClicked(object sender, RoutedEventArgs e) => ReloadThemes();
+
+    /// <summary>
+    /// Re-reads the themes folder from outside. For the host, after it has written a theme file on this dialog's
+    /// behalf - the new file has to appear in the list, or a second Edit would overwrite what was just typed into it.
+    /// </summary>
+    public void ReloadThemesForHost() => ReloadThemes();
+
+    /// <summary>
+    /// Re-reads the themes folder and rebuilds the list, keeping the selection.
+    /// <para>
+    /// The manual half of a live preview: an edit happens in a text editor, and nothing tells this dialog when the
+    /// file was saved. A <c>FileSystemWatcher</c> was the alternative and is worse - it fires while an editor is
+    /// still writing, so a theme would be read half-saved and reported as broken.
+    /// </para>
+    /// <para>
+    /// Selection is restored <em>by name</em> and the preview re-applied, so pressing Reload after an edit shows the
+    /// new colours. A theme whose file has gone falls back to the stored setting rather than to whatever now happens
+    /// to sit at the same index.
+    /// </para>
+    /// </summary>
+    private void ReloadThemes()
+    {
+        var wanted = ThemeCombo.SelectedIndex >= 0 && ThemeCombo.SelectedIndex < _themeNames.Count
+            ? _themeNames[ThemeCombo.SelectedIndex]
+            : _baseline.Theme;
+
+        _themes?.Refresh();
+
+        // Detached while the list is rebuilt: clearing the items fires SelectionChanged with -1 and then again on
+        // repopulation, which would preview twice and flash the window.
+        ThemeCombo.SelectionChanged -= OnThemeSelectionChanged;
+
+        _themeNames.Clear();
+        ThemeCombo.Items.Clear();
+
+        foreach (var choice in BuiltInThemeChoices)
+        {
+            _themeNames.Add(choice.Name);
+            ThemeCombo.Items.Add(choice.Label);
+        }
+
+        foreach (var theme in _themes?.Themes ?? [])
+        {
+            _themeNames.Add(theme.Name);
+            ThemeCombo.Items.Add(theme.Name);
+        }
+
+        var index = _themeNames.FindIndex(n => string.Equals(n, wanted, StringComparison.OrdinalIgnoreCase));
+
+        ThemeCombo.SelectedIndex = index >= 0
+            ? index
+            : _themeNames.FindIndex(n => string.Equals(n, ThemeNames.System, StringComparison.Ordinal));
+
+        ThemeCombo.SelectionChanged += OnThemeSelectionChanged;
+
+        ShowThemeProblems();
+
+        // Explicitly, because the handler was detached over the rebuild - and re-applying is the whole point of
+        // Reload: the file may now say something different under the same name.
+        if (ThemeCombo.SelectedIndex >= 0 && ThemeCombo.SelectedIndex < _themeNames.Count)
+        {
+            ThemePreviewRequested?.Invoke(_themeNames[ThemeCombo.SelectedIndex]);
+        }
+    }
+
+    /// <summary>
+    /// Shows why any theme file was skipped, or hides the line when none was. The only place this can be reported -
+    /// see <see cref="ThemeCatalog.Refresh"/>.
+    /// </summary>
+    private void ShowThemeProblems()
+    {
+        if (_themes is { Problems.Count: > 0 })
+        {
+            ThemeProblems.Text = "Some theme files were skipped - " + string.Join("; ", _themes.Problems);
+            ThemeProblems.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ThemeProblems.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>Asks the host to open a theme's file for editing, writing one out first if it has none.</summary>
+    public event Action<string>? ThemeEditRequested;
 
     private void OnOpenThemesFolderClicked(object sender, RoutedEventArgs e) => ThemesFolderRequested?.Invoke();
 

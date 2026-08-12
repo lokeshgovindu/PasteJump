@@ -768,9 +768,34 @@ that immediately caught two real bugs. Expect to do the same again.
   drifting apart**, and it checks both directions plus the resource *type* of every key: a key in one and not the
   other is either a theme setting that does nothing or a colour nobody can theme, and neither surfaces as an error.
   Verified by renaming one key in `Light.xaml`: exit 2, both halves named.
-- **The two shipped extras are theme *files*, not compiled dictionaries.** `BuiltInThemes` holds Midnight and
-  Sepia as JSON in the same format a user writes, so there is one code path rather than two and the format is kept
-  honest. Light and Dark stay as XAML because they are the **bases** — something has to define all 25 keys.
+- **The nine shipped extras are theme *files*, not compiled dictionaries.** `BuiltInThemes` holds Midnight, Sepia,
+  Solarized Dark/Light, Monokai, Nord, Dracula, Gruvbox Dark and Zenburn as JSON in the same format a user writes,
+  so there is one code path rather than two and the format is kept honest by being used. Light and Dark stay as XAML
+  because they are the **bases** — something has to define all 25 keys. Two things about that class:
+  - **`Sources` must be declared before `All`.** Static field initialisers run in declaration order, so with them
+    the other way round `Parse` read a null list and every theme vanished behind a `TypeInitializationException`.
+    Three tests caught it at once, which is the only reason it was not shipped.
+  - **The smoke harness applies and renders every one of them**, and checks each resolves to the base it declares.
+    A palette that parses can still be unreadable — text the colour of its background — and nothing but a rendered
+    window shows that; `basedOn` is easy to get wrong by copying another theme's file, and it decides the title bar.
+- **The theme applies live as you step through the combo, and Cancel puts it back.** A theme is the one setting
+  whose effect cannot be judged from the dialog that sets it, so applying on OK meant choosing blind. The revert is
+  driven by **comparing `ThemeManager.Requested` with the saved setting** on close rather than by tracking whether
+  the dialog was accepted: OK and Apply have already written the new name into settings, so the comparison is a
+  no-op for them and a revert for Cancel, Esc and the close button alike — one rule, no state to get out of step.
+  `ThemeCombo.SelectionChanged` is subscribed *after* `Load()`, so filling the combo does not itself fire a preview.
+- **Editing a theme means editing its file, and the three cases differ.** A user theme has a file, so *Edit* opens
+  it. A shipped theme has none, so it is written out **under its own name** — a user file replaces a shipped theme
+  of the same name, which is exactly what editing one should mean. Light, Dark and System cannot be edited in place
+  at all (the parser refuses those names, and they are the bases everything inherits from), so they are copied.
+  *Duplicate* never overwrites: `FreeName` numbers the **theme name**, not just the file, because two files
+  declaring one name is a clash the catalogue reports and skips — numbering the file alone would produce a theme
+  that silently vanished.
+- **Reload is a button, not a `FileSystemWatcher`.** An edit happens in a text editor and nothing tells the dialog
+  when the file was saved; a watcher fires while the editor is still writing, so the theme would be read half-saved
+  and reported as broken. Reload detaches `SelectionChanged` over the rebuild — clearing the items fires it with
+  −1 and again on repopulation, which would preview twice and flash the window — and restores the selection **by
+  name**, then re-applies it, because the file may now say something different under the same name.
 - **`Theme` is a name, not an enum, and that cost nothing on disk.** `AppTheme` is gone; the setting was already
   written through `JsonStringEnumConverter`, so an existing file saying `"Theme": "Dark"` reads unchanged. An
   *unknown* name is deliberately **not** corrected by `Normalise` — a theme file can be missing for a moment (an

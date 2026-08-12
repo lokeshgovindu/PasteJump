@@ -74,6 +74,16 @@ public sealed class ThemeManager : IDisposable
     public bool IsDark { get; private set; }
 
     /// <summary>
+    /// The name last handed to <see cref="Apply"/>, unresolved.
+    /// <para>
+    /// Exists so a live preview can be undone: the settings dialog applies a theme as the user steps through the
+    /// combo, and whoever closes that dialog needs to know whether what is on screen still matches the saved
+    /// setting. Comparing names rather than tracking a "previewing" flag means there is no state to get out of step.
+    /// </para>
+    /// </summary>
+    public string Requested => _requested;
+
+    /// <summary>
     /// The palette dictionary currently in force. Handed to <see cref="ThemeCatalog.WriteStartingPoint"/> so an
     /// exported theme starts from the colours on screen.
     /// </summary>

@@ -640,18 +640,34 @@
                             which would otherwise be invisible: the catalogue refuses to fail at start-up over a bad
                             file, so this dialog is the only place that can say anything about it.
                         -->
+                        <!--
+                            No access keys on any of these four, deliberately, exactly as the four Browse… buttons
+                            carry none. "Create a _Theme" collided with the Cap_ture tab header, and a tab header is
+                            loaded whatever tab you are on - so WPF would have moved focus between them instead of
+                            invoking, which is the "Alt+A does nothing" bug in a new place. Four buttons cannot have
+                            four sensible distinct letters left over, and an ambiguous one is worse than none.
+                        -->
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Button x:Name="EditThemeButton"
+                                    Click="OnEditThemeClicked"
+                                    Content="Edit…"
+                                    MinWidth="90"
+                                    ToolTip="Opens this theme's file in your text editor. A shipped theme is written out under its own name first, so editing it replaces it; Light, Dark and Same as Windows are copied to a new name instead." />
                             <Button x:Name="CreateThemeButton"
                                     Click="OnCreateThemeClicked"
-                                    Content="Create a _Theme from This One…"
-                                    MinWidth="210"
-                                    ToolTip="Writes the colours currently in force to a .json file you can edit, and opens the folder. Anything you delete from the file is inherited from the theme it is based on." />
+                                    Content="Duplicate…"
+                                    MinWidth="110"
+                                    ToolTip="Writes the colours currently in force to a new .json file under a copied name, and opens it. Anything you delete from the file is inherited from the theme it is based on." />
+                            <Button x:Name="ReloadThemesButton"
+                                    Click="OnReloadThemesClicked"
+                                    Content="Reload"
+                                    MinWidth="90"
+                                    ToolTip="Re-reads the themes folder and applies the selection again. Press this after saving an edit to see it." />
                             <Button x:Name="OpenThemesFolderButton"
                                     Click="OnOpenThemesFolderClicked"
-                                    Content="Themes _Folder"
-                                    Margin="8,0,0,0"
-                                    MinWidth="120"
-                                    ToolTip="Opens the folder PasteJump reads theme files from. Files appear in the list above when this dialog is next opened." />
+                                    Content="Folder"
+                                    MinWidth="90"
+                                    ToolTip="Opens the folder PasteJump reads theme files from." />
                         </StackPanel>
 
                         <TextBlock x:Name="ThemeProblems"
@@ -836,7 +852,7 @@
                             <Button Content="Add from ru_nning programs…"
                                     Click="OnAddPasteDelayClicked"
                                     ToolTip="Pick a program that currently has a window. It is added with the current global delay, which you can then edit." />
-                            <Button Content="Remo_ve"
+                            <Button Content="Re_move"
                                     Click="OnRemovePasteDelayClicked"
                                     ToolTip="Remove the selected rows, so those programs go back to the global delay." />
                         </StackPanel>

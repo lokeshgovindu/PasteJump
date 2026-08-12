@@ -37,6 +37,16 @@ public sealed class ThemeCatalog
     /// <summary>What went wrong in the last <see cref="Refresh"/>, one line per file. Empty when all was well.</summary>
     public IReadOnlyList<string> Problems => _problems;
 
+    /// <summary>
+    /// Where each theme was read from, by name. A shipped theme has no entry, which is how "edit this" knows whether
+    /// to open a file or to write one out first.
+    /// </summary>
+    private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The file a theme came from, or null for one that ships with the application.</summary>
+    public string? FileFor(string? name)
+        => name is not null && _files.TryGetValue(name, out var path) ? path : null;
+
     /// <summary>Where a user's own theme files live. Created on demand, never assumed to exist.</summary>
     public string Folder => Path.Combine(_paths.SettingsDirectory, "themes");
 
@@ -56,6 +66,7 @@ public sealed class ThemeCatalog
     public void Refresh()
     {
         _problems.Clear();
+        _files.Clear();
 
         var byName = new Dictionary<string, ThemeDefinition>(StringComparer.OrdinalIgnoreCase);
         var shipped = new List<ThemeDefinition>(BuiltInThemes.All);
@@ -111,6 +122,7 @@ public sealed class ThemeCatalog
                 }
 
                 byName[theme.Name] = theme;
+                _files[theme.Name] = file;
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -137,11 +149,21 @@ public sealed class ThemeCatalog
     /// that shows the whole surface is more useful than one that hides most of it.
     /// </para>
     /// </summary>
-    public string WriteStartingPoint(string name, bool dark, ResourceDictionary palette)
+    /// <param name="overwrite">
+    /// True when the file for this exact name is meant to be replaced - which is what editing a shipped theme does,
+    /// since a user file of the same name takes its place. False finds a free name instead, because a duplicate must
+    /// never silently destroy the file that was already there.
+    /// </param>
+    public string WriteStartingPoint(string name, bool dark, ResourceDictionary palette, bool overwrite = false)
     {
         ArgumentNullException.ThrowIfNull(palette);
 
         Directory.CreateDirectory(Folder);
+
+        if (!overwrite)
+        {
+            name = FreeName(name);
+        }
 
         var builder = new System.Text.StringBuilder();
 
@@ -172,15 +194,64 @@ public sealed class ThemeCatalog
         builder.AppendLine("    }");
         builder.AppendLine("}");
 
-        // A name that is not a legal file name is the user's, so it is sanitised rather than refused - they typed a
-        // theme name, not a path.
-        var fileName = string.Join("_", name.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
-        var path = Path.Combine(Folder, $"{(fileName.Length == 0 ? "Theme" : fileName)}.json");
+        var path = PathFor(name);
 
         File.WriteAllText(path, builder.ToString());
 
         return path;
     }
+
+    /// <summary>
+    /// The file a theme of this name would be written to.
+    /// <para>
+    /// A name that is not a legal file name is sanitised rather than refused - the user typed a theme name, not a
+    /// path. The name inside the file is what identifies the theme, so the two need not match exactly.
+    /// </para>
+    /// </summary>
+    public string PathFor(string name)
+    {
+        var fileName = string.Join("_", name.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+
+        return Path.Combine(Folder, $"{(fileName.Length == 0 ? "Theme" : fileName)}.json");
+    }
+
+    /// <summary>
+    /// A theme name nothing is using yet, by appending a number.
+    /// <para>
+    /// The <em>name</em> is numbered rather than only the file, and that is the point: two files declaring the same
+    /// name is a clash the catalogue reports and skips, so numbering the file alone would produce a theme that
+    /// vanished. Checked against both the loaded themes and the files on disk, since a file that failed to parse is
+    /// in neither list yet would still be overwritten.
+    /// </para>
+    /// </summary>
+    private string FreeName(string name)
+    {
+        // Truncated first, so appending a number cannot push the result past what the parser accepts.
+        var stem = name.Length > ThemeDefinition.MaxNameLength - 4
+            ? name[..(ThemeDefinition.MaxNameLength - 4)].TrimEnd()
+            : name;
+
+        if (!Taken(stem))
+        {
+            return stem;
+        }
+
+        for (var i = 2; i < 100; i++)
+        {
+            var candidate = $"{stem} {i}";
+
+            if (!Taken(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        // A hundred themes of one name is not a case worth handling further; overwriting the hundredth is fine.
+        return $"{stem} 100";
+    }
+
+    private bool Taken(string name)
+        => ThemeNames.IsBuiltIn(name) || Find(name) is not null || File.Exists(PathFor(name));
 
     /// <summary>
     /// One palette entry as a theme file would write it. Reads the live resource, so the exported file starts from

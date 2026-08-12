@@ -10,6 +10,7 @@ using PasteJump.Core.Model;
 using PasteJump.Core.Paste;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
+using PasteJump.Core.Theming;
 using PasteJump.Core.Storage;
 using PasteJump.Core.Updates;
 using PasteJump.Interop;
@@ -841,7 +842,23 @@ public partial class App : Application
             _settingsWindow.LegacyImportRequested += OnLegacyImportRequested;
             _settingsWindow.ThemeCreationRequested += OnThemeCreationRequested;
             _settingsWindow.ThemesFolderRequested += OnThemesFolderRequested;
-            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+
+            // Preview: applied, not saved. Nothing writes settings here.
+            _settingsWindow.ThemePreviewRequested += theme => _theme.Apply(theme);
+            _settingsWindow.ThemeEditRequested += OnThemeEditRequested;
+
+            _settingsWindow.Closed += (_, _) =>
+            {
+                _settingsWindow = null;
+
+                // Undo a preview. Comparing against the saved setting rather than tracking whether the dialog was
+                // accepted: OK and Apply have already written the new theme into _settings, so this is a no-op for
+                // them and a revert for Cancel, Esc and the close button alike. One rule, no state to get wrong.
+                if (!string.Equals(_theme.Requested, _settings.Theme, StringComparison.OrdinalIgnoreCase))
+                {
+                    _theme.Apply(_settings.Theme);
+                }
+            };
             _settingsWindow.Show();
         }
         else
@@ -877,6 +894,71 @@ public partial class App : Application
                 $"The theme file could not be written to {_themes.Folder}.\n\n{exception.Message}",
                 "Could not create the theme",
                 _settingsWindow);
+        }
+    }
+
+    /// <summary>
+    /// Opens a theme's file in the user's text editor, writing it out first when it has none.
+    /// <para>
+    /// The editor is the one from settings - the same program the clip editor uses - rather than a hard-coded
+    /// Notepad, and the file is opened through the shell if that fails, so a machine whose .json files are
+    /// associated with something better still gets it.
+    /// </para>
+    /// </summary>
+    private void OnThemeEditRequested(string name)
+    {
+        try
+        {
+            var existing = _themes.FileFor(name);
+
+            if (existing is null)
+            {
+                // No file: either a shipped theme, written out under its own name so editing it replaces it, or one
+                // of the three built-in names, which the parser refuses - those become a copy instead.
+                var reserved = ThemeNames.IsBuiltIn(name);
+
+                existing = _themes.WriteStartingPoint(
+                    reserved ? $"{name} copy" : name,
+                    _theme.IsDark,
+                    _theme.CurrentPalette,
+                    overwrite: !reserved);
+
+                // Re-read so the new file is in the catalogue, and the dialog's list with it - otherwise a second
+                // Edit would write the file again and discard whatever had just been typed into it.
+                _settingsWindow?.ReloadThemesForHost();
+            }
+
+            OpenInTextEditor(existing);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            MessageDialog.Warn(
+                $"The theme file could not be opened.\n\n{exception.Message}",
+                "Could not edit the theme",
+                _settingsWindow);
+        }
+    }
+
+    /// <summary>
+    /// Opens a file in the configured text editor, falling back to whatever the shell associates with it.
+    /// <para>
+    /// The fallback matters more here than for a clip: a <c>.json</c> file is very often associated with a proper
+    /// editor, while <c>TextEditor</c> defaults to Notepad - which is a poor place to edit JSON but the only thing
+    /// guaranteed to exist.
+    /// </para>
+    /// </summary>
+    private void OpenInTextEditor(string path)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_settings.TextEditor, $"\"{path}\"")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
         }
     }
 

@@ -323,7 +323,7 @@ public class ThemeDefinitionTests
 
         // Exactly one gradient and one bare Color today. Asserted so that adding another forces a look at
         // everything that special-cases them - the theme parser, the dictionary builder and the sample file.
-        Assert.Single(PaletteKeys.All.Where(static k => k.Kind == PaletteEntryKind.Gradient));
-        Assert.Single(PaletteKeys.All.Where(static k => k.Kind == PaletteEntryKind.Color));
+        Assert.Single(PaletteKeys.All, static k => k.Kind == PaletteEntryKind.Gradient);
+        Assert.Single(PaletteKeys.All, static k => k.Kind == PaletteEntryKind.Color);
     }
 }

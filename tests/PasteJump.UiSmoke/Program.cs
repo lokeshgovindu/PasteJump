@@ -309,28 +309,41 @@ internal static class Program
             // switch happened.
             using (var manager = new ThemeManager(app, new ThemeCatalog(paths)))
             {
-                manager.Apply("Sepia");
-                _theme = "Sepia";
-
-                Check("HistoryWindow-CustomTheme", () =>
+                // Every shipped theme, rendered. A palette that parses can still be unreadable - text the same
+                // colour as its background, a selection that hides what it selects - and nothing but a rendered
+                // window shows that. It also checks each one resolves to the base it declares, since basedOn is
+                // what decides the title bar and is easy to get wrong by copying another theme's file.
+                foreach (var theme in BuiltInThemes.All)
                 {
-                    var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
+                    manager.Apply(theme.Name);
+                    _theme = theme.Name.Replace(" ", string.Empty);
 
-                    window.Loaded += (_, _) => window.SelectRowForSmokeTest(2);
-                    return window;
-                });
+                    Check($"HistoryWindow-{_theme}", () =>
+                    {
+                        var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
+
+                        window.Loaded += (_, _) => window.SelectRowForSmokeTest(2);
+                        return window;
+                    });
+
+                    var expectedDark = theme.BasedOn == ThemeBase.Dark;
+
+                    if (manager.IsDark != expectedDark)
+                    {
+                        _failures++;
+                        Console.WriteLine($"  FAIL  {theme.Name} declares basedOn {theme.BasedOn} but resolved as {(manager.IsDark ? "dark" : "light")}");
+                    }
+                }
+
+                // One settings dialog under a custom theme as well: it holds far more control types than the
+                // history window - tabs, a grid, radio buttons, a list box - so a palette key that reads badly is
+                // most likely to show up there.
+                manager.Apply("Solarized Dark");
+                _theme = "SolarizedDark";
 
                 Check("SettingsWindow-CustomTheme", () => new SettingsWindow(settings, formatters, DataLocation.UserProfile));
 
-                if (!manager.IsDark)
-                {
-                    Console.WriteLine("  custom theme: Sepia applied, light-based as declared");
-                }
-                else
-                {
-                    _failures++;
-                    Console.WriteLine("  FAIL  Sepia declares basedOn light but resolved as dark");
-                }
+                Console.WriteLine($"  themes: {BuiltInThemes.All.Count} shipped, each applied and rendered");
             }
         }
 
