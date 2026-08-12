@@ -84,6 +84,19 @@ $wanted = [ordered]@{
     'ToastWindow'               = 'toast.png'
 }
 
+# Shots that carry a theme's own name as their prefix rather than "Light-", because the harness renders each shipped
+# theme in turn and labels the file with it. Kept in a second table because the prefix is part of the name here, and
+# folding that into $wanted above would mean every entry carrying a prefix it does not need.
+#
+# For the website's theme gallery. Regenerated with everything else, so the gallery cannot drift from the product -
+# which a screenshot dropped into a site folder by hand certainly would.
+$wantedThemed = [ordered]@{
+    'Monokai-HistoryWindow-Monokai'                 = 'theme-monokai.png'
+    'CatppuccinMocha-HistoryWindow-CatppuccinMocha' = 'theme-catppuccin-mocha.png'
+    'GitHubLight-HistoryWindow-GitHubLight'         = 'theme-github-light.png'
+    'Sepia-HistoryWindow-Sepia'                     = 'theme-sepia.png'
+}
+
 $capture = Join-Path ([System.IO.Path]::GetTempPath()) ("pastejump-help-shots-" + [guid]::NewGuid().ToString('n'))
 New-Item -ItemType Directory -Force -Path $capture | Out-Null
 
@@ -117,7 +130,30 @@ foreach ($entry in $wanted.GetEnumerator()) {
     $copied++
 }
 
+foreach ($entry in $wantedThemed.GetEnumerator()) {
+    # No "Light-" prefix: these names already carry the theme they were rendered under.
+    $source = Join-Path $capture ($entry.Key + ".png")
+
+    if (-not (Test-Path $source)) {
+        $missing += $entry.Key
+        continue
+    }
+
+    Copy-Item -Path $source -Destination (Join-Path $imageDirectory $entry.Value) -Force
+    $copied++
+}
+
 Write-Host "Copied $copied image(s) to $imageDirectory"
+
+# The application mark, for the website's hero and its favicon. Copied rather than referenced across folders because
+# GitHub Pages serves docs/ and nothing above it - a relative path up into src/ would 404 on the published site while
+# working perfectly on this machine, which is the worst way for a link to break.
+$mark = Join-Path $repoRoot 'src\PasteJump.App\Assets\pastejump-256.png'
+
+if (Test-Path $mark) {
+    Copy-Item -Path $mark -Destination (Join-Path $repoRoot 'docs\pastejump-256.png') -Force
+    Write-Host "Copied the application mark to docs\ for the website"
+}
 
 # Reported rather than ignored: a shot that stopped being produced means the help now references an image
 # that is either stale or absent, and hhc.exe will not tell you which.

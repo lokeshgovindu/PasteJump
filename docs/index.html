@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<!--
+    The project's website, served by GitHub Pages from this folder (Settings, Pages, master /docs).
+
+    Hand-written and self-contained on purpose: no Jekyll theme, no CDN, no web fonts, no JavaScript. A page about a
+    clipboard manager - a program people are right to be careful about - should not be asking three other servers for
+    permission to render. .nojekyll beside this file stops Pages processing it and serves these bytes as they are.
+
+    Every screenshot comes from help/images, which tools/update-help-images.ps1 regenerates from the UI smoke harness.
+    That is deliberate: the pictures on this page cannot drift from the product, because nobody takes them by hand.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PasteJump — a jog wheel for your clipboard</title>
+<meta name="description" content="A keyboard-driven multiple-clipboard manager for Windows. Hold Ctrl, tap V to walk back through everything you have copied, release to paste. Free, open source, portable.">
+<link rel="icon" href="pastejump-256.png" type="image/png">
+
+<meta property="og:title" content="PasteJump">
+<meta property="og:description" content="Hold Ctrl, tap V to walk back through everything you have copied, release to paste. No window, no mouse.">
+<meta property="og:image" content="https://lokeshgovindu.github.io/PasteJump/pastejump-256.png">
+<meta property="og:url" content="https://lokeshgovindu.github.io/PasteJump/">
+<meta name="twitter:card" content="summary">
+
+<style>
+/*
+    One palette, defined as tokens and swapped by prefers-color-scheme - the same approach the application takes, and
+    for the same reason: every colour named once means a theme change cannot leave one control behind.
+*/
+:root {
+    --bg: #f7f7f9;
+    --surface: #ffffff;
+    --border: #d9d9e0;
+    --text: #1b1b20;
+    --muted: #6b6b77;
+    --accent: #2563eb;
+    --accent-text: #fbfbfe;
+    --code-bg: #f0f0f4;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 8px 24px rgba(0, 0, 0, .06);
+    --hero-bg: linear-gradient(165deg, #1b1f2e 0%, #232a44 55%, #2a2050 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #17171b;
+        --surface: #1e1e24;
+        --border: #33333d;
+        --text: #e8e8ee;
+        --muted: #9a9aa8;
+        --accent: #7c9cff;
+        --accent-text: #14141a;
+        --code-bg: #24242c;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+    }
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 -apple-system, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, kbd {
+    font-family: "Cascadia Mono", Consolas, ui-monospace, monospace;
+    font-size: .9em;
+}
+
+kbd {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: .1em .4em;
+    white-space: nowrap;
+}
+
+.wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+
+/* ---------------------------------------------------------------- hero */
+
+header {
+    background: var(--hero-bg);
+    color: #eef0ff;
+    padding: 72px 0 64px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+}
+
+header img.mark { width: 96px; height: 96px; }
+
+h1 {
+    font-size: clamp(2.4rem, 6vw, 3.4rem);
+    margin: 18px 0 6px;
+    letter-spacing: -.02em;
+}
+
+.tagline { font-size: clamp(1.05rem, 2.6vw, 1.3rem); color: #c3c8e8; margin: 0 auto 6px; max-width: 40ch; }
+.subtle { color: #9aa0c8; font-size: .95rem; margin-top: 18px; }
+
+.gesture {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 26px 0 6px;
+    font-size: 1.05rem;
+    color: #dfe3ff;
+}
+
+.gesture kbd { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .25); color: #fff; }
+
+.buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+
+.button {
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.button.primary { background: var(--accent); color: var(--accent-text); }
+.button.primary:hover { filter: brightness(1.1); text-decoration: none; }
+.button.ghost { border-color: rgba(255, 255, 255, .35); color: #eef0ff; }
+.button.ghost:hover { background: rgba(255, 255, 255, .1); text-decoration: none; }
+
+/* ---------------------------------------------------------------- sections */
+
+section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+section:last-of-type { border-bottom: 0; }
+
+h2 { font-size: 1.9rem; margin: 0 0 8px; letter-spacing: -.01em; }
+h3 { font-size: 1.1rem; margin: 0 0 6px; }
+.lede { color: var(--muted); margin: 0 0 32px; max-width: 62ch; }
+
+figure { margin: 0; }
+
+figure img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    background: var(--surface);
+}
+
+figcaption { color: var(--muted); font-size: .9rem; margin-top: 10px; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.card p { color: var(--muted); margin: 0; font-size: .95rem; }
+
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+td.name { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; font-size: .85rem; white-space: nowrap; }
+
+.scroller { overflow-x: auto; }
+
+pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: .88rem;
+    line-height: 1.5;
+}
+
+footer { padding: 40px 0 56px; color: var(--muted); font-size: .9rem; text-align: center; }
+footer a { color: var(--muted); text-decoration: underline; }
+
+.note {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-top: 28px;
+    font-size: .95rem;
+}
+
+@media (max-width: 760px) {
+    .split { grid-template-columns: 1fr; gap: 28px; }
+    section { padding: 48px 0; }
+}
+</style>
+</head>
+<body>
+
+<header>
+    <div class="wrap">
+        <img class="mark" src="pastejump-256.png" alt="">
+        <h1>PasteJump</h1>
+        <p class="tagline">A jog wheel for your clipboard.</p>
+
+        <p class="gesture">
+            <kbd>Ctrl</kbd> held <span>&rarr;</span> tap <kbd>V</kbd> to walk back <span>&rarr;</span> release to paste
+        </p>
+
+        <div class="buttons">
+            <a class="button primary" href="https://github.com/lokeshgovindu/PasteJump/releases">Download</a>
+            <a class="button ghost" href="help/overview.html">Read the manual</a>
+            <a class="button ghost" href="https://github.com/lokeshgovindu/PasteJump">Source on GitHub</a>
+        </div>
+
+        <p class="subtle">Windows 10 / 11, 64-bit &middot; free and open source, MIT &middot; portable, nothing to install</p>
+    </div>
+</header>
+
+<section>
+    <div class="wrap split">
+        <div>
+            <h2>No window. No mouse.</h2>
+            <p class="lede">
+                Every clipboard manager can show you a list. The point of this one is that you never have to look at
+                it: hold <kbd>Ctrl</kbd>, tap <kbd>V</kbd> until the clip you want appears beside the caret, and let go.
+                Your hand never leaves the keyboard and nothing steals focus.
+            </p>
+            <p class="lede">
+                The overlay is there so you <em>can</em> look, not because you must. Once the gesture is in your
+                fingers you will stop reading it &mdash; and then you can turn most of it off.
+            </p>
+        </div>
+        <figure>
+            <img src="help/images/overlay.png" alt="The paste overlay, showing clip 3 of 41 with its tags and source application">
+            <figcaption>Clip 3 of 41, with its tags, the application it came from, and the paste format.</figcaption>
+        </figure>
+    </div>
+</section>
+
+<section>
+    <div class="wrap">
+        <h2>What it does</h2>
+        <p class="lede">A reimplementation of Clipjump's gesture in .NET 10 and WPF, with the parts that were missing.</p>
+
+        <div class="cards">
+            <div class="card">
+                <h3>Two stores, kept apart</h3>
+                <p>
+                    A stack of clips the gesture pastes from, holding every clipboard format, and a searchable history
+                    archive that keeps a flattened record. Cleared separately, bounded separately.
+                </p>
+            </div>
+            <div class="card">
+                <h3>Join clips into one paste</h3>
+                <p>
+                    Press <kbd>J</kbd> on each clip you want, release, and they arrive as a single paste &mdash;
+                    separator of your choosing. Or select rows in the history window and press Copy.
+                </p>
+            </div>
+            <div class="card">
+                <h3>Paste formats</h3>
+                <p>
+                    <kbd>Z</kbd> cycles Original, Plain text, Collapse whitespace, Sentence case and Unindent, so the
+                    thing you paste is the thing you wanted rather than what the web page was wearing.
+                </p>
+            </div>
+            <div class="card">
+                <h3>Search without leaving the gesture</h3>
+                <p>
+                    <kbd>F</kbd> opens an incremental search over content and tags, full-text over the archive. You can
+                    release <kbd>Ctrl</kbd> and simply type.
+                </p>
+            </div>
+            <div class="card">
+                <h3>Pin, tag, filter</h3>
+                <p>
+                    Pinned clips sort first and survive Delete All. <kbd>K</kbd> narrows the stack to text, images or
+                    files only when you know what you are hunting for.
+                </p>
+            </div>
+            <div class="card">
+                <h3>Yours to rebind</h3>
+                <p>
+                    Every letter can be moved or switched off. The arrows, <kbd>Home</kbd>, <kbd>End</kbd>,
+                    <kbd>Delete</kbd>, <kbd>Esc</kbd> and <kbd>F1</kbd> never move, so no set of bindings can leave you
+                    stuck.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="wrap split">
+        <figure>
+            <img src="help/images/history-window.png" alt="The history window, showing the searchable archive with a preview pane">
+            <figcaption>The archive: search, preview, copy back, remove duplicates.</figcaption>
+        </figure>
+        <div>
+            <h2>And a window, when you want one</h2>
+            <p class="lede">
+                Full-text search across everything you have copied, with a preview pane that renders images and reads
+                the first lines of a copied text file. Select several rows and Copy joins them into one clip.
+            </p>
+            <p class="lede">
+                Reachable from the tray, from <kbd>H</kbd> during the gesture, or from a global hotkey if you set one.
+            </p>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="wrap">
+        <h2>Nineteen themes, or write your own</h2>
+        <p class="lede">
+            Light, Dark, Same&nbsp;as&nbsp;Windows, and seventeen more &mdash; applied as you step through the list, so
+            you can see one rather than imagine it. A theme is a small JSON file of named colours that inherits
+            everything it does not set, so a three-line file is a valid theme.
+        </p>
+
+        <div class="gallery">
+            <figure>
+                <img src="help/images/theme-catppuccin-mocha.png" alt="PasteJump under the Catppuccin Mocha theme">
+                <figcaption>Catppuccin Mocha</figcaption>
+            </figure>
+            <figure>
+                <img src="help/images/theme-monokai.png" alt="PasteJump under the Monokai theme">
+                <figcaption>Monokai</figcaption>
+            </figure>
+            <figure>
+                <img src="help/images/theme-sepia.png" alt="PasteJump under the Sepia theme">
+                <figcaption>Sepia</figcaption>
+            </figure>
+            <figure>
+                <img src="help/images/theme-github-light.png" alt="PasteJump under the GitHub Light theme">
+                <figcaption>GitHub Light</figcaption>
+            </figure>
+        </div>
+
+        <p class="lede" style="margin-top: 28px;">
+            Also shipped: Solarized Dark and Light, Tokyo Night, One Dark, Nord, Dracula, Rose Pine, Everforest Dark,
+            Kanagawa, Gruvbox Dark, Zenburn, Midnight and Catppuccin Latte.
+            <a href="help/themes.html">How to write one.</a>
+        </p>
+    </div>
+</section>
+
+<section>
+    <div class="wrap">
+        <h2>Download</h2>
+        <p class="lede">
+            Three shapes of the same build. Take the first one unless you have a reason not to.
+        </p>
+
+        <div class="scroller">
+            <table>
+                <tr>
+                    <th>File</th>
+                    <th>What is in it</th>
+                    <th>Size</th>
+                    <th>Needs</th>
+                </tr>
+                <tr>
+                    <td class="name">…-win-x64.zip</td>
+                    <td>One <code>PasteJump.exe</code>. Portable &mdash; put it on a USB stick and its data goes with it.</td>
+                    <td>60&nbsp;MB</td>
+                    <td>Nothing</td>
+                </tr>
+                <tr>
+                    <td class="name">…-win-x64-unpacked.zip</td>
+                    <td>The same build with the runtime already unpacked, 257 files. Starts about four times faster.</td>
+                    <td>59&nbsp;MB</td>
+                    <td>Nothing</td>
+                </tr>
+                <tr>
+                    <td class="name">…-win-x64-net10.zip</td>
+                    <td>PasteJump's own files only, 15 of them.</td>
+                    <td>2.6&nbsp;MB</td>
+                    <td>.NET 10 Desktop Runtime</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="note">
+            <p style="margin: 0;">
+                <strong>Windows will warn you on first run.</strong> The download is not signed with a paid
+                certificate, so SmartScreen reports an unknown publisher &mdash; choose <em>More info</em> and
+                <em>Run anyway</em>. Every release carries a SHA256 so you can check you got what was published, and
+                the whole source is here to read.
+            </p>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="wrap split">
+        <div>
+            <h2>Build it yourself</h2>
+            <p class="lede">
+                .NET 10 SDK, Windows, and one command. The tests and the UI smoke harness run on the same machine.
+            </p>
+<pre>git clone https://github.com/lokeshgovindu/PasteJump
+cd PasteJump
+dotnet build
+dotnet test
+dotnet run --project src/PasteJump.App</pre>
+            <p class="lede" style="margin-top: 20px;">
+                <a href="https://github.com/lokeshgovindu/PasteJump/blob/master/README.md">The README</a> covers the
+                release packaging, the data locations and how to coexist with another clipboard manager.
+            </p>
+        </div>
+        <div>
+            <h2>Privacy, plainly</h2>
+            <p class="lede">
+                It is a clipboard manager, so it sees what you copy. Everything stays in a SQLite database on your own
+                machine. There is no telemetry, no account, no network call except an optional check for a new release
+                on GitHub.
+            </p>
+            <p class="lede">
+                Password managers are excluded by default, and you can add any program to that list &mdash; while it is
+                in the foreground, nothing is recorded at all.
+            </p>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="wrap">
+        <p>
+            <a href="https://github.com/lokeshgovindu/PasteJump">GitHub</a> &middot;
+            <a href="https://github.com/lokeshgovindu/PasteJump/releases">Releases</a> &middot;
+            <a href="help/overview.html">Manual</a> &middot;
+            <a href="https://github.com/lokeshgovindu/PasteJump/issues">Report a problem</a>
+        </p>
+        <p>
+            MIT licensed &middot; &copy; 2026 <a href="https://github.com/lokeshgovindu">Lokesh Govindu</a><br>
+            Screenshots on this page are generated from the application itself, not taken by hand.
+        </p>
+    </div>
+</footer>
+
+</body>
+</html>
