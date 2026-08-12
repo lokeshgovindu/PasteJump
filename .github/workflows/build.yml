@@ -69,12 +69,12 @@ jobs:
         # that each template still resolves, that every theme defines every palette key, that every
         # setting has a control, that the F1 card lists every action that is bound.
         #
-        # continue-on-error is deliberate and TEMPORARY. Whether a hosted runner's session can create
-        # WPF windows and render them is unverified - it works locally, and locally there is a desktop.
-        # Delete this line the first time the step passes, because a check that cannot fail is not a
-        # check. If it turns out it cannot pass here, move the step to a self-hosted runner instead of
-        # leaving it tolerated: a permanently yellow step is one nobody looks at.
-        continue-on-error: true
+        # This was tolerated with continue-on-error for exactly one run, because whether a hosted
+        # runner's session could create WPF windows and render them was unverified. It can: run
+        # 31614138027 opened every window, applied and rendered all seventeen themes, and checked the
+        # palette contract, the tray icon frames and the settings round trip - the same output as a
+        # local run, in 2m25s for the whole job. So the step is required, because a check that cannot
+        # fail is not a check.
         run: dotnet run --project tests/PasteJump.UiSmoke -c Release --no-build -- --shot artifacts/ci-shots
 
       - name: Keep the screenshots
