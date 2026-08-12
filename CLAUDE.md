@@ -1033,6 +1033,12 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   because a live exe is held open and a stale exe beside new DLLs fails at load with nothing useful in the
   message; and it **checks the published version against MSBuild's**, which catches a publish made before the
   last commit — easy to do by accident now that the revision is the commit count.
+- **Releases ship UNSIGNED, permanently, and that is a settled decision (2026-08-12).** Free open-source signing
+  through SignPath was pursued for AltTab and abandoned — too much asked for, approval unlikely — so do not raise it,
+  or self-signing, or a paid certificate, unless the user asks about signing first. The consequence is that SmartScreen
+  names an unknown publisher on a first run; the answer is to **say so plainly and publish SHA256 hashes**, which the
+  release notes and the website both do. `pack-release.ps1` keeps `-SignThumbprint` and `-SignAzureMetadata` for the
+  day that changes, and has no `-SelfSigned` switch on purpose.
 - **A signature can be had locally, and it is worth exactly what it costs.** `tools/sign-local.ps1` creates a
   self-signed code-signing certificate in `CurrentUser\My` (reused after the first run, found by subject
   since the thumbprint changes whenever it is regenerated) and signs the deployed build. That is enough to
