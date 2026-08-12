@@ -37,6 +37,18 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
+    /// Which cosmetic parts to draw. Everything on until told otherwise, so a host that never calls
+    /// <see cref="ApplyParts"/> behaves exactly as this window always did.
+    /// </summary>
+    private OverlayParts _parts = OverlayParts.All;
+
+    /// <summary>
+    /// Sets which parts of the overlay are drawn. Applied on the next <see cref="Render"/>, which happens on every
+    /// tap of the trigger key - so a change made in Settings while a session is somehow open still lands.
+    /// </summary>
+    public void ApplyParts(OverlayParts parts) => _parts = parts;
+
+    /// <summary>
     /// Sets the key hint, or hides it.
     /// <para>
     /// Built as coloured runs rather than one string: the keys are accented and the words beside them are ordinary
@@ -124,9 +136,17 @@ public partial class OverlayWindow : Window
             ? "No matching clips"
             : $"Clip {model.Position} of {model.Total}";
 
-        FormatterChip.Text = model.FormatterName;
+        // "No matching clips" survives the position being switched off. It is the only thing on screen when a search
+        // matches nothing, so hiding it would leave an empty box reading as a broken overlay rather than as a search
+        // with no hits.
+        PositionText.Visibility = _parts.Position || model.IsEmpty
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
-        PinnedChip.Visibility = model.Pinned ? Visibility.Visible : Visibility.Collapsed;
+        FormatterChip.Text = model.FormatterName;
+        FormatterChip.Visibility = _parts.Formatter ? Visibility.Visible : Visibility.Collapsed;
+
+        PinnedChip.Visibility = model.Pinned && _parts.Pinned ? Visibility.Visible : Visibility.Collapsed;
         PopChip.Visibility = model.PopOnPaste ? Visibility.Visible : Visibility.Collapsed;
 
         // Describe() returns null for "all", which is the state that needs no chip.
@@ -155,7 +175,7 @@ public partial class OverlayWindow : Window
             JoinChip.Visibility = Visibility.Collapsed;
         }
 
-        if (model.Tags.Count > 0)
+        if (model.Tags.Count > 0 && _parts.Tags)
         {
             TagsChip.Text = "#" + string.Join(" #", model.Tags);
             TagsChip.Visibility = Visibility.Visible;
@@ -165,7 +185,7 @@ public partial class OverlayWindow : Window
             TagsChip.Visibility = Visibility.Collapsed;
         }
 
-        if (!string.IsNullOrEmpty(model.SourceExecutable))
+        if (!string.IsNullOrEmpty(model.SourceExecutable) && _parts.Source)
         {
             SourceChip.Text = model.SourceExecutable;
             SourceChip.Visibility = Visibility.Visible;
@@ -325,11 +345,23 @@ public partial class OverlayWindow : Window
         ImageFacts.Visibility = Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// Fills the row under the preview, honouring the two switches that govern its halves.
+    /// <para>
+    /// The row disappears when neither half has anything to say, rather than remaining as an empty strip of padding.
+    /// Each half is cleared as well as hidden, so a stale value cannot reappear if the other is switched back on
+    /// while an overlay is up.
+    /// </para>
+    /// </summary>
     private void ShowImageFacts(string dimensions, string? bytes)
     {
-        ImageDimensions.Text = dimensions;
-        ImageBytes.Text = bytes ?? string.Empty;
-        ImageFacts.Visibility = Visibility.Visible;
+        var showDetails = _parts.Details && dimensions.Length > 0;
+        var showSize = _parts.Size && !string.IsNullOrEmpty(bytes);
+
+        ImageDimensions.Text = showDetails ? dimensions : string.Empty;
+        ImageBytes.Text = showSize ? bytes! : string.Empty;
+
+        ImageFacts.Visibility = showDetails || showSize ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static string FormatBytes(long bytes) => bytes switch

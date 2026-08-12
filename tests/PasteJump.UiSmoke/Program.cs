@@ -287,6 +287,12 @@ internal static class Program
                 // one defect this feature could have.
                 Check("OverlayWindow-KindFilter", () => RenderOverlay(KindFilterFrame()));
                 Check("OverlayWindow-JoinMark", () => RenderOverlay(JoinMarkFrame()));
+
+                // The same frame with every cosmetic part switched off, which is the quietest overlay the settings
+                // allow. Worth its own shot: it is the state that proves the row under the preview disappears rather
+                // than leaving an empty strip, and that what is left is the preview plus the chips that change what
+                // releasing Ctrl does - here the JOIN count, which no setting can hide.
+                Check("OverlayWindow-Minimal", () => RenderOverlay(JoinMarkFrame(), OverlayParts.Minimal));
                 Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
 
                 // A copied TEXT FILE, whose contents are read off disk. Written as a real file because that is
@@ -372,14 +378,23 @@ internal static class Program
     /// harness, and a repeatable position is what makes the screenshots comparable between runs.
     /// </para>
     /// </summary>
-    private static OverlayWindow RenderOverlay(PasteOverlayModel frame)
+    /// <param name="parts">
+    /// Which cosmetic parts to draw. Defaults to all of them, so every existing case renders what a fresh install
+    /// shows; the minimal case passes the other extreme.
+    /// </param>
+    private static OverlayWindow RenderOverlay(PasteOverlayModel frame, OverlayParts? parts = null)
     {
         var overlay = new OverlayWindow();
 
         overlay.Loaded += (_, _) =>
         {
-            // On, as it is by default, so the help screenshots show what a user sees.
-            overlay.ApplyKeyHint(show: true, triggerKey: 'V');
+            var chosen = parts ?? OverlayParts.All;
+
+            overlay.ApplyParts(chosen);
+
+            // The hint is one of the parts, so it follows the same value rather than being hard-coded on - otherwise
+            // the minimal case would render a "quietest possible" overlay with a row of key names along the bottom.
+            overlay.ApplyKeyHint(chosen.KeyHint, triggerKey: 'V');
             overlay.Render(frame, anchorX: 200, anchorY: 200);
         };
 

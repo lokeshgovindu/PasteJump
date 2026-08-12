@@ -267,6 +267,55 @@ public sealed class PasteJumpSettings
     /// </summary>
     public bool ShowOverlayKeyHint { get; set; } = true;
 
+    // ---- what else the overlay says about a clip
+    //
+    // All on by default, so nothing changes for anyone who never opens these. They exist because the overlay
+    // accumulated a lot of true things to say - position, tags, source application, line counts, byte counts - and
+    // not everybody wants all of them beside the caret on every paste.
+    //
+    // Only cosmetic parts are switchable. The POP chip, the JOIN count, the kind filter and the commit-mode banner
+    // are not here on purpose: each changes what releasing Ctrl will do, and hiding one would arm a deletion the user
+    // cannot see. See PasteMode.OverlayParts.
+
+    /// <summary>Show the <c>Clip 3 of 41</c> line at the top of the overlay.</summary>
+    public bool ShowOverlayPosition { get; set; } = true;
+
+    /// <summary>
+    /// Show the clip's own facts under the preview: lines and characters for text, pixel dimensions for an image,
+    /// the line count for a copied text file.
+    /// </summary>
+    public bool ShowOverlayDetails { get; set; } = true;
+
+    /// <summary>Show the size in bytes, on the right of the same row as <see cref="ShowOverlayDetails"/>.</summary>
+    public bool ShowOverlaySize { get; set; } = true;
+
+    /// <summary>Show the clip's tags.</summary>
+    public bool ShowOverlayTags { get; set; } = true;
+
+    /// <summary>Show which application the clip was copied from.</summary>
+    public bool ShowOverlaySource { get; set; } = true;
+
+    /// <summary>Show the paste format - Original, Plain text, and so on.</summary>
+    public bool ShowOverlayFormatter { get; set; } = true;
+
+    /// <summary>Show the <c>PINNED</c> chip.</summary>
+    public bool ShowOverlayPinned { get; set; } = true;
+
+    /// <summary>
+    /// The overlay's parts as one value, for handing to the view. Computed rather than stored, exactly like
+    /// <see cref="PasteModeOptions"/>, so there is no second copy of these flags to fall out of step.
+    /// </summary>
+    [JsonIgnore]
+    public PasteMode.OverlayParts OverlayParts => new(
+        ShowOverlayPosition,
+        ShowOverlayDetails,
+        ShowOverlaySize,
+        ShowOverlayTags,
+        ShowOverlaySource,
+        ShowOverlayFormatter,
+        ShowOverlayPinned,
+        ShowOverlayKeyHint);
+
     /// <summary>Show a brief notification near the cursor after each copy, as Clipjump did.</summary>
     public bool ShowCopyNotification { get; set; } = true;
 

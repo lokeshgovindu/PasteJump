@@ -77,6 +77,10 @@ $wanted = [ordered]@{
     'HistoryWindow-Joining'     = 'history-joining.png'
     'HistoryWindow-Joined'      = 'history-joined.png'
     'OverlayWindow-JoinMark'    = 'overlay-join-mark.png'
+
+    # The same frame with every optional part switched off. Worth publishing beside the full one: the point of the
+    # feature is the difference between the two.
+    'OverlayWindow-Minimal'     = 'overlay-minimal.png'
     'ToastWindow'               = 'toast.png'
 }
 

@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 876 passing (`dotnet test`) - 824 in Core.Tests, 52 in Interop.Tests |
+| Tests | 890 passing (`dotnet test`) - 838 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -113,7 +113,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      824 tests.
+tests/PasteJump.Core.Tests      838 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -838,6 +838,25 @@ that immediately caught two real bugs. Expect to do the same again.
   `ThemeProblems` line is the only place the reason for a missing theme can appear. A user theme whose name matches
   a shipped one *replaces* it, which is how Midnight gets tweaked without inventing a name.
 
+### The overlay is customisable, within one hard line
+
+- **`OverlayParts` switches off the cosmetic parts of the overlay: position, details, size, format, tags, source,
+  pinned, key hint.** Seven new settings plus the existing `ShowOverlayKeyHint`, all defaulting to on, so nothing
+  moves for anyone who never opens them. `PasteJumpSettings.OverlayParts` is a computed `[JsonIgnore]` view over the
+  flags, exactly as `PasteModeOptions` is - one definition, no second copy to fall out of step.
+- **The line is behaviour, not taste: `POP`, `JOIN`, the kind filter and the commit-mode banner can never be
+  hidden**, because each changes what releasing Ctrl will do. A user who could hide those would not have tidied the
+  overlay, they would have armed a deletion they cannot see. The preview is not optional either. A test asserts the
+  switch count so that adding one forces the question "is this cosmetic?" to be answered.
+- **`OverlayParts` is a record CLASS, and that is load-bearing.** As a record *struct*, `new OverlayParts()`
+  zero-initialises and **ignores the primary constructor''s default values** - so `All` came out with every flag
+  `false` and a fresh install would have rendered an overlay with nothing on it. Two tests caught it on the first
+  run. Never reach for a record struct with defaulted parameters again.
+- Two smaller decisions inside `Render`: **"No matching clips" survives the position being switched off**, since it
+  is the only thing on screen when a search matches nothing and hiding it reads as a broken overlay rather than as an
+  empty result; and **the facts row collapses when both halves are off** rather than remaining an empty strip of
+  padding, with each half cleared as well as hidden so a stale value cannot reappear.
+
 ### Theming landmines
 
 Every one of these compiles, builds clean, and silently defeats the theme.
@@ -1147,7 +1166,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 876 tests
+dotnet test                                         # 890 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

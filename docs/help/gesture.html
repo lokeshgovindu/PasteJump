@@ -263,6 +263,29 @@ holding a pop, how many clips are marked to be joined, its tags, and which appli
 An action you switch off is left out of it.</li>
 </ul>
 
+<h2>Showing less of it</h2>
+
+<p>Most of that is description, and it is all optional. <b>Settings, Appearance, What the Overlay Shows</b> has a
+switch for each: the position in the stack, the clip's own details, its size, the paste format, tags, the source
+application and the <code>PINNED</code> marker. Everything is on to begin with.</p>
+
+<div class="shot shot-inline">
+<img src="images/overlay-minimal.png" alt="The overlay with every optional part switched off">
+<p>Everything optional switched off: the clip, and the <b>JOIN</b> count &mdash; which no setting can hide.</p>
+</div>
+
+<div class="warn">
+<p><b>Four things cannot be switched off, and that is deliberate.</b> The <code>POP</code> chip, the
+<b>JOIN</b> count, the kind filter, and the Cancel / Delete / Delete All banner all change <i>what releasing
+<code>Ctrl</code> will do</i>. Hiding one of those would not make the overlay tidier &mdash; it would arm a deletion
+you cannot see, which is the one thing this overlay exists to prevent. The preview is not optional either: an
+overlay that says nothing about the clip is not quieter, it is broken.</p>
+</div>
+
+<p>Switching off both the details and the size removes the row under the preview entirely, rather than leaving an
+empty strip. Turning off the position still leaves <b>No matching clips</b> when a search finds nothing, since in
+that case it is the only thing there is to say.</p>
+
 <h2>Other keys are held back while the overlay is open</h2>
 
 <p>Any key that has no meaning above is <b>swallowed</b> for as long as the overlay is up, rather than

@@ -755,6 +755,42 @@
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="One muted line naming the keys worth knowing when you have lost your place: A returns to the newest clip, X deletes, Esc cancels, and F1 opens the full list. Turn it off once the gesture is in your fingers." />
 
+                        <!--
+                            What else the overlay says about a clip. All on by default, so nothing moves for anyone
+                            who never opens this.
+
+                            Note what is deliberately absent: the POP chip, the JOIN count, the kind filter and the
+                            Cancel / Delete / Delete All banner cannot be switched off. Each of those changes what
+                            releasing Ctrl will do, and hiding one would not tidy the overlay - it would arm a
+                            deletion the user cannot see, which is the failure this overlay exists to prevent.
+                        -->
+                        <TextBlock Style="{StaticResource SectionHeading}" Text="What the Overlay Shows" />
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Margin="0,3,0,4"
+                                   Text="The preview itself is always shown, as is anything that changes what releasing Ctrl will do — the POP and JOIN chips, the kind filter, and the Cancel or Delete banner. Everything below is description, and yours to switch off." />
+
+                        <CheckBox x:Name="ShowPositionCheck" Content="Position in the Stack" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="The &quot;Clip 3 of 41&quot; line. Switching it off still leaves &quot;No matching clips&quot; when a search finds nothing, since that is the only thing on screen in that case." />
+
+                        <CheckBox x:Name="ShowDetailsCheck" Content="The Clip's Own Details" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="Lines and characters for text, pixel dimensions for an image, the line count for a copied text file — on the left of the row under the preview." />
+
+                        <CheckBox x:Name="ShowSizeCheck" Content="Size in Bytes" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="On the right of that same row. With both this and the details off, the row disappears rather than leaving an empty strip." />
+
+                        <CheckBox x:Name="ShowFormatterCheck" Content="Paste Format" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="The chip naming Original, Plain text and so on. Worth keeping if you use Z to cycle formats, since nothing else says which one is in force." />
+
+                        <CheckBox x:Name="ShowTagsCheck" Content="Tags" />
+                        <CheckBox x:Name="ShowSourceCheck" Content="Application It Was Copied From" />
+                        <CheckBox x:Name="ShowPinnedCheck" Content="The PINNED Marker" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="Pinning itself is unaffected — this only hides the marker. A pinned clip still sorts first and still survives Delete All." />
+
                         <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,0" Text="After Each Copy" />
 
                         <CheckBox x:Name="ShowCopyNotificationCheck"

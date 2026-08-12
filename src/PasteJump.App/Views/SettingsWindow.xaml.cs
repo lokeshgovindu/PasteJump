@@ -486,6 +486,14 @@ public partial class SettingsWindow : Window
 
         ShowKeyHintCheck.IsChecked = source.ShowOverlayKeyHint;
 
+        ShowPositionCheck.IsChecked = source.ShowOverlayPosition;
+        ShowDetailsCheck.IsChecked = source.ShowOverlayDetails;
+        ShowSizeCheck.IsChecked = source.ShowOverlaySize;
+        ShowFormatterCheck.IsChecked = source.ShowOverlayFormatter;
+        ShowTagsCheck.IsChecked = source.ShowOverlayTags;
+        ShowSourceCheck.IsChecked = source.ShowOverlaySource;
+        ShowPinnedCheck.IsChecked = source.ShowOverlayPinned;
+
         // Deliberately just the setting. Load reconciles it with the Startup folder afterwards, which is right
         // for opening the dialog and wrong for a reset: resetting means "go back to not starting at logon", and
         // a box that stayed ticked because the shortcut is still there would read as the reset being ignored.
@@ -2016,6 +2024,13 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.OverlayX)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayY)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayKeyHint)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayPosition)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayDetails)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlaySize)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayFormatter)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayTags)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlaySource)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayPinned)] = "Appearance",
         [nameof(PasteJumpSettings.ShowCopyNotification)] = "Appearance",
         [nameof(PasteJumpSettings.CopyNotificationMs)] = "Appearance",
         [nameof(PasteJumpSettings.BeepOnCopy)] = "Appearance",
@@ -2406,6 +2421,13 @@ public partial class SettingsWindow : Window
         settings.OverlayPreviewMaxHeight = previewHeight;
         settings.OverlayPreviewChars = overlayChars;
         settings.ShowOverlayKeyHint = ShowKeyHintCheck.IsChecked == true;
+        settings.ShowOverlayPosition = ShowPositionCheck.IsChecked == true;
+        settings.ShowOverlayDetails = ShowDetailsCheck.IsChecked == true;
+        settings.ShowOverlaySize = ShowSizeCheck.IsChecked == true;
+        settings.ShowOverlayFormatter = ShowFormatterCheck.IsChecked == true;
+        settings.ShowOverlayTags = ShowTagsCheck.IsChecked == true;
+        settings.ShowOverlaySource = ShowSourceCheck.IsChecked == true;
+        settings.ShowOverlayPinned = ShowPinnedCheck.IsChecked == true;
         settings.BeepDurationMs = beepMs;
         settings.PreviewMaxChars = previewChars;
         settings.HistoryLoadLimit = historyLimit;
