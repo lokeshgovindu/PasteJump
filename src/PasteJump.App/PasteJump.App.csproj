@@ -86,19 +86,24 @@
                        Alt+Tab and Task Manager read - and, because no window sets Window.Icon, what
                        every window falls back to as well. Windows picks the frame per surface and per
                        DPI, which is the one approach that cannot pick wrong. NOT reachable through a
-                       pack:// URI, so XAML cannot bind to this copy.
-    Content            copies it loose beside the executable, which is what the notification area
-                       needs: TrayIcon calls LoadImage(LR_LOADFROMFILE) so it can ask for the icon at
-                       the shell's current small-icon metric. Extracting the PE copy instead would
-                       hand back a fixed 16x16 that the shell then upscales, and at 150% scaling -
-                       where it wants 24 - that is visibly blurry.
+                       pack:// URI, so no code or XAML can read this copy.
+    Resource           embeds it in the assembly, where TrayIconArt reads the bytes by pack:// URI and
+                       hands one frame to CreateIconFromResourceEx at the shell's current small-icon
+                       metric. Extracting the PE copy instead would give a fixed 16x16 that the shell
+                       upscales, and at 150% scaling - where it wants 24 - that is visibly blurry.
 
-    There was a third, a Resource item for the pack:// URI behind Shared.xaml's AppIcon key. It is gone
-    with that key: binding Window.Icon to a BitmapImage forces one frame to serve every size, and every
-    choice of frame was wrong somewhere. See the note at the top of Themes/Shared.xaml.
+    These were Content items until 2026-08-12, which put three loose .ico files beside the exe. The
+    reason was that only LoadImage(LR_LOADFROMFILE) honoured a requested size, and it needs a path;
+    CreateIconFromResourceEx takes a size and raw bytes, so the files no longer have to exist on disk.
+    What that fixes is not the 54 KB: a portable copy unzipped without its Assets folder lost its tray
+    icon, and with no main window that left no way to reach the application at all.
+
+    There was a third mechanism, a Resource item for the pack:// URI behind Shared.xaml's AppIcon key.
+    It is gone with that key: binding Window.Icon to a BitmapImage forces one frame to serve every size,
+    and every choice of frame was wrong somewhere. See the note at the top of Themes/Shared.xaml.
   -->
   <ItemGroup>
-    <Content Include="Assets\pastejump.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\pastejump.ico" />
 
     <!--
       Large single-frame mark for anything that displays the logo at a chosen size, as opposed to handing it
@@ -107,13 +112,13 @@
     <Resource Include="Assets\pastejump-256.png" />
 
     <!--
-      Greyed and amber variants for the tray while PasteJump is disabled or paused. Content only: no window
-      shows them, so they need no pack:// URI. Unlike the pair of monochrome glyphs this project used to carry,
-      these are not a light/dark theme split - they are three application states, and picking between them is
-      not something a single icon can do.
+      Greyed and amber variants for the tray while PasteJump is disabled or paused. Unlike the pair of
+      monochrome glyphs this project used to carry, these are not a light/dark theme split - they are three
+      application states, and picking between them is not something a single icon can do. Neither is in the PE
+      header, which holds one icon group only, so embedding is what makes them reachable without loose files.
     -->
-    <Content Include="Assets\pastejump-disabled.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\pastejump-paused.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\pastejump-disabled.ico" />
+    <Resource Include="Assets\pastejump-paused.ico" />
   </ItemGroup>
 
   <ItemGroup>

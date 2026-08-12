@@ -64,32 +64,11 @@ public sealed class AppPaths
     // There is deliberately no LogDirectory. The app has no logger, and the property existed only to have
     // EnsureCreated make an empty data\logs folder on every start. Reintroduce both together or neither.
 
-    /// <summary>
-    /// Assets shipped with the executable, such as the notification-area icons.
-    /// <para>
-    /// The only place in the app that may fall back to <see cref="AppContext.BaseDirectory"/>, and the
-    /// exception is deliberate. Everywhere else that property is a trap, because under a single-file publish
-    /// it returns the *extraction* directory rather than the folder holding the exe - which is exactly wrong
-    /// for the user's data, since it would move the clip database into a temp folder and break portability.
-    /// </para>
-    /// <para>
-    /// For assets it is exactly right, because the extraction directory is where the bundled
-    /// <c>Assets</c> folder actually is. Written as a probe rather than a check on whether we are running
-    /// single-file: it simply uses whichever location has the folder, so it needs no knowledge of how the
-    /// app was published and degrades to the executable's own icon if neither does.
-    /// </para>
-    /// </summary>
-    public string AssetsDirectory
-    {
-        get
-        {
-            var besideExecutable = Path.Combine(ApplicationDirectory, "Assets");
-
-            return Directory.Exists(besideExecutable)
-                ? besideExecutable
-                : Path.Combine(AppContext.BaseDirectory, "Assets");
-        }
-    }
+    // There is deliberately no AssetsDirectory any more. It existed for the three tray icons, which were loose
+    // files beside the exe until 2026-08-12 and are now embedded in the assembly - see TrayIconArt. It was also
+    // the one place in the app allowed to fall back to AppContext.BaseDirectory, since under a single-file
+    // publish that is where bundled content is extracted; HelpDocument still needs that two-candidate probe for
+    // PasteJump.chm and carries its own copy of the reasoning.
 
     /// <summary>Directory holding the executable. Also where the data-location pointer file lives.</summary>
     public static string ApplicationDirectory

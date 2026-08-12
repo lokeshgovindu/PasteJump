@@ -615,9 +615,8 @@ public partial class App : Application
     /// cover redistribution.
     /// </para>
     /// <para>
-    /// If the file is missing, <c>TrayIcon</c> keeps the icon it extracted from the executable - a
-    /// portable folder can be copied incompletely, and no tray icon at all would leave the app running
-    /// with no reachable menu.
+    /// If an icon cannot be read, <c>TrayIcon</c> keeps the one it extracted from the executable - no tray
+    /// icon at all would leave the app running with no reachable menu, which is the worst failure it has.
     /// </para>
     /// </summary>
     private void ApplyTrayIcon()
@@ -633,15 +632,15 @@ public partial class App : Application
         // stronger state is the one worth showing.
         var name = _keyboardHook switch
         {
-            { IsInstalled: false } => "pastejump-disabled.ico",
-            _ when !_settings.MonitorClipboard => "pastejump-paused.ico",
-            _ => "pastejump.ico",
+            { IsInstalled: false } => TrayIconArt.Disabled,
+            _ when !_settings.MonitorClipboard => TrayIconArt.Paused,
+            _ => TrayIconArt.Normal,
         };
 
-        // Through AppPaths, so this resolves off Environment.ProcessPath like every other path in the
-        // app. AppContext.BaseDirectory would look correct and then break under a single-file publish,
-        // where it points at the extraction directory rather than the folder holding the exe.
-        _trayIcon.SetIconFromFile(Path.Combine(_paths.AssetsDirectory, name));
+        // Embedded, not a path. These were loose files beside the exe until 2026-08-12, which meant a portable
+        // copy unzipped without its Assets folder started with no tray icon - and with no main window, no way
+        // to reach the application at all.
+        _trayIcon.SetIcon(TrayIconArt.Read(name));
     }
 
     /// <summary>

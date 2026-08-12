@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 769 passing (`dotnet test`) - 717 in Core.Tests, 52 in Interop.Tests |
+| Tests | 788 passing (`dotnet test`) - 736 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -61,20 +61,9 @@ is a different chord and a few applications bind it elsewhere.
 
 ### Asked for, not yet built
 
-The first is next, by agreement; the rest are in the order they were requested, and 2–4 all came out of one
-feature review against Ditto and CopyQ.
+In the order they were requested. All three came out of one feature review against Ditto and CopyQ.
 
-1. **Embed the three tray icons and delete `Assets\`.** Agreed 2026-08-11, to start the next day. They are loose
-   files *only* because `TrayIcon.SetIconFromFile` uses `LoadImage(LR_LOADFROMFILE)` — the one call that returns
-   an icon at the shell's current small-icon metric, 24 px at 150% scaling, where `ExtractIconEx` can only give
-   32 or 16 and would be upscaled. `CreateIconFromResourceEx` takes an explicit size over raw `.ico` bytes, so
-   the frames can be embedded: parse the ICONDIR to pick the frame nearest the requested size (pure bytes, so
-   `Core`, with tests) and make the HICON in `Interop`. Two things not to break: **`ApplicationIcon` stays** —
-   that PE-header copy is a different mechanism serving Explorer, the taskbar, Alt+Tab and every window, and is
-   not reachable by file path; and `pastejump-256.png` is already a compiled `Resource`, so it is not involved.
-   The gain is not the 54 KB: a portable copy unzipped without `Assets\` currently loses its tray icon, and with
-   no main window that leaves no way to reach the application at all.
-2. **Join several clips into one paste.** Select rows in the history window, or mark clips during the gesture, and
+1. **Join several clips into one paste.** Select rows in the history window, or mark clips during the gesture, and
    paste them concatenated with a chosen separator. Distinct from `Enter`, which pastes them one after another.
 3. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
    mine:** a DPAPI key ties the store to one Windows account, which ends "copy the exe to a USB stick and it takes
@@ -129,7 +118,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      717 tests.
+tests/PasteJump.Core.Tests      736 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -380,8 +369,8 @@ that immediately caught two real bugs. Expect to do the same again.
   Delete key that also rearmed what releasing Ctrl does would take a second clip the user never chose.
 - **The manual is reachable from the app now, and it shipped for months without being.** `PasteJump.chm` was in
   the ZIP with no code anywhere that could open it. `HelpDocument` probes beside the exe and then
-  `AppContext.BaseDirectory` — the same two-candidate shape as `AppPaths.AssetsDirectory`, and for the same
-  reason — and returns null rather than throwing, because a development build genuinely has no `.chm` (it is
+  `AppContext.BaseDirectory` — the two-candidate probe that `AppPaths.AssetsDirectory` used to share, and it is
+  now the only place doing it — and returns null rather than throwing, because a development build genuinely has no `.chm` (it is
   built by `tools/build-help.ps1`, not by the compiler). The caller passes `null` for the card's manual button
   in that case, which hides it; the window itself knows nothing about where the file lives, which is what lets
   the UI smoke harness render the button for the screenshot. Two things worth keeping: the tray item's
@@ -695,9 +684,10 @@ that immediately caught two real bugs. Expect to do the same again.
   single-file, so this is live rather than hypothetical: under single-file `Assembly.Location` is empty and
   `AppContext.BaseDirectory` is the **extraction** directory, not the folder holding the exe. All paths go
   through `AppPaths`, which uses `Environment.ProcessPath` — that is what keeps the clip database beside the
-  exe instead of in a temp folder. The single deliberate exception is `AppPaths.AssetsDirectory`, where the
-  extraction directory is where the bundled `Assets` folder genuinely is; it probes both locations rather
-  than testing how the app was published.
+  exe instead of in a temp folder. The single deliberate exception is `HelpDocument`, where the extraction
+  directory is genuinely where a bundled `PasteJump.chm` would be; it probes both locations rather than testing
+  how the app was published. `AppPaths.AssetsDirectory` was the other, and is gone — the icons it existed for
+  are embedded now, so nothing is looked up beside the exe but that one document.
 
 ### Theming landmines
 
@@ -904,8 +894,9 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   decompression, then CLR and WPF init. `Compose` itself is 103–217 ms either way, so app-side start-up work is
   not the lever; the deployment shape is.
 - **`IncludeAllContentForSelfExtract` must stay OFF.** It was once set here on the mistaken belief that
-  without it the `Assets\*.ico` files would sit loose beside the exe. They do not: content is bundled *and*
-  extracted either way. What the flag adds is extracting every **managed assembly** too, which .NET loads
+  without it the `Assets\*.ico` files would sit loose beside the exe. They did not: content was bundled *and*
+  extracted either way — and there is no content at all now, since the icons became embedded resources.
+  What the flag adds is extracting every **managed assembly** too, which .NET loads
   straight from the bundle and has no reason to write to disk. Measured: **9.76 MB in 8 files** extracted to
   `%TEMP%` without it, against **133.95 MB** with it — about ten seconds of first-run I/O for nothing.
 - **WPF supports neither trimming nor NativeAOT**, and that is what fixes the floor in the tens of
@@ -924,13 +915,30 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   (`Clipjump.ahk:1198`); we keep the original DIB and render previews on demand, so adding the knob would be
   a regression. `RAM_Flush` and `Priority` are `EmptyWorkingSet` and process priority — the former is a
   well-known anti-pattern that makes an app slower by forcing page faults, and nothing here is CPU-bound.
-- **One icon, two delivery mechanisms** — separate from the three tray *states* noted below, which are
-  three different files. `Assets/pastejump.ico` is generated by
-  `tools/generate-icon.ps1` (coloured tile, 9 frames) and referenced twice in
-  `PasteJump.App.csproj`, because neither is reachable by the other's mechanism:
-  `ApplicationIcon` for the PE header, and `Content` for the loose file the tray's `LoadImage` needs.
-  Dropping either silently blanks that surface. `ApplicationIcon` was in fact missing until it was noticed
-  while the tray was rewired — masked because the tray overwrote the icon a moment after start-up.
+- **Nothing ships loose beside the exe any more: the icons are embedded, and `Assets\` is a source folder
+  only.** They were `Content` items — three `.ico` files in the deployed directory — for exactly one reason:
+  `LoadImage(LR_LOADFROMFILE)` was the only call that would render an icon at the size the notification area
+  asks for (16 px at 100% scaling, **24 at 150%**), and it needs a path. `ExtractIconEx` offers only 32 and 16,
+  so the PE-header copy cannot answer 24 without being upscaled, which is the blurry-tray-icon bug.
+  `CreateIconFromResourceEx` takes a size **and** raw bytes, so the files no longer have to exist:
+  `IconFile` (`Core`, 19 tests) parses the ICONDIR and picks the frame, `TrayIcon.SetIcon` makes the HICON,
+  `TrayIconArt` reads the bytes by `pack://` URI and caches them. What that fixed is not the 54 KB — a portable
+  copy unzipped without `Assets\` lost its tray icon, and with no main window that leaves the application
+  running with no way to reach it.
+  Four things to know before touching this:
+  - **`CreateIconFromResourceEx` does accept a PNG-compressed frame**, and every frame in our icons is PNG.
+    The documentation does not say so and older accounts say the opposite, so it was **measured** before the
+    code was written this way — a 24×24 32bpp icon came back. If that ever changes the symptom is a missing
+    tray icon, and the fix is to emit DIB frames from `generate-icon.ps1`.
+  - `dwVer` must be `0x00030000`. That is the icon *resource format* version, nothing to do with this app, and
+    any other value fails the call outright.
+  - **`ApplicationIcon` stays**, and it is not a duplicate: the PE-header copy is what Explorer, the taskbar,
+    Alt+Tab and every window read, and it is not reachable by `pack://` URI. `SelectFrame` prefers an exact
+    frame, then the smallest **larger** one — never an upscale, which is the same rule the About window's logo
+    and the program picker had to learn.
+  - `VerifyTrayIcons` in the UI smoke harness is the only check on the whole path, because a broken `pack://`
+    URI or a resource that failed to embed would surface as a missing tray icon at run time and nothing else
+    tests it. It asserts the frame chosen is the exact size asked for, not merely that a handle came back.
 - **No window sets `Window.Icon`, and there is no `AppIcon` resource. That is deliberate.** A `BitmapImage`
   decodes exactly *one* frame of an `.ico`, so binding `Window.Icon` hands Windows a single bitmap to answer
   every size with — and every choice of frame is wrong somewhere. All three were shipped and each was
@@ -990,7 +998,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 769 tests
+dotnet test                                         # 788 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

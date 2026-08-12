@@ -296,14 +296,34 @@ internal static class NativeMethods
         IntPtr[]? phiconSmall,
         uint nIcons);
 
-    [DllImport(User32, SetLastError = true, CharSet = CharSet.Unicode)]
-    public static extern IntPtr LoadImage(
-        IntPtr hinst,
-        string lpszName,
-        uint uType,
+    /// <summary>
+    /// Builds an icon from the bytes of ONE frame of an <c>.ico</c> - not the whole file - at an explicit size.
+    /// <para>
+    /// This is what lets the icons live inside the executable. <c>ExtractIconEx</c> can only return the two
+    /// system sizes, 32 and 16, so it cannot produce the 24 px the shell asks for at 150% scaling, and
+    /// <c>LoadImage</c> honours a requested size only from a file on disk. This takes both: a size, and bytes
+    /// from anywhere.
+    /// </para>
+    /// <para>
+    /// <c>dwVer</c> must be 0x00030000 - the version of the icon *resource format*, not of anything in this
+    /// application, and the call fails outright with any other value.
+    /// </para>
+    /// <para>
+    /// It accepts a PNG-compressed frame, which is worth recording because the documentation does not say so
+    /// and older accounts say it does not: every frame in our own icons is PNG, and this was verified returning
+    /// a 24x24 32bpp icon from one before the code was written this way. If that ever stops being true the
+    /// symptom is a missing tray icon, and the fix is to emit DIB frames from tools/generate-icon.ps1.
+    /// </para>
+    /// </summary>
+    [DllImport(User32, SetLastError = true)]
+    public static extern IntPtr CreateIconFromResourceEx(
+        byte[] presbits,
+        uint dwResSize,
+        [MarshalAs(UnmanagedType.Bool)] bool fIcon,
+        uint dwVer,
         int cxDesired,
         int cyDesired,
-        uint fuLoad);
+        uint flags);
 
     [DllImport(User32, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

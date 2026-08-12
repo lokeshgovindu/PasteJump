@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PasteJump.Core.Imaging;
 using PasteJump.Interop.Win32;
 
 namespace PasteJump.Interop;
@@ -14,6 +15,12 @@ namespace PasteJump.Interop;
 public sealed class TrayIcon : IDisposable
 {
     private const uint IconId = 1;
+
+    /// <summary>
+    /// The icon <em>resource format</em> version <c>CreateIconFromResourceEx</c> demands. Nothing to do with
+    /// this application's version, and the call fails outright with any other value.
+    /// </summary>
+    private const uint IconResourceVersion = 0x00030000;
 
     private readonly MessageOnlyWindow _window;
     private readonly bool _ownsWindow;
@@ -71,34 +78,55 @@ public sealed class TrayIcon : IDisposable
     }
 
     /// <summary>
-    /// Replaces the icon, loading it from an <c>.ico</c> file at the size the shell wants.
+    /// Replaces the icon from the bytes of an <c>.ico</c>, rendered at the size the shell wants.
     /// <para>
-    /// Exists because the notification area is the one surface whose background colour changes under
-    /// the icon: the taskbar follows the Windows "choose your mode" setting, so a single icon is
-    /// wrong half the time. Returns false and leaves the current icon in place if the file is missing
-    /// or unreadable - a portable folder can be copied incompletely, and losing the tray icon
-    /// entirely would leave the app running with no way to reach its menu.
+    /// Bytes rather than a path so the icons can be embedded in the executable. They were loose files beside
+    /// it until 2026-08-12, for one reason: only <c>LoadImage(LR_LOADFROMFILE)</c> honoured a requested size,
+    /// and the notification area asks for 16 px at 100% scaling but 24 at 150%. <c>CreateIconFromResourceEx</c>
+    /// takes a size too, given a single frame - so <see cref="IconFile"/> picks the frame and this makes the
+    /// icon, and nothing has to be on disk. A portable copy unzipped without its <c>Assets</c> folder used to
+    /// lose its tray icon, and with no main window that left no way to reach the application at all.
+    /// </para>
+    /// <para>
+    /// Returns false and leaves the current icon in place if the bytes are not a usable icon, rather than
+    /// throwing: this is called during start-up and on every state change, and no tray icon is a far worse
+    /// outcome than a stale one.
     /// </para>
     /// </summary>
-    public bool SetIconFromFile(string path)
+    public bool SetIcon(ReadOnlySpan<byte> ico)
     {
-        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        if (ico.IsEmpty)
         {
             return false;
         }
 
         // Ask for the shell's small-icon metric rather than a hard-coded 16: at 150% scaling it wants
         // 24, and passing 16 there gets it upscaled and blurry.
-        var width = NativeMethods.GetSystemMetrics(NativeConstants.SM_CXSMICON);
-        var height = NativeMethods.GetSystemMetrics(NativeConstants.SM_CYSMICON);
+        var metricWidth = NativeMethods.GetSystemMetrics(NativeConstants.SM_CXSMICON);
+        var metricHeight = NativeMethods.GetSystemMetrics(NativeConstants.SM_CYSMICON);
 
-        var loaded = NativeMethods.LoadImage(
-            IntPtr.Zero,
-            path,
-            NativeConstants.IMAGE_ICON,
-            width > 0 ? width : 16,
-            height > 0 ? height : 16,
-            NativeConstants.LR_LOADFROMFILE);
+        var width = metricWidth > 0 ? metricWidth : 16;
+        var height = metricHeight > 0 ? metricHeight : 16;
+
+        // Chosen on width alone, since every icon here is square and a non-square frame would be a defect in
+        // the artwork rather than something to accommodate.
+        if (IconFile.SelectFrame(ico, width) is not { } frame)
+        {
+            return false;
+        }
+
+        // Copied out because the P/Invoke marshals a byte[]. It is one frame - under 1 KB at these sizes - so
+        // the allocation is not worth avoiding with a fixed pointer and unsafe code.
+        var bytes = ico.Slice(frame.Offset, frame.Length).ToArray();
+
+        var loaded = NativeMethods.CreateIconFromResourceEx(
+            bytes,
+            (uint)bytes.Length,
+            fIcon: true,
+            IconResourceVersion,
+            width,
+            height,
+            NativeConstants.LR_DEFAULTCOLOR);
 
         if (loaded == IntPtr.Zero)
         {
@@ -122,6 +150,45 @@ public sealed class TrayIcon : IDisposable
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Reports which frame <see cref="SetIcon"/> would choose for a given size, and whether Windows accepts it,
+    /// without touching the notification area. For the UI smoke harness.
+    /// <para>
+    /// A hook rather than a test in PasteJump.Interop.Tests because the icons are embedded in the WPF project,
+    /// which that test project deliberately does not reference. The harness already loads them.
+    /// </para>
+    /// </summary>
+    /// <returns>
+    /// The chosen frame's width, and whether an icon was created. Width is 0 when nothing could be selected.
+    /// </returns>
+    public static (int FrameWidth, bool Created) DescribeIconForSmokeTest(ReadOnlySpan<byte> ico, int size)
+    {
+        if (IconFile.SelectFrame(ico, size) is not { } frame)
+        {
+            return (0, false);
+        }
+
+        var bytes = ico.Slice(frame.Offset, frame.Length).ToArray();
+
+        var icon = NativeMethods.CreateIconFromResourceEx(
+            bytes,
+            (uint)bytes.Length,
+            fIcon: true,
+            IconResourceVersion,
+            size,
+            size,
+            NativeConstants.LR_DEFAULTCOLOR);
+
+        if (icon != IntPtr.Zero)
+        {
+            // Destroyed at once: this creates icons in a loop and hands none of them to the shell, so without
+            // it the harness would leak one per size per state.
+            NativeMethods.DestroyIcon(icon);
+        }
+
+        return (frame.Width, icon != IntPtr.Zero);
     }
 
     public void Hide()

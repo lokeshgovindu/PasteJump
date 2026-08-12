@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using PasteJump.App.Services;
 using PasteJump.App.Views;
 using PasteJump.Core;
 using PasteJump.Core.Abstractions;
@@ -11,6 +12,7 @@ using PasteJump.Core.Model;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
+using PasteJump.Interop;
 
 namespace PasteJump.UiSmoke;
 
@@ -271,6 +273,11 @@ internal static class Program
 
         TryDelete(root);
 
+        // Outside the theme loop: the tray icons are three application states, not a light/dark pair, so
+        // running this twice would only assert the same thing again.
+        Console.WriteLine();
+        VerifyTrayIcons();
+
         Console.WriteLine();
         Console.WriteLine(_failures == 0
             ? "RESULT: all windows opened cleanly"
@@ -438,6 +445,63 @@ internal static class Program
         }
 
         tip.IsOpen = false;
+    }
+
+    /// <summary>
+    /// Turns each embedded tray icon into a real HICON at every size the shell asks for, and reports the size it
+    /// actually got.
+    /// <para>
+    /// This is the only check on the whole path: the icons stopped being files on 2026-08-12, so a broken pack://
+    /// URI, a resource that did not get embedded, or a frame Windows declines to decode would all present as a
+    /// missing tray icon at run time - and with no main window, an unreachable application. None of it is
+    /// reachable from Core.Tests, which cannot see the WPF project's resources.
+    /// </para>
+    /// <para>
+    /// Two separate claims per size, because either alone would pass while the icon looked wrong. That Windows
+    /// built an icon at all proves it decodes these frames - every one of ours is PNG-compressed, which some
+    /// accounts say this API rejects. That the frame chosen is the exact size asked for is what keeps the icon
+    /// sharp, and it is a fact about the artwork rather than about the code: IconFileTests proves the selection
+    /// rule, but only this notices if a regenerated icon set stops carrying a 24 px frame.
+    /// </para>
+    /// </summary>
+    private static void VerifyTrayIcons()
+    {
+        // 16 and 32 are the two system sizes; 24 is what the shell asks for at 150% scaling and is the one
+        // neither ExtractIconEx nor the PE header can produce. 20 and 40 stand in for 125% and 250%.
+        int[] sizes = [16, 20, 24, 32, 40];
+
+        foreach (var name in new[] { TrayIconArt.Normal, TrayIconArt.Disabled, TrayIconArt.Paused })
+        {
+            var bytes = TrayIconArt.Read(name);
+
+            if (bytes.Length == 0)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  {name} is not embedded, or could not be read by pack:// URI");
+                continue;
+            }
+
+            var results = new List<string>();
+
+            foreach (var size in sizes)
+            {
+                var (frame, created) = TrayIcon.DescribeIconForSmokeTest(bytes, size);
+
+                results.Add((frame == size, created) switch
+                {
+                    (true, true) => $"{size}ok",
+                    (false, true) => $"{size}<-{frame}px frame",
+                    _ => $"{size}FAILED",
+                });
+
+                if (frame != size || !created)
+                {
+                    _failures++;
+                }
+            }
+
+            Console.WriteLine($"  tray icon {name,-24} {bytes.Length,6} bytes  {string.Join("  ", results)}");
+        }
     }
 
     /// <summary>First descendant of the given type, or null. Visual tree, so it must be called after layout.</summary>

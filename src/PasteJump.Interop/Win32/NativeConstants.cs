@@ -185,10 +185,10 @@ internal static class NativeConstants
     public const int WM_RBUTTONUP = 0x0205;
     public const int WM_LBUTTONDBLCLK = 0x0203;
 
-    // ---- LoadImage
-    public const uint IMAGE_ICON = 1;
-    public const uint LR_LOADFROMFILE = 0x00000010;
-    public const uint LR_DEFAULTSIZE = 0x00000040;
+    // ---- CreateIconFromResourceEx
+    // Zero, and named rather than written as a literal 0 at the call site: it is a flags argument, so a bare
+    // zero reads as "no flags yet" when it is in fact the documented value meaning "the display's own depth".
+    public const uint LR_DEFAULTCOLOR = 0x00000000;
 
     // ---- GetSystemMetrics
     public const int SM_CXSMICON = 49;
