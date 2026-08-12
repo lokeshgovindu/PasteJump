@@ -106,6 +106,7 @@
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    <RowDefinition />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="release Ctrl" />
@@ -122,6 +123,11 @@
 
                 <TextBlock x:Name="KeyClipboard" Grid.Row="4" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Put the clip on the Windows clipboard without pasting it" />
+
+                <!-- In PASTING rather than ORGANISING: marking is not something done TO a clip, it is a decision
+                     about what the next paste will contain. -->
+                <TextBlock x:Name="KeyJoin" Grid.Row="5" Grid.Column="0" Style="{StaticResource KeyStyle}" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource DescStyle}" Text="Mark this clip. Releasing Ctrl pastes every marked clip as ONE clip, in the order you marked them, joined by the separator set in Settings, History. A JOIN chip counts them; press again to unmark. Marks last only for this gesture." />
             </Grid>
 
             <TextBlock Style="{StaticResource SectionStyle}" Text="ORGANISING" />

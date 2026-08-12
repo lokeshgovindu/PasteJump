@@ -435,7 +435,11 @@ that immediately caught two real bugs. Expect to do the same again.
   `sqlite_sequence` of 55, and history was intact — `PruneHistoryOlderThan` never touches `clip`, and
   `EvictBeyond` was capped at 1000, so a bulk `DELETE FROM clip WHERE pinned = 0` was the only candidate left.
 - **`J` marks clips during the gesture, and releasing Ctrl pastes every marked clip joined.** The other half of
-  joining. Decisions worth keeping:
+  joining. Note the F1 key card's rows are **hand-written XAML** - it says more per action than
+  `PasteKeyMap.Description` does - so adding an action means adding a row there too. `J` was added to the map and not
+  to the card, and a user reported it; `VerifyKeyCardIsComplete` now compares what the card rendered against
+  `PasteKeyMap.Entries` and fails the build instead. It works by recording each name the card asks `Keys` for, so
+  there is no second hand-written list to keep in step. Decisions worth keeping:
   - **Marks win over the cursor.** With anything marked, the commit ignores where the cursor ended up — that is
     the point of having marked. Checked *before* the ordinary path and independently of whether there is a current
     clip at all, so a search matching nothing cannot throw a set of marks away.

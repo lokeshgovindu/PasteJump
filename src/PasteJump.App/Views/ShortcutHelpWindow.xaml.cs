@@ -50,6 +50,7 @@ public partial class ShortcutHelpWindow : Window
         KeyHistory.Text = Keys(map, "history");
         KeyExport.Text = Keys(map, "export");
         KeyCommit.Text = Keys(map, "commit");
+        KeyJoin.Text = Keys(map, "join");
 
         Title = $"PasteJump - Paste-mode keys ({chord})";
 
@@ -85,13 +86,28 @@ public partial class ShortcutHelpWindow : Window
     /// they may later wonder about.
     /// </para>
     /// </summary>
-    private static string Keys(PasteKeyMap map, string name)
+    private string Keys(PasteKeyMap map, string name)
     {
         var entry = PasteKeyMap.Entries.First(e => e.Name == name);
         var letter = map.LetterFor(name) is { } value ? value.ToString() : "off";
 
+        // Recorded so the harness can prove this card lists every action. The rows are hand-written XAML with prose
+        // per row - the card says more about each action than PasteKeyMap.Description does, which is why it is not
+        // generated - and a hand-written list of fourteen is a list that will one day be thirteen. It already was:
+        // "mark to join" was added to the key map and never to this card, and was reported.
+        _named.Add(name);
+
         return entry.FixedAlias is { } alias ? $"{letter}  {alias}" : letter;
     }
+
+    /// <summary>Every action this card actually rendered a row for. See <see cref="Keys"/>.</summary>
+    private readonly HashSet<string> _named = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Test hook: the actions the card listed. Compared against <see cref="PasteKeyMap.Entries"/> by the UI smoke
+    /// harness, so an action added to the key map and forgotten here fails a build rather than a user.
+    /// </summary>
+    public IReadOnlyCollection<string> NamedActionsForSmokeTest => _named;
 
     private readonly Action? _onOpenManual;
 

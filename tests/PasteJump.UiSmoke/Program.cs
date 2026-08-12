@@ -196,7 +196,10 @@ internal static class Program
                 // A no-op manual action rather than null, so the shot shows the window the way a release build
                 // shows it. The button is hidden when there is no .chm to open, and there never is one beside
                 // this harness - the manual is compiled separately by tools/build-help.ps1.
-                Check("ShortcutHelpWindow", () => new ShortcutHelpWindow(TriggerKey.Default, static () => { }));
+                Check(
+                    "ShortcutHelpWindow",
+                    () => new ShortcutHelpWindow(TriggerKey.Default, static () => { }),
+                    static (window, _) => VerifyKeyCardIsComplete((ShortcutHelpWindow)window));
                 Check("AboutWindow", () => new AboutWindow());
 
                 // MessageDialog is normally shown modally, which would block this harness for ever - so it is
@@ -574,6 +577,38 @@ internal static class Program
         }
 
         tip.IsOpen = false;
+    }
+
+    /// <summary>
+    /// Checks the <c>F1</c> key card lists every configurable action.
+    /// <para>
+    /// The card's rows are hand-written XAML, because it says more about each action than the key map's own
+    /// one-line description does. A hand-written list of fourteen is a list that will one day be thirteen - and it
+    /// already was: <c>J</c> was added to the key map and never to this card, which a user reported. Nothing else
+    /// could have caught it, since a missing row is not a missing row anywhere but on screen.
+    /// </para>
+    /// </summary>
+    private static void VerifyKeyCardIsComplete(ShortcutHelpWindow card)
+    {
+        var listed = card.NamedActionsForSmokeTest;
+        var expected = PasteKeyMap.Entries.Select(static e => e.Name).ToList();
+
+        var missing = expected.Except(listed, StringComparer.Ordinal).ToList();
+        var unknown = listed.Except(expected, StringComparer.Ordinal).ToList();
+
+        Console.WriteLine($"  key card: {listed.Count} of {expected.Count} actions listed");
+
+        if (missing.Count > 0)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  the key card has no row for: {string.Join(", ", missing)}");
+        }
+
+        if (unknown.Count > 0)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  the key card names actions the key map does not have: {string.Join(", ", unknown)}");
+        }
     }
 
     /// <summary>
