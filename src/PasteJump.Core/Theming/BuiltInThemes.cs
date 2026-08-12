@@ -329,6 +329,287 @@ public static class BuiltInThemes
         }
         """;
 
+    /// <summary>Catppuccin Mocha. Soft pastels on a violet-tinted charcoal - the gentlest of the dark set.</summary>
+    private const string CatppuccinMocha = """
+        {
+            "name": "Catppuccin Mocha",
+            "basedOn": "dark",
+            "colors": {
+                "SurfaceBrush": "#1E1E2E",
+                "SurfaceRaisedBrush": "#272739",
+                "BorderBrush": "#45475A",
+                "TextBrush": "#CDD6F4",
+                "MutedTextBrush": "#A6ADC8",
+                "AccentBrush": "#89B4FA",
+                "AccentHoverBrush": "#9EC1FB",
+                "AccentPressedBrush": "#B4CEFC",
+                "AccentTextBrush": "#1E1E2E",
+                "WarnBrush": "#F9E2AF",
+                "DangerBrush": "#F38BA8",
+                "ControlBackgroundBrush": "#272739",
+                "ControlBorderBrush": "#45475A",
+                "ControlHoverBrush": "#313244",
+                "ControlPressedBrush": "#3B3D51",
+                "ControlDisabledTextBrush": "#6C7086",
+                "SelectionBrush": ["#3B3D57", "#313248"],
+                "SelectionBorderBrush": "#B4BEFE",
+                "SelectionTextBrush": "#EFF1F8",
+                "HoverBorderBrush": "#313244",
+                "ModifiedRowBrush": "#3B3A45",
+                "ScrollThumbBrush": "#45475A",
+                "ScrollThumbHoverBrush": "#585B70",
+                "SplitterLineBrush": "#45475A",
+                "ShadowColor": "#FF11111B"
+            }
+        }
+        """;
+
+    /// <summary>Catppuccin Latte. The light sibling - cool greys with the same saturated accents.</summary>
+    private const string CatppuccinLatte = """
+        {
+            "name": "Catppuccin Latte",
+            "basedOn": "light",
+            "colors": {
+                "SurfaceBrush": "#EFF1F5",
+                "SurfaceRaisedBrush": "#FFFFFF",
+                "BorderBrush": "#CCD0DA",
+                "TextBrush": "#4C4F69",
+                "MutedTextBrush": "#6C6F85",
+                "AccentBrush": "#1E66F5",
+                "AccentHoverBrush": "#3B7BF7",
+                "AccentPressedBrush": "#5B92F9",
+                "WarnBrush": "#DF8E1D",
+                "DangerBrush": "#D20F39",
+                "ControlBackgroundBrush": "#FFFFFF",
+                "ControlBorderBrush": "#BCC0CC",
+                "ControlHoverBrush": "#E6E9EF",
+                "ControlPressedBrush": "#DCE0E8",
+                "ControlDisabledTextBrush": "#9CA0B0",
+                "SelectionBrush": ["#DCE6FB", "#C6D6F8"],
+                "SelectionBorderBrush": "#7287FD",
+                "SelectionTextBrush": "#1E2030",
+                "HoverBorderBrush": "#E6E9EF",
+                "ModifiedRowBrush": "#FAF0DC",
+                "ScrollThumbBrush": "#BCC0CC",
+                "ScrollThumbHoverBrush": "#9CA0B0",
+                "SplitterLineBrush": "#ACB0BE",
+                "ShadowColor": "#FF5C5F77"
+            }
+        }
+        """;
+
+    /// <summary>Tokyo Night. Deep indigo with cool blue accents.</summary>
+    private const string TokyoNight = """
+        {
+            "name": "Tokyo Night",
+            "basedOn": "dark",
+            "colors": {
+                "SurfaceBrush": "#1A1B26",
+                "SurfaceRaisedBrush": "#20212E",
+                "BorderBrush": "#2F344D",
+                "TextBrush": "#C0CAF5",
+                "MutedTextBrush": "#787C99",
+                "AccentBrush": "#7AA2F7",
+                "AccentHoverBrush": "#8FB1F8",
+                "AccentPressedBrush": "#A5C1FA",
+                "AccentTextBrush": "#16161E",
+                "WarnBrush": "#E0AF68",
+                "DangerBrush": "#F7768E",
+                "ControlBackgroundBrush": "#20212E",
+                "ControlBorderBrush": "#343A55",
+                "ControlHoverBrush": "#292E42",
+                "ControlPressedBrush": "#32384F",
+                "ControlDisabledTextBrush": "#565F89",
+                "SelectionBrush": ["#2E3550", "#262C43"],
+                "SelectionBorderBrush": "#7DCFFF",
+                "SelectionTextBrush": "#C0CAF5",
+                "HoverBorderBrush": "#292E42",
+                "ModifiedRowBrush": "#33323E",
+                "ScrollThumbBrush": "#343A55",
+                "ScrollThumbHoverBrush": "#4A5178",
+                "SplitterLineBrush": "#343A55",
+                "ShadowColor": "#FF0D0E14"
+            }
+        }
+        """;
+
+    /// <summary>One Dark. Atom's palette, the most familiar dark grey-blue of the lot.</summary>
+    private const string OneDark = """
+        {
+            "name": "One Dark",
+            "basedOn": "dark",
+            "colors": {
+                "SurfaceBrush": "#282C34",
+                "SurfaceRaisedBrush": "#31353F",
+                "BorderBrush": "#3E4451",
+                "TextBrush": "#ABB2BF",
+                "MutedTextBrush": "#828997",
+                "AccentBrush": "#61AFEF",
+                "AccentHoverBrush": "#75BAF1",
+                "AccentPressedBrush": "#8CC6F4",
+                "AccentTextBrush": "#21252B",
+                "WarnBrush": "#E5C07B",
+                "DangerBrush": "#E06C75",
+                "ControlBackgroundBrush": "#31353F",
+                "ControlBorderBrush": "#4B5263",
+                "ControlHoverBrush": "#383D48",
+                "ControlPressedBrush": "#414855",
+                "ControlDisabledTextBrush": "#5C6370",
+                "SelectionBrush": ["#3E4451", "#353B47"],
+                "SelectionBorderBrush": "#98C379",
+                "SelectionTextBrush": "#DCDFE4",
+                "HoverBorderBrush": "#383D48",
+                "ModifiedRowBrush": "#3D3B33",
+                "ScrollThumbBrush": "#4B5263",
+                "ScrollThumbHoverBrush": "#5C6370",
+                "SplitterLineBrush": "#4B5263",
+                "ShadowColor": "#FF14171C"
+            }
+        }
+        """;
+
+    /// <summary>Rose Pine. Muted plum and rose - the most distinctive palette here, and still readable.</summary>
+    private const string RosePine = """
+        {
+            "name": "Rose Pine",
+            "basedOn": "dark",
+            "colors": {
+                "SurfaceBrush": "#191724",
+                "SurfaceRaisedBrush": "#1F1D2E",
+                "BorderBrush": "#403D52",
+                "TextBrush": "#E0DEF4",
+                "MutedTextBrush": "#908CAA",
+                "AccentBrush": "#EBBCBA",
+                "AccentHoverBrush": "#F0CBC9",
+                "AccentPressedBrush": "#F4D9D8",
+                "AccentTextBrush": "#191724",
+                "WarnBrush": "#F6C177",
+                "DangerBrush": "#EB6F92",
+                "ControlBackgroundBrush": "#1F1D2E",
+                "ControlBorderBrush": "#403D52",
+                "ControlHoverBrush": "#26233A",
+                "ControlPressedBrush": "#302D44",
+                "ControlDisabledTextBrush": "#6E6A86",
+                "SelectionBrush": ["#33304A", "#2A273D"],
+                "SelectionBorderBrush": "#9CCFD8",
+                "SelectionTextBrush": "#E0DEF4",
+                "HoverBorderBrush": "#26233A",
+                "ModifiedRowBrush": "#38313C",
+                "ScrollThumbBrush": "#403D52",
+                "ScrollThumbHoverBrush": "#56526E",
+                "SplitterLineBrush": "#403D52",
+                "ShadowColor": "#FF100E1A"
+            }
+        }
+        """;
+
+    /// <summary>Everforest Dark. Green-grey and low-contrast, the easiest of the dark themes on tired eyes.</summary>
+    private const string EverforestDark = """
+        {
+            "name": "Everforest Dark",
+            "basedOn": "dark",
+            "colors": {
+                "SurfaceBrush": "#2D353B",
+                "SurfaceRaisedBrush": "#343F44",
+                "BorderBrush": "#4A555B",
+                "TextBrush": "#D3C6AA",
+                "MutedTextBrush": "#9DA9A0",
+                "AccentBrush": "#A7C080",
+                "AccentHoverBrush": "#B6CB95",
+                "AccentPressedBrush": "#C5D6AB",
+                "AccentTextBrush": "#2D353B",
+                "WarnBrush": "#DBBC7F",
+                "DangerBrush": "#E67E80",
+                "ControlBackgroundBrush": "#343F44",
+                "ControlBorderBrush": "#4A555B",
+                "ControlHoverBrush": "#3D484D",
+                "ControlPressedBrush": "#465258",
+                "ControlDisabledTextBrush": "#7A8478",
+                "SelectionBrush": ["#475258", "#3D484D"],
+                "SelectionBorderBrush": "#83C092",
+                "SelectionTextBrush": "#E4DCC8",
+                "HoverBorderBrush": "#3D484D",
+                "ModifiedRowBrush": "#48413A",
+                "ScrollThumbBrush": "#4A555B",
+                "ScrollThumbHoverBrush": "#5C6A72",
+                "SplitterLineBrush": "#4A555B",
+                "ShadowColor": "#FF1E2326"
+            }
+        }
+        """;
+
+    /// <summary>Kanagawa. Ink-wash blues over sumi black, with a paper-white foreground.</summary>
+    private const string Kanagawa = """
+        {
+            "name": "Kanagawa",
+            "basedOn": "dark",
+            "colors": {
+                "SurfaceBrush": "#1F1F28",
+                "SurfaceRaisedBrush": "#2A2A37",
+                "BorderBrush": "#363646",
+                "TextBrush": "#DCD7BA",
+                "MutedTextBrush": "#A9A18B",
+                "AccentBrush": "#7E9CD8",
+                "AccentHoverBrush": "#92ACDF",
+                "AccentPressedBrush": "#A7BCE6",
+                "AccentTextBrush": "#1F1F28",
+                "WarnBrush": "#FF9E3B",
+                "DangerBrush": "#C34043",
+                "ControlBackgroundBrush": "#2A2A37",
+                "ControlBorderBrush": "#43435A",
+                "ControlHoverBrush": "#323240",
+                "ControlPressedBrush": "#3A3A4C",
+                "ControlDisabledTextBrush": "#727169",
+                "SelectionBrush": ["#2D4F67", "#223249"],
+                "SelectionBorderBrush": "#6A9589",
+                "SelectionTextBrush": "#E6E0C8",
+                "HoverBorderBrush": "#323240",
+                "ModifiedRowBrush": "#3B3A32",
+                "ScrollThumbBrush": "#43435A",
+                "ScrollThumbHoverBrush": "#54546D",
+                "SplitterLineBrush": "#43435A",
+                "ShadowColor": "#FF16161D"
+            }
+        }
+        """;
+
+    /// <summary>
+    /// GitHub Light. Not a mood but a default - the cleanest light theme here, and the one that looks least like a
+    /// theme at all.
+    /// </summary>
+    private const string GitHubLight = """
+        {
+            "name": "GitHub Light",
+            "basedOn": "light",
+            "colors": {
+                "SurfaceBrush": "#F6F8FA",
+                "SurfaceRaisedBrush": "#FFFFFF",
+                "BorderBrush": "#D0D7DE",
+                "TextBrush": "#1F2328",
+                "MutedTextBrush": "#656D76",
+                "AccentBrush": "#0969DA",
+                "AccentHoverBrush": "#1F7BE8",
+                "AccentPressedBrush": "#3D8DF0",
+                "WarnBrush": "#9A6700",
+                "DangerBrush": "#CF222E",
+                "ControlBackgroundBrush": "#FFFFFF",
+                "ControlBorderBrush": "#D0D7DE",
+                "ControlHoverBrush": "#EFF2F5",
+                "ControlPressedBrush": "#E4E8ED",
+                "ControlDisabledTextBrush": "#8C959F",
+                "SelectionBrush": ["#DDF4FF", "#C6E9FF"],
+                "SelectionBorderBrush": "#54AEFF",
+                "SelectionTextBrush": "#0A3069",
+                "HoverBorderBrush": "#EFF2F5",
+                "ModifiedRowBrush": "#FFF8C5",
+                "ScrollThumbBrush": "#CFD5DB",
+                "ScrollThumbHoverBrush": "#AFB8C1",
+                "SplitterLineBrush": "#C2C9D0",
+                "ShadowColor": "#FF57606A"
+            }
+        }
+        """;
+
     /// <summary>
     /// The raw JSON of every shipped theme, in the order the settings dialog lists them, for tests and for writing
     /// one out as a starting point.
@@ -344,11 +625,19 @@ public static class BuiltInThemes
         Sepia,
         SolarizedDark,
         SolarizedLight,
+        CatppuccinMocha,
+        CatppuccinLatte,
+        TokyoNight,
+        OneDark,
         Monokai,
         Nord,
         Dracula,
+        RosePine,
+        EverforestDark,
+        Kanagawa,
         GruvboxDark,
         Zenburn,
+        GitHubLight,
     ];
 
     /// <summary>

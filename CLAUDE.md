@@ -768,8 +768,9 @@ that immediately caught two real bugs. Expect to do the same again.
   drifting apart**, and it checks both directions plus the resource *type* of every key: a key in one and not the
   other is either a theme setting that does nothing or a colour nobody can theme, and neither surfaces as an error.
   Verified by renaming one key in `Light.xaml`: exit 2, both halves named.
-- **The nine shipped extras are theme *files*, not compiled dictionaries.** `BuiltInThemes` holds Midnight, Sepia,
-  Solarized Dark/Light, Monokai, Nord, Dracula, Gruvbox Dark and Zenburn as JSON in the same format a user writes,
+- **The seventeen shipped extras are theme *files*, not compiled dictionaries.** `BuiltInThemes` holds Midnight,
+  Sepia, Solarized Dark/Light, Catppuccin Mocha/Latte, Tokyo Night, One Dark, Monokai, Nord, Dracula, Rose Pine,
+  Everforest Dark, Kanagawa, Gruvbox Dark, Zenburn and GitHub Light as JSON in the same format a user writes,
   so there is one code path rather than two and the format is kept honest by being used. Light and Dark stay as XAML
   because they are the **bases** — something has to define all 25 keys. Two things about that class:
   - **`Sources` must be declared before `All`.** Static field initialisers run in declaration order, so with them
