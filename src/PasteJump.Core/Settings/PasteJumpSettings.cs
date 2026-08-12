@@ -182,6 +182,16 @@ public sealed class PasteJumpSettings
     public string PasteSettleDelayPerApp { get; set; } = string.Empty;
 
     /// <summary>
+    /// What goes between clips when several are copied as one. A line break by default.
+    /// <para>
+    /// Stored escaped - <c>\n</c>, <c>\r</c>, <c>\t</c>, <c>\\</c> - because the useful separators are mostly
+    /// invisible characters, and a settings file holding a literal newline inside a JSON string is legal,
+    /// unreadable, and easily mangled by hand. See <see cref="Paste.ClipJoiner"/>.
+    /// </para>
+    /// </summary>
+    public string ClipJoinSeparator { get; set; } = Paste.ClipJoiner.DefaultSeparator;
+
+    /// <summary>
     /// Chord sent to make the target application paste. See <see cref="Settings.PasteKeystroke"/> - the
     /// short version is that another clipboard manager's keyboard hook can swallow Ctrl+V before the
     /// target window sees it, and Shift+Insert is the way out.
@@ -379,6 +389,15 @@ public sealed class PasteJumpSettings
         // Re-rendered through the parser, which drops unparseable entries and clamps out-of-range ones, so a
         // hand-edited file cannot leave a delay that says one thing and behaves as another.
         PasteSettleDelayPerApp = Paste.PerAppSettleDelays.Parse(PasteSettleDelayPerApp).ToSettingsString();
+
+        // Only emptiness is corrected, and it is corrected to the default rather than accepted: joining with
+        // nothing runs clips together into one unreadable string, and an accidentally cleared box is the way
+        // that would happen. Anything else is left exactly as typed, since a separator is arbitrary text and
+        // there is nothing to validate it against.
+        if (string.IsNullOrEmpty(ClipJoinSeparator))
+        {
+            ClipJoinSeparator = Paste.ClipJoiner.DefaultSeparator;
+        }
         // Floor of 1, not 250. The old floor silently overrode anyone who asked for something shorter, and there
         // is no reason to: the toast fades on its own timer, so a tiny value gives a brief flash rather than
         // anything broken. 0 is excluded because that reads as "off", and off is ShowCopyNotification's job -

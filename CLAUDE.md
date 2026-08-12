@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 788 passing (`dotnet test`) - 736 in Core.Tests, 52 in Interop.Tests |
+| Tests | 809 passing (`dotnet test`) - 757 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -61,16 +61,19 @@ is a different chord and a few applications bind it elsewhere.
 
 ### Asked for, not yet built
 
-In the order they were requested. All three came out of one feature review against Ditto and CopyQ.
+In the order they were requested. Both came out of one feature review against Ditto and CopyQ.
 
-1. **Join several clips into one paste.** Select rows in the history window, or mark clips during the gesture, and
-   paste them concatenated with a chosen separator. Distinct from `Enter`, which pastes them one after another.
-3. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
+1. **Marking clips to join *during the gesture*.** Half of "join several clips into one paste" now exists — see
+   the note below — but only in the history window, by selecting rows. The other half is marking clips while the
+   overlay is up and pasting them joined when Ctrl is released, which needs a letter in `PasteKeyMap`, a set of
+   marked ids on the session, and the overlay showing how many are marked. Note the mark has to survive stepping
+   and searching but not the end of a session, for the same reason `PasteKindFilter` resets.
+2. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
    mine:** a DPAPI key ties the store to one Windows account, which ends "copy the exe to a USB stick and it takes
    its history with it" — the property the portable ZIP exists for. A passphrase keeps portability but has to be
    typed at every logon, which is intolerable for a resident app, and a key file beside the data is security
    theatre. Put that choice to the user before writing any of it.
-4. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
+3. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
    `Application.Resources.MergedDictionaries[0]` and `AppTheme` has exactly three values. A user-authored theme
    means the palette becomes data — a file of named colours — rather than a compiled `ResourceDictionary`, so:
    every key in `Light.xaml`/`Dark.xaml` becomes a contract that a theme file must satisfy (a missing key
@@ -118,7 +121,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      736 tests.
+tests/PasteJump.Core.Tests      757 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -439,6 +442,30 @@ that immediately caught two real bugs. Expect to do the same again.
   restated by whoever draws the dialog. Note the diagnostic that found this: `clip` had 14 rows against a
   `sqlite_sequence` of 55, and history was intact — `PruneHistoryOlderThan` never touches `clip`, and
   `EvictBeyond` was capped at 1000, so a bulk `DELETE FROM clip WHERE pinned = 0` was the only candidate left.
+- **Selecting several rows and pressing Copy joins them into ONE clip, and the button relabels itself to say
+  so.** Four decisions worth keeping, each chosen rather than observed — Ditto's "paste as one" is the closest
+  precedent, and Clipjump has nothing like it:
+  - **Copy is overloaded rather than a sixth toolbar button, but only above one row.** A single row keeps the
+    existing path, which replays *every format* a clip was copied with; a join can only ever produce text, so
+    overloading must not cost that fidelity when joining is not what was asked for. The label change is the whole
+    discoverability of the feature — nothing else hints it exists — and the **access key stays on C** in both
+    states, because one that moves with the selection is worse than no label change at all.
+  - **Display order, not click order.** `SelectedItems` is in the order rows joined the selection and a
+    shift-click gives no meaningful order at all, so it is re-sorted by row index. "Top to bottom, as I see it"
+    is the only rule that can be predicted before pressing the button.
+  - **Text only, and what is left out is counted.** Two images cannot be concatenated without inventing a
+    layout, so an image contributes nothing — and `ClipJoinResult.Skipped` exists so the status line can say
+    that, because five rows silently producing two lines reads as data lost. A **file list does join**, since
+    its text is its paths, which is one of the more useful cases.
+  - **The full text is read, never the preview.** `preview` is capped at `PreviewMaxChars`, so joining previews
+    would produce a paste truncated in the middle — worse than one that is obviously short. Same reason Copy
+    reads the archived blob.
+  `ClipJoiner` is in `Core` with 21 tests. Its separator is stored **escaped** (`\n`, `\r`, `\t`, `\\`) because
+  the useful ones are invisible characters and a literal newline inside a JSON string is legal, unreadable and
+  easily mangled by hand. Two details there: a backslash naming no escape is **kept** rather than eaten, since a
+  separator is arbitrary text; and an empty setting means the default rather than "no separator", so an
+  accidentally cleared box cannot produce one unreadable run of text. There is deliberately no way to express
+  "join with nothing".
 - **History archives the full text separately, because `preview` is capped at `PreviewMaxChars` (4096).**
   `RecordHistory` writes a blob for text longer than that, and the History window's Copy prefers it. Without
   the blob, Copy handed back the first 4096 characters *silently* — and for an entry no longer in the stack
@@ -998,7 +1025,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 788 tests
+dotnet test                                         # 809 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

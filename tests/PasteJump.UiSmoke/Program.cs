@@ -111,6 +111,34 @@ internal static class Program
                     },
                     static (window, _) => VerifyToolTipWrapping(window));
 
+                // Several rows selected, then joined. Two shots because they are two different states and each
+                // is only reachable here: the Copy button relabels itself to "Copy Joined" with more than one row
+                // selected, and the status line a join produces is written nowhere else. They cannot be one shot,
+                // because the reload after a join drops the multi-selection and the label follows it back.
+                Check(
+                    "HistoryWindow-Joining",
+                    () =>
+                    {
+                        var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
+
+                        // After Loaded, so there are rows to select - Refresh runs there.
+                        window.Loaded += (_, _) => window.SelectFirstRowsForSmokeTest(3);
+
+                        return window;
+                    },
+                    (window, name) =>
+                    {
+                        // Its own shot, taken after the join, because Check's is taken before this callback runs.
+                        ((HistoryWindow)window).JoinSelectionForSmokeTest();
+                        window.UpdateLayout();
+                        Drain();
+
+                        if (_shotDirectory is not null)
+                        {
+                            Capture(window, Path.Combine(_shotDirectory, $"{_theme}-HistoryWindow-Joined.png"));
+                        }
+                    });
+
                 // Cycles every tab. TabControl only realises the SELECTED tab's content, so without
                 // this the other tabs' templates are never instantiated and a broken one goes unseen -
                 // which is exactly the class of failure this harness exists to catch.

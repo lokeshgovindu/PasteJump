@@ -329,6 +329,7 @@ public partial class SettingsWindow : Window
         PreviewMaxCharsBox.Text = source.PreviewMaxChars.ToString(CultureInfo.CurrentCulture);
         HistoryLoadLimitBox.Text = source.HistoryLoadLimit.ToString(CultureInfo.CurrentCulture);
         HistoryPreviewWidthBox.Text = source.HistoryPreviewMaxWidth.ToString(CultureInfo.CurrentCulture);
+        ClipJoinSeparatorBox.Text = source.ClipJoinSeparator;
 
         PreservePositionCheck.IsChecked = source.PreserveClipPosition;
         OpenSearchCheck.IsChecked = source.OpenSearchImmediately;
@@ -2060,6 +2061,13 @@ public partial class SettingsWindow : Window
         settings.PreviewMaxChars = previewChars;
         settings.HistoryLoadLimit = historyLimit;
         settings.HistoryPreviewMaxWidth = historyPreviewWidth;
+
+        // Not validated, because there is nothing to validate it against - any text is a legal separator. An
+        // empty box is corrected to the default by Normalise rather than refused here: emptying it is a plausible
+        // accident, and the alternative reading, "join with nothing", produces one unreadable run of text.
+        settings.ClipJoinSeparator = string.IsNullOrEmpty(ClipJoinSeparatorBox.Text)
+            ? ClipJoiner.DefaultSeparator
+            : ClipJoinSeparatorBox.Text;
 
         // Carried through explicitly. Before these had controls they were simply never assigned here, so a
         // position set by hand in PasteJump.json was silently discarded by opening this dialog and clicking OK.

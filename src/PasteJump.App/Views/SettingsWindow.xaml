@@ -373,6 +373,21 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="How large an image is decoded for the history preview pane, between 120 and 4096. Higher is sharper on a high-resolution screen and slower per row selected. Smaller images are never enlarged past their own size." />
 
+                        <!--
+                            Wider than the numeric boxes beside it: a separator can be a phrase rather than a
+                            character, and a few words in a 96px box show about half of themselves.
+                        -->
+                        <Grid Style="{StaticResource SettingRow}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="160" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Separator When Joining Clips" />
+                            <TextBox x:Name="ClipJoinSeparatorBox" Grid.Column="1" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Text="What goes between clips when several rows are selected in the history window and copied as one. Write invisible characters as \n for a new line, \r\n, \t for a tab, and \\ for a backslash; anything else is used literally, so &quot;, &quot; or &quot; — &quot; work as typed. Emptying the box restores a new line, since joining with nothing runs the clips together." />
+
                         <TextBlock Style="{StaticResource SectionHeading}" Text="Import from Clipjump" />
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Margin="0,3,0,8"

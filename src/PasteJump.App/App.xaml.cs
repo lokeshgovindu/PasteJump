@@ -798,7 +798,8 @@ public partial class App : Application
                 _formatters,
                 _settings.GridDensity,
                 _settings.HistoryLoadLimit,
-                _settings.HistoryPreviewMaxWidth));
+                _settings.HistoryPreviewMaxWidth,
+                _settings.ClipJoinSeparator));
             _historyWindow.DensityChanged += OnHistoryDensityChanged;
             _historyWindow.Closed += (_, _) => _historyWindow = null;
             _historyWindow.Show();
@@ -1135,7 +1136,7 @@ public partial class App : Application
 
         // An open history window follows the new density rather than needing to be reopened.
         _historyWindow?.ApplyDensity(_settings.GridDensity);
-        _historyWindow?.ApplyLimits(_settings.HistoryLoadLimit, _settings.HistoryPreviewMaxWidth);
+        _historyWindow?.ApplyLimits(_settings.HistoryLoadLimit, _settings.HistoryPreviewMaxWidth, _settings.ClipJoinSeparator);
 
         // Set on the store rather than passed per call, because it decides what gets written and every write
         // path would otherwise have to remember to thread it through.

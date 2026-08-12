@@ -12,6 +12,7 @@ using PasteJump.Core.Capture;
 using PasteJump.Core.Formatting;
 using PasteJump.Core.Imaging;
 using PasteJump.Core.Model;
+using PasteJump.Core.Paste;
 using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
 using PasteJump.Interop;
@@ -145,6 +146,12 @@ public partial class HistoryWindow : Window
     /// <summary>Widest an image file is decoded for the preview pane, from settings.</summary>
     private int _thumbnailMaxWidth;
 
+    /// <summary>
+    /// What goes between clips when several are copied at once, in its escaped settings form. Held escaped and
+    /// parsed at the point of use, so a change from the Settings dialog needs no conversion on the way in.
+    /// </summary>
+    private string _joinSeparator;
+
     public HistoryWindow(
         ClipStore store,
         IClipboardAccess clipboard,
@@ -152,7 +159,8 @@ public partial class HistoryWindow : Window
         FormatterRegistry formatters,
         GridDensity density = GridDensity.Cozy,
         int historyLoadLimit = ClipStore.DefaultHistoryLimit,
-        int previewImageMaxWidth = DefaultThumbnailMaxWidth)
+        int previewImageMaxWidth = DefaultThumbnailMaxWidth,
+        string joinSeparator = ClipJoiner.DefaultSeparator)
     {
         _store = store;
         _clipboard = clipboard;
@@ -160,6 +168,7 @@ public partial class HistoryWindow : Window
         _formatters = formatters;
         _historyLoadLimit = historyLoadLimit;
         _thumbnailMaxWidth = previewImageMaxWidth;
+        _joinSeparator = joinSeparator;
 
         InitializeComponent();
 
@@ -247,12 +256,17 @@ public partial class HistoryWindow : Window
     /// Applies the two numeric limits from settings. Separate from <see cref="ApplyDensity"/> only because
     /// density has a control in this window and these do not; both exist so an open window follows Apply.
     /// </summary>
-    public void ApplyLimits(int historyLoadLimit, int previewImageMaxWidth)
+    public void ApplyLimits(int historyLoadLimit, int previewImageMaxWidth, string joinSeparator)
     {
         var reload = historyLoadLimit != _historyLoadLimit;
 
         _historyLoadLimit = historyLoadLimit;
         _thumbnailMaxWidth = previewImageMaxWidth;
+        _joinSeparator = joinSeparator;
+
+        // The Copy button's tooltip names the separator, so it has to be rebuilt rather than left saying what
+        // the old one was.
+        UpdateCopyButton();
 
         // Only the row limit needs a reload; the thumbnail width is read on the next selection change, and
         // re-decoding the current one would be work for a difference nobody asked to see right now.
@@ -302,6 +316,34 @@ public partial class HistoryWindow : Window
             EntriesGrid.SelectedIndex = index;
         }
     }
+
+    /// <summary>
+    /// Selects several rows and joins them, for the UI smoke harness.
+    /// <para>
+    /// Two states nothing else renders: the Copy button relabelled to <c>Copy Joined</c>, and the status line a
+    /// join produces. Both need more than one row selected, which no other case does. The harness's clipboard
+    /// accepts writes without touching the real one, so this runs the whole path - read the text, join it, write
+    /// it, add the result to the stack - and the shot shows what the user would see.
+    /// </para>
+    /// </summary>
+    public void SelectFirstRowsForSmokeTest(int count)
+    {
+        EntriesGrid.SelectedItems.Clear();
+
+        foreach (var row in _rows.Take(count))
+        {
+            EntriesGrid.SelectedItems.Add(row);
+        }
+
+        UpdateCopyButton();
+    }
+
+    /// <summary>
+    /// Joins whatever is selected. Split from <see cref="SelectFirstRowsForSmokeTest"/> because the two produce
+    /// different shots: the relabelled button is only visible <em>before</em> the join, since the reload
+    /// afterwards drops the multi-selection and the label follows it back.
+    /// </summary>
+    public void JoinSelectionForSmokeTest() => CopySelectionJoined();
 
     /// <summary>Asks for a reload, coalescing rapid successive calls.</summary>
     public void QueueRefresh()
@@ -541,7 +583,33 @@ public partial class HistoryWindow : Window
     }
 
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
-        => ShowPreview(EntriesGrid.SelectedItem as HistoryRow);
+    {
+        ShowPreview(EntriesGrid.SelectedItem as HistoryRow);
+        UpdateCopyButton();
+    }
+
+    /// <summary>
+    /// Relabels Copy to say what it will actually do with the current selection.
+    /// <para>
+    /// The alternative was a sixth toolbar button. This is one action with two shapes rather than two actions,
+    /// and joining is not discoverable at all if nothing changes when several rows are selected - the user has
+    /// to already know. The access key stays on C either way, because an access key that moves with the
+    /// selection is worse than no label change at all.
+    /// </para>
+    /// </summary>
+    private void UpdateCopyButton()
+    {
+        var several = EntriesGrid.SelectedItems.Count > 1;
+
+        CopyButton.Content = several ? "_Copy Joined" : "_Copy";
+
+        CopyButton.ToolTip = several
+            ? "Copy the selected entries as ONE clip, their text joined with "
+                + $"{ClipJoiner.Describe(ClipJoiner.ParseSeparator(_joinSeparator))}, in the order shown. "
+                + "Change the separator in Settings, History. Entries with no text, such as images, are left out."
+            : "Put the selected entry back on the clipboard (Enter, or double-click a row). Select several rows "
+                + "to copy them joined into one clip.";
+    }
 
     private void ShowPreview(HistoryRow? row)
     {
@@ -739,7 +807,120 @@ public partial class HistoryWindow : Window
     private void OnRowDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         => CopySelectionToClipboard();
 
-    private void OnCopyClicked(object sender, RoutedEventArgs e) => CopySelectionToClipboard();
+    private void OnCopyClicked(object sender, RoutedEventArgs e)
+    {
+        // Two rows or more is taken as "join these", which is why the button relabels itself - see
+        // UpdateCopyButton. One row keeps the single-clip path, which replays every format a clip was copied
+        // with; joining can only ever produce text, so overloading the button must not cost that fidelity when
+        // it is not what was asked for.
+        if (EntriesGrid.SelectedItems.Count > 1)
+        {
+            CopySelectionJoined();
+            return;
+        }
+
+        CopySelectionToClipboard();
+    }
+
+    /// <summary>
+    /// Copies several selected entries as one clip, their text run together with the configured separator.
+    /// <para>
+    /// Distinct from <c>Enter</c> during the gesture, which pastes clips one after another: that leaves the
+    /// target application to decide what happens between them, and in a spreadsheet it means separate cells.
+    /// This is one clip, so it lands as one paste.
+    /// </para>
+    /// <para>
+    /// Joined in the order shown rather than the order the rows were clicked. Selection order is not something
+    /// a <c>DataGrid</c> reports reliably - a shift-click gives no order at all - and "top to bottom, as I see
+    /// it" is the only rule that can be predicted before pressing the button.
+    /// </para>
+    /// </summary>
+    private void CopySelectionJoined()
+    {
+        // Back to display order: SelectedItems is in the order rows were added to the selection, so a
+        // ctrl-click upwards would otherwise join bottom-to-top.
+        var selected = EntriesGrid.SelectedItems
+            .OfType<HistoryRow>()
+            .OrderBy(_rows.IndexOf)
+            .ToList();
+
+        if (selected.Count == 0)
+        {
+            return;
+        }
+
+        var separator = ClipJoiner.ParseSeparator(_joinSeparator);
+
+        // Null for anything with no text of its own, which ClipJoiner counts so the status line can account for
+        // every row the user selected. An image is the case that matters: its preview text is the literal
+        // "[image]", so contributing that would silently paste the word instead of admitting it was left out.
+        var result = ClipJoiner.Join(selected.Select(TryReadJoinableText), separator);
+
+        if (result.Joined == 0)
+        {
+            StatusText.Text = selected.Count == 1
+                ? "That entry has no text to join."
+                : $"None of those {selected.Count} entries has text to join - images cannot be joined.";
+
+            return;
+        }
+
+        var payloads = Win32ClipboardAccess.TextOnlyPayloads(result.Text);
+        var snapshot = new ClipboardSnapshot(payloads, result.Text, ClipKind.Text, null);
+
+        // Registered before the write, exactly as the single-entry path does: without it the capture service
+        // sees a clipboard change it did not cause and files the joined text as a brand-new clip, on top of the
+        // one added deliberately below.
+        _selfWrites.NoteWrite(snapshot.ContentHash);
+
+        if (!_clipboard.TryWrite(payloads))
+        {
+            StatusText.Text = "Could not open the clipboard - another application may be holding it.";
+            return;
+        }
+
+        // Added to the stack for the same reason a single copy is: the gesture pastes from the stack, not from
+        // the system clipboard, so without this Ctrl+V would immediately offer something else. Duplicates
+        // allowed because the user asked for this specific combination.
+        _store.Add(snapshot, allowDuplicates: true);
+        Refresh();
+
+        var skipped = result.Skipped == 0
+            ? string.Empty
+            : $" {result.Skipped} with no text {(result.Skipped == 1 ? "was" : "were")} left out.";
+
+        StatusText.Text =
+            $"Joined {result.Joined} entries with {ClipJoiner.Describe(separator)} and copied as one clip - "
+            + $"{result.Text.Length:N0} characters.{skipped}";
+    }
+
+    /// <summary>
+    /// The text a row contributes to a join, or null when it has none.
+    /// <para>
+    /// Prefers the archived full text over the preview column, which is capped at
+    /// <c>ClipStore.PreviewMaxChars</c> - joining previews would produce a paste that is silently truncated in
+    /// the middle, which is worse than one that is obviously short.
+    /// </para>
+    /// </summary>
+    private string? TryReadJoinableText(HistoryRow row)
+    {
+        if (row.Kind == ClipKind.Image)
+        {
+            return null;
+        }
+
+        // A clip carries its formats, so the text it was copied with is better than the preview that was
+        // rendered from it - and for a clip there is no history blob to read.
+        if (row.IsClip)
+        {
+            if (Win32ClipboardAccess.ExtractText(_store.GetPayloads(row.Id)) is { } text)
+            {
+                return text;
+            }
+        }
+
+        return TryReadArchivedText(row) ?? row.Preview;
+    }
 
     /// <summary>
     /// Puts the selected entry back on the clipboard.
