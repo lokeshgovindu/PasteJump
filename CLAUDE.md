@@ -61,14 +61,7 @@ is a different chord and a few applications bind it elsewhere.
 
 ### Asked for, not yet built
 
-In the order they were requested. Both came out of one feature review against Ditto and CopyQ.
-
-1. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
-   mine:** a DPAPI key ties the store to one Windows account, which ends "copy the exe to a USB stick and it takes
-   its history with it" — the property the portable ZIP exists for. A passphrase keeps portability but has to be
-   typed at every logon, which is intolerable for a resident app, and a key file beside the data is security
-   theatre. Put that choice to the user before writing any of it.
-2. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
+1. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
    `Application.Resources.MergedDictionaries[0]` and `AppTheme` has exactly three values. A user-authored theme
    means the palette becomes data — a file of named colours — rather than a compiled `ResourceDictionary`, so:
    every key in `Light.xaml`/`Dark.xaml` becomes a contract that a theme file must satisfy (a missing key
@@ -81,6 +74,17 @@ Explicitly **rejected** in that same review, so they do not need revisiting: LAN
 single-writer SQLite model — two machines on one folder corrupt the store), scripting and plugins, cloud accounts,
 and CopyQ-style tabs (channels were dropped deliberately). Content-based exclusion of sensitive clips was offered
 and not chosen.
+
+**Encryption at rest was asked for and then dropped (2026-08-12), with the trade-offs on the table.** Do not
+re-raise it unprompted. The choice put to the user was how the key is held — a passphrase remembered per machine
+through DPAPI (KeePass's model, keeping portability and costing nothing daily), DPAPI alone (invisible, but the
+store stops opening anywhere else), a passphrase at every launch, or nothing — and the answer was nothing: the
+exclusion list already keeps password managers out, NTFS already stops another standard user reading the store, and
+anyone with admin or the logged-in session can read it whatever we do. Two facts worth keeping if it ever returns:
+**`history_fts` indexes `preview`, so field-level encryption would kill search outright** (FTS5 cannot index
+ciphertext) — the mechanism would have to be whole-database, and `SQLitePCLRaw.bundle_e_sqlcipher` 2.1.11 exists on
+nuget.org and drops in where `bundle_e_sqlite3` is now; and blobs on disk need separate treatment either way, which
+`BlobStore`'s compression pipeline is the place for.
 
 ### The immediate next task
 
