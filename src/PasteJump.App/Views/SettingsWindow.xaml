@@ -630,6 +630,35 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="Applies immediately, no restart. &quot;Same as Windows&quot; follows the app colour mode and keeps tracking it if you change it later. Note the notification-area icon does not follow this — it follows the Windows taskbar colour, which is a separate Windows setting." />
 
+                        <!--
+                            Writing a theme, reachable from the setting it affects. The button writes the palette
+                            currently in force as a .json file with every key listed and commented, so someone starts
+                            from what they are looking at rather than from an empty file - and then opens the folder,
+                            because a file created somewhere the user cannot find is no better than no file.
+
+                            ThemeProblems is normally collapsed. It carries the reason a theme file was skipped,
+                            which would otherwise be invisible: the catalogue refuses to fail at start-up over a bad
+                            file, so this dialog is the only place that can say anything about it.
+                        -->
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Button x:Name="CreateThemeButton"
+                                    Click="OnCreateThemeClicked"
+                                    Content="Create a _Theme from This One…"
+                                    MinWidth="210"
+                                    ToolTip="Writes the colours currently in force to a .json file you can edit, and opens the folder. Anything you delete from the file is inherited from the theme it is based on." />
+                            <Button x:Name="OpenThemesFolderButton"
+                                    Click="OnOpenThemesFolderClicked"
+                                    Content="Themes _Folder"
+                                    Margin="8,0,0,0"
+                                    MinWidth="120"
+                                    ToolTip="Opens the folder PasteJump reads theme files from. Files appear in the list above when this dialog is next opened." />
+                        </StackPanel>
+
+                        <TextBlock x:Name="ThemeProblems"
+                                   Style="{StaticResource SettingHelp}"
+                                   Foreground="{DynamicResource WarnBrush}"
+                                   Visibility="Collapsed" />
+
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

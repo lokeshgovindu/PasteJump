@@ -1,3 +1,4 @@
+using PasteJump.Core.Theming;
 using System.Text.Json.Serialization;
 using PasteJump.Core.Formatting;
 using PasteJump.Core.PasteMode;
@@ -208,15 +209,26 @@ public sealed class PasteJumpSettings
     // ------------------------------------------------------------ appearance
 
     /// <summary>
-    /// Colour scheme. Follows Windows by default.
+    /// Colour scheme, by name. <c>System</c>, <c>Light</c>, <c>Dark</c>, or the name of any other theme -
+    /// shipped or written by the user. Follows Windows by default.
     /// <para>
     /// Following the system is the right default for a utility that lives in the notification area: it has no
-    /// branding to assert and no reason to be the one light window on a dark desktop. Note this is
-    /// <see cref="AppTheme.System"/> = 2 rather than the enum's zero, so a settings file that spells out
-    /// <c>"Theme": 0</c> still gets Light - only an absent property picks this up.
+    /// branding to assert and no reason to be the one light window on a dark desktop.
+    /// </para>
+    /// <para>
+    /// A <b>name</b> rather than the <c>AppTheme</c> enum this used to be, because the set of themes is no longer
+    /// fixed - see <see cref="Theming.ThemeDefinition"/>. The change costs nothing on disk: the enum was written
+    /// through <c>JsonStringEnumConverter</c>, so existing files already say <c>"Theme": "Dark"</c> and are read
+    /// unchanged. The alternative - an enum plus a separate name for the custom case - is the shape that needed
+    /// four rules to be made safe for the data locations, and for the same reason: two values that must agree.
+    /// </para>
+    /// <para>
+    /// A name that matches no theme <b>falls back to following Windows</b> rather than being corrected on load.
+    /// A theme file that is temporarily missing - an unplugged drive, a file being edited - must not silently
+    /// rewrite the setting to something else, or the choice is lost the first time the file is unavailable.
     /// </para>
     /// </summary>
-    public AppTheme Theme { get; set; } = AppTheme.System;
+    public string Theme { get; set; } = ThemeNames.System;
 
     /// <summary>Row spacing in the history list. Cozy by default.</summary>
     public GridDensity GridDensity { get; set; } = GridDensity.Cozy;
@@ -410,9 +422,13 @@ public sealed class PasteJumpSettings
         OverlayPreviewMaxWidth = Math.Clamp(OverlayPreviewMaxWidth, SettingsBounds.OverlayPreviewMaxWidth.Min, SettingsBounds.OverlayPreviewMaxWidth.Max);
         OverlayPreviewMaxHeight = Math.Clamp(OverlayPreviewMaxHeight, SettingsBounds.OverlayPreviewMaxHeight.Min, SettingsBounds.OverlayPreviewMaxHeight.Max);
 
-        if (!Enum.IsDefined(Theme))
+        // Only emptiness is corrected. An unrecognised NAME is deliberately left alone: it may be a theme file that
+        // is missing right now - an unplugged drive, a file mid-edit - and rewriting the setting would throw the
+        // user's choice away the first time their theme was briefly unavailable. Resolving a name to a palette is
+        // the App's job, and it falls back to following Windows without touching what is stored.
+        if (string.IsNullOrWhiteSpace(Theme))
         {
-            Theme = AppTheme.Light;
+            Theme = ThemeNames.System;
         }
 
         if (!Enum.IsDefined(GridDensity))

@@ -267,6 +267,49 @@ public class ThemeDefinitionTests
     }
 
     /// <summary>
+    /// The shipped themes are written in the same format as anyone's own, so they are parsed rather than compiled -
+    /// which means a typo in one is a run-time absence, not a build error. This is what catches that, and it is the
+    /// only thing that would: <c>BuiltInThemes.All</c> deliberately drops what it cannot parse rather than throwing
+    /// during start-up.
+    /// </summary>
+    [Fact]
+    public void Every_built_in_theme_parses()
+    {
+        Assert.NotEmpty(BuiltInThemes.Sources);
+
+        foreach (var source in BuiltInThemes.Sources)
+        {
+            Assert.True(ThemeDefinition.TryParse(source, out _, out var error), error);
+        }
+
+        Assert.Equal(BuiltInThemes.Sources.Count, BuiltInThemes.All.Count);
+    }
+
+    [Fact]
+    public void Built_in_theme_names_are_distinct_and_not_reserved()
+    {
+        var names = BuiltInThemes.All.Select(static t => t.Name).ToList();
+
+        Assert.Equal(names.Count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.All(names, static name => Assert.False(ThemeDefinition.IsReservedName(name)));
+    }
+
+    /// <summary>
+    /// A shipped theme is also a worked example, so it must not be one that only works by accident: each has to
+    /// name a base explicitly and change enough to be visibly different from it.
+    /// </summary>
+    [Fact]
+    public void Every_built_in_theme_recolours_at_least_the_window_and_the_text()
+    {
+        foreach (var theme in BuiltInThemes.All)
+        {
+            Assert.Contains("SurfaceBrush", theme.Colors.Keys);
+            Assert.Contains("TextBrush", theme.Colors.Keys);
+            Assert.Contains("AccentBrush", theme.Colors.Keys);
+        }
+    }
+
+    /// <summary>
     /// The contract is a list a human maintains, so this guards the things that would silently break it: a
     /// duplicate name would make one entry unreachable, and an empty description would leave a blank row in the
     /// settings dialog.

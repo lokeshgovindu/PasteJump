@@ -80,6 +80,12 @@ public partial class App : Application
 
     private ThemeManager _theme = null!;
 
+    /// <summary>
+    /// The themes on offer beyond Light, Dark and System - shipped and user-authored. Read once at start-up and
+    /// again whenever the settings dialog opens, so a file added while the app was running needs no restart.
+    /// </summary>
+    private ThemeCatalog _themes = null!;
+
     private HistoryWindow? _historyWindow;
     private SettingsWindow? _settingsWindow;
     private ShortcutHelpWindow? _helpWindow;
@@ -175,7 +181,12 @@ public partial class App : Application
 
         // Before any window is constructed, so the first one painted is already the right colour
         // rather than flashing light and then re-rendering.
-        _theme = new ThemeManager(this);
+        // The catalogue is read before the first Apply, so a theme chosen last session is in force from the first
+        // window rather than after the settings dialog has been opened once.
+        _themes = new ThemeCatalog(_paths);
+        _themes.Refresh();
+
+        _theme = new ThemeManager(this, _themes);
         _theme.Apply(_settings.Theme);
 
         StartupTrace.Mark("theme");
@@ -823,16 +834,71 @@ public partial class App : Application
                 _paths.ClipsLocation,
                 _paths.SettingsLocation,
                 _paths.ClipsLocation == DataLocation.CustomFolder ? _paths.ClipsRoot : null,
-                _paths.SettingsLocation == DataLocation.CustomFolder ? _paths.SettingsRoot : null));
+                _paths.SettingsLocation == DataLocation.CustomFolder ? _paths.SettingsRoot : null,
+                _themes));
             _settingsWindow.SettingsApplied += OnSettingsApplied;
             _settingsWindow.DataLocationChangeRequested += OnDataLocationChangeRequested;
             _settingsWindow.LegacyImportRequested += OnLegacyImportRequested;
+            _settingsWindow.ThemeCreationRequested += OnThemeCreationRequested;
+            _settingsWindow.ThemesFolderRequested += OnThemesFolderRequested;
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Show();
         }
         else
         {
             _settingsWindow.Activate();
+        }
+    }
+
+    /// <summary>
+    /// Writes the palette currently in force out as a theme file, then shows it in Explorer.
+    /// <para>
+    /// The palette comes from <see cref="ThemeManager.CurrentPalette"/> rather than from the theme's own definition,
+    /// so what lands in the file is what is on screen - a partial theme's inherited keys included. That is the whole
+    /// point of "from this one": a starting point with every key filled in, whatever the theme it came from named.
+    /// </para>
+    /// </summary>
+    private void OnThemeCreationRequested(string suggestedName)
+    {
+        try
+        {
+            var path = _themes.WriteStartingPoint(suggestedName, _theme.IsDark, _theme.CurrentPalette);
+
+            // Selected in Explorer rather than merely opening the folder: a themes folder with several files in it
+            // would otherwise leave the user hunting for the one just written.
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            MessageDialog.Warn(
+                $"The theme file could not be written to {_themes.Folder}.\n\n{exception.Message}",
+                "Could not create the theme",
+                _settingsWindow);
+        }
+    }
+
+    private void OnThemesFolderRequested()
+    {
+        try
+        {
+            // Created first: the folder does not exist until a theme has been written, and opening Explorer on a
+            // path that is not there fails with a dialog of its own that explains nothing.
+            Directory.CreateDirectory(_themes.Folder);
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_themes.Folder)
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            MessageDialog.Warn(
+                $"The themes folder could not be opened.\n\n{exception.Message}",
+                "Could not open the folder",
+                _settingsWindow);
         }
     }
 

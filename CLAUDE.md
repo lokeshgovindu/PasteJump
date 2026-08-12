@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 833 passing (`dotnet test`) - 781 in Core.Tests, 52 in Interop.Tests |
+| Tests | 876 passing (`dotnet test`) - 824 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -61,16 +61,9 @@ is a different chord and a few applications bind it elsewhere.
 
 ### Asked for, not yet built
 
-1. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
-   `Application.Resources.MergedDictionaries[0]` and `AppTheme` has exactly three values. A user-authored theme
-   means the palette becomes data — a file of named colours — rather than a compiled `ResourceDictionary`, so:
-   every key in `Light.xaml`/`Dark.xaml` becomes a contract that a theme file must satisfy (a missing key
-   resolves to *nothing* and the control renders unstyled, silently — the trap this file already warns about
-   twice), `AppTheme` stops being an enum, and the DWM title-bar and border calls need re-pushing per theme as
-   `RefreshThemedBorders` already does. Deciding what happens to a theme file that omits keys, or names a colour
-   that will not parse, is the design question.
+Nothing. The list is empty for the first time — everything asked for has been built or explicitly dropped.
 
-Explicitly **rejected** in that same review, so they do not need revisiting: LAN peer-to-peer sync (fights the
+Explicitly **rejected** in the Ditto/CopyQ feature review, so they do not need revisiting: LAN peer-to-peer sync (fights the
 single-writer SQLite model — two machines on one folder corrupt the store), scripting and plugins, cloud accounts,
 and CopyQ-style tabs (channels were dropped deliberately). Content-based exclusion of sensitive clips was offered
 and not chosen.
@@ -120,7 +113,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      781 tests.
+tests/PasteJump.Core.Tests      824 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -756,6 +749,45 @@ that immediately caught two real bugs. Expect to do the same again.
   how the app was published. `AppPaths.AssetsDirectory` was the other, and is gone — the icons it existed for
   are embedded now, so nothing is looked up beside the exe but that one document.
 
+### Themes are data now
+
+- **A theme is a JSON file of named colours, and `PaletteKeys` in `Core` is the contract.** 25 keys, and the
+  design turns on one fact: a key a theme fails to supply resolves to **nothing** through `DynamicResource`, and
+  the control renders unstyled *silently*. Demanding all 25 would be the only safe rule, so instead **a theme
+  inherits from Light or Dark and overrides what it names** — a three-line file that recolours the accent is legal
+  and complete. `ThemeManager` always loads the base palette in full and writes the theme's keys over it.
+- **`basedOn` does double duty and both halves matter.** It fills the omitted keys *and* decides whether Windows
+  draws dark title bars — those come from a DWM call, not the palette, so a dark theme declaring itself light puts
+  correct content inside a white title bar. `OnUserPreferenceChanged` therefore ignores an OS switch unless the
+  chosen theme is literally `System`: a custom theme states its own base and must not be repainted underneath.
+- **An unknown key is refused, not ignored.** `SurfceBrush` would otherwise load cleanly and do nothing, and the
+  author could not tell that from a colour that merely looks wrong. Keys are **case-sensitive** because WPF's own
+  resource lookup is — accepting `surfacebrush` would validate and then have no effect. `TryParse` refuses rather
+  than degrading to defaults, unlike the settings parsers, because a person chose this file.
+- **`VerifyPaletteContract` in the UI smoke harness is the only thing that can catch the XAML and `PaletteKeys`
+  drifting apart**, and it checks both directions plus the resource *type* of every key: a key in one and not the
+  other is either a theme setting that does nothing or a colour nobody can theme, and neither surfaces as an error.
+  Verified by renaming one key in `Light.xaml`: exit 2, both halves named.
+- **The two shipped extras are theme *files*, not compiled dictionaries.** `BuiltInThemes` holds Midnight and
+  Sepia as JSON in the same format a user writes, so there is one code path rather than two and the format is kept
+  honest. Light and Dark stay as XAML because they are the **bases** — something has to define all 25 keys.
+- **`Theme` is a name, not an enum, and that cost nothing on disk.** `AppTheme` is gone; the setting was already
+  written through `JsonStringEnumConverter`, so an existing file saying `"Theme": "Dark"` reads unchanged. An
+  *unknown* name is deliberately **not** corrected by `Normalise` — a theme file can be missing for a moment (an
+  unplugged drive, a file mid-edit) and rewriting the setting would throw the choice away the first time that
+  happened. `ThemeManager` falls back to following Windows without touching what is stored.
+- **The palette URIs are absolute `pack://…/PasteJump;component/…` and must stay that way.** They were relative,
+  which resolves against the **entry** assembly — fine in the app, and `Cannot locate resource 'themes/light.xaml'`
+  the moment the UI smoke harness drove `ThemeManager` from its own executable. Same lesson as `TrayIconArt`.
+- **"Create a Theme from This One" writes the live palette, not the theme's own definition**, so what lands in the
+  file is what is on screen with every key filled in — including the ones a partial theme inherited. Generated from
+  `PaletteKeys` and the live `ResourceDictionary`, so it cannot fall behind the contract, and Explorer is opened
+  with `/select` on the new file rather than merely on the folder.
+- **A bad theme file is reported in the settings dialog and nowhere else.** `ThemeCatalog.Refresh` skips what it
+  cannot parse rather than failing at start-up, where there is nothing to report into — so the Appearance tab's
+  `ThemeProblems` line is the only place the reason for a missing theme can appear. A user theme whose name matches
+  a shipped one *replaces* it, which is how Midnight gets tweaked without inventing a name.
+
 ### Theming landmines
 
 Every one of these compiles, builds clean, and silently defeats the theme.
@@ -1065,7 +1097,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 833 tests
+dotnet test                                         # 876 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

@@ -1,4 +1,5 @@
 using PasteJump.Core.Settings;
+using PasteJump.Core.Theming;
 using Xunit;
 
 namespace PasteJump.Core.Tests;
@@ -16,7 +17,7 @@ public class SettingsTransferTests
         var original = new PasteJumpSettings
         {
             MaxClips = 1_234,
-            Theme = AppTheme.Dark,
+            Theme = ThemeNames.Dark,
             CopyNotificationMs = 42,
             TrayLeftClick = TrayClickAction.Menu,
             PasteModeKeys = "tags=J;format=",
@@ -28,7 +29,7 @@ public class SettingsTransferTests
         Assert.Equal(string.Empty, error);
         Assert.NotNull(imported);
         Assert.Equal(1_234, imported.MaxClips);
-        Assert.Equal(AppTheme.Dark, imported.Theme);
+        Assert.Equal(ThemeNames.Dark, imported.Theme);
         Assert.Equal(42, imported.CopyNotificationMs);
         Assert.Equal(TrayClickAction.Menu, imported.TrayLeftClick);
         Assert.Equal(["keepass.exe", "1password.exe"], imported.IgnoredProcesses);

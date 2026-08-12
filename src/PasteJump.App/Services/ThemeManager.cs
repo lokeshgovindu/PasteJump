@@ -1,7 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using PasteJump.Core.Settings;
+using PasteJump.Core.Theming;
 using Microsoft.Win32;
 
 namespace PasteJump.App.Services;
@@ -26,7 +28,7 @@ public sealed class ThemeManager : IDisposable
     private const string PersonalizeKey = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
     /// <summary>
-    /// Governs application windows. What <see cref="AppTheme.System"/> follows.
+    /// Governs application windows. What <c>System</c> follows.
     /// <para>
     /// Note this is <em>not</em> the setting the taskbar and notification area obey - that is
     /// <c>SystemUsesLightTheme</c>, a genuinely independent value, and light-apps-on-a-dark-taskbar is
@@ -37,16 +39,30 @@ public sealed class ThemeManager : IDisposable
     /// </summary>
     private const string AppsUseLightThemeValue = "AppsUseLightTheme";
 
-    private static readonly Uri LightPalette = new("Themes/Light.xaml", UriKind.Relative);
-    private static readonly Uri DarkPalette = new("Themes/Dark.xaml", UriKind.Relative);
+    /// <summary>
+    /// The base palettes, as absolute component pack URIs rather than the relative paths these used to be.
+    /// <para>
+    /// A relative URI resolves against the <em>entry</em> assembly, so it worked in the application and threw
+    /// "Cannot locate resource" the moment anything else drove this class - which the UI smoke harness does, being
+    /// its own executable that references this one. The component form names the assembly, so it resolves from
+    /// either host. Same lesson as <c>TrayIconArt</c>'s pack URI.
+    /// </para>
+    /// </summary>
+    private static readonly Uri LightPalette = new("pack://application:,,,/PasteJump;component/Themes/Light.xaml", UriKind.Absolute);
+    private static readonly Uri DarkPalette = new("pack://application:,,,/PasteJump;component/Themes/Dark.xaml", UriKind.Absolute);
 
     private readonly Application _application;
-    private AppTheme _requested = AppTheme.Light;
+    private readonly ThemeCatalog? _catalog;
+    private string _requested = ThemeNames.Light;
     private bool _disposed;
 
-    public ThemeManager(Application application)
+    public ThemeManager(Application application, ThemeCatalog? catalog = null)
     {
         _application = application ?? throw new ArgumentNullException(nameof(application));
+
+        // Optional so the UI smoke harness can build a manager with no data folder behind it. Without a catalog only
+        // the three built-in names resolve, which is all that harness needs.
+        _catalog = catalog;
 
         // Subscribed unconditionally rather than only while Theme is System. Keeping the subscription
         // tied to the current setting would mean attaching and detaching it from Apply, and the handler
@@ -54,25 +70,39 @@ public sealed class ThemeManager : IDisposable
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
     }
 
-    /// <summary>The theme actually in force: never <see cref="AppTheme.System"/>, always resolved.</summary>
+    /// <summary>The theme actually in force: never <c>System</c> and never a missing name, always resolved.</summary>
     public bool IsDark { get; private set; }
 
-    /// <summary>Applies a theme, resolving <see cref="AppTheme.System"/> against the OS setting.</summary>
-    public void Apply(AppTheme theme)
+    /// <summary>
+    /// The palette dictionary currently in force. Handed to <see cref="ThemeCatalog.WriteStartingPoint"/> so an
+    /// exported theme starts from the colours on screen.
+    /// </summary>
+    public ResourceDictionary CurrentPalette { get; private set; } = new();
+
+    /// <summary>
+    /// Applies a theme by name: <c>System</c>, <c>Light</c>, <c>Dark</c>, or any theme in the catalogue.
+    /// <para>
+    /// A name that resolves to nothing <b>falls back to following Windows</b> and says nothing about it. This is
+    /// reached during start-up, before there is any window to report into, and a theme file can be legitimately
+    /// absent for a moment - an unplugged drive, a file being edited. The stored setting is deliberately left
+    /// untouched by the fallback, so the choice comes back when the file does.
+    /// </para>
+    /// </summary>
+    public void Apply(string? theme)
     {
-        _requested = theme;
+        _requested = theme ?? ThemeNames.System;
 
-        var dark = theme switch
-        {
-            AppTheme.Dark => true,
-            AppTheme.Light => false,
-            _ => SystemPrefersDark(),
-        };
+        var custom = ThemeNames.IsBuiltIn(_requested) ? null : _catalog?.Find(_requested);
 
-        ApplyResolved(dark);
+        var dark = custom is not null
+            ? custom.BasedOn == ThemeBase.Dark
+            : string.Equals(_requested, ThemeNames.Dark, StringComparison.OrdinalIgnoreCase)
+                || (!string.Equals(_requested, ThemeNames.Light, StringComparison.OrdinalIgnoreCase) && SystemPrefersDark());
+
+        ApplyResolved(dark, custom);
     }
 
-    private void ApplyResolved(bool dark)
+    private void ApplyResolved(bool dark, ThemeDefinition? custom = null)
     {
         var merged = _application.Resources.MergedDictionaries;
 
@@ -86,10 +116,21 @@ public sealed class ThemeManager : IDisposable
 
         IsDark = dark;
 
-        merged[PaletteSlot] = new ResourceDictionary
+        // The base always loads in full, even for a custom theme: it is what supplies the keys the theme does not
+        // name. A dictionary built only from a theme's own keys would leave the rest resolving to nothing, and the
+        // controls that referenced them would render unstyled with no error anywhere.
+        var palette = new ResourceDictionary
         {
             Source = dark ? DarkPalette : LightPalette,
         };
+
+        if (custom is not null)
+        {
+            Overlay(palette, custom);
+        }
+
+        CurrentPalette = palette;
+        merged[PaletteSlot] = palette;
 
         // Window chrome is drawn by the OS, not by WPF, so it does not follow the palette. Without
         // this a dark window keeps a white title bar.
@@ -127,9 +168,45 @@ public sealed class ThemeManager : IDisposable
         _ = DwmSetWindowAttribute(handle, 19, ref dark, sizeof(int));
     }
 
+    /// <summary>
+    /// Writes a theme's colours over the base palette, in place.
+    /// <para>
+    /// The kind decides what is built, and getting it wrong is invisible rather than fatal: a <c>Color</c> where a
+    /// brush is expected makes <c>DropShadowEffect.Color</c> throw at render time, and a brush where a colour is
+    /// expected simply does not apply. The one gradient key accepts a single colour too, which becomes a flat
+    /// brush - a theme should not have to care that the default happens to be a gradient.
+    /// </para>
+    /// </summary>
+    private static void Overlay(ResourceDictionary palette, ThemeDefinition theme)
+    {
+        foreach (var (name, value) in theme.Colors)
+        {
+            var kind = PaletteKeys.Find(name)?.Kind ?? PaletteEntryKind.Brush;
+            var top = ToColor(value.Top);
+
+            palette[name] = kind switch
+            {
+                PaletteEntryKind.Color => top,
+
+                PaletteEntryKind.Gradient when value.Bottom is { } bottom => new LinearGradientBrush(
+                    top,
+                    ToColor(bottom),
+                    new Point(0, 0),
+                    new Point(0, 1)),
+
+                _ => new SolidColorBrush(top),
+            };
+        }
+    }
+
+    private static Color ToColor(ThemeColor color) => Color.FromArgb(color.A, color.R, color.G, color.B);
+
     private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
     {
-        if (e.Category != UserPreferenceCategory.General || _requested != AppTheme.System)
+        // Only while following Windows, and only for a built-in name: a custom theme states its own base, so the OS
+        // switching to dark must not repaint it.
+        if (e.Category != UserPreferenceCategory.General
+            || !string.Equals(_requested, ThemeNames.System, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }

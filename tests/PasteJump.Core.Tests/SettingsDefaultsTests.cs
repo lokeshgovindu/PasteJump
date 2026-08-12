@@ -1,4 +1,5 @@
 using PasteJump.Core.Settings;
+using PasteJump.Core.Theming;
 using Xunit;
 
 namespace PasteJump.Core.Tests;
@@ -22,19 +23,36 @@ public class SettingsDefaultsTests
     /// </summary>
     [Fact]
     public void The_theme_follows_Windows()
-        => Assert.Equal(AppTheme.System, Fresh.Theme);
+        => Assert.Equal(ThemeNames.System, Fresh.Theme);
 
     /// <summary>
-    /// And note this is NOT the enum's zero value, which is <see cref="AppTheme.Light"/>. A settings file that
-    /// spells out <c>"Theme": 0</c> therefore still gets Light - only an absent property picks up the default.
-    /// That is the right way round, but it is the sort of thing worth stating so nobody "fixes" it by renumbering
-    /// the enum and silently reassigning everyone's stored value.
+    /// The theme is a NAME now rather than the <c>AppTheme</c> enum it used to be, because the set of themes is no
+    /// longer fixed. The change is invisible on disk - the enum was written through
+    /// <c>JsonStringEnumConverter</c>, so an existing file already says <c>"Theme": "Dark"</c> - and this asserts
+    /// the stored spelling so that stays true.
     /// </summary>
     [Fact]
-    public void The_theme_default_is_deliberately_not_the_enums_zero()
+    public void The_theme_is_stored_as_a_name()
     {
-        Assert.Equal(AppTheme.Light, default(AppTheme));
-        Assert.NotEqual(default, Fresh.Theme);
+        Assert.Equal("System", Fresh.Theme);
+        Assert.True(ThemeNames.IsBuiltIn(Fresh.Theme));
+    }
+
+    /// <summary>
+    /// An unrecognised name is deliberately <em>not</em> corrected: it may be a theme file that is missing for the
+    /// moment - an unplugged drive, a file mid-edit - and rewriting the setting would throw the user's choice away
+    /// the first time it was unavailable. Only an empty value is repaired.
+    /// </summary>
+    [Fact]
+    public void Normalise_keeps_an_unknown_theme_name_but_repairs_an_empty_one()
+    {
+        var missing = new PasteJumpSettings { Theme = "Solarized" };
+        missing.Normalise();
+        Assert.Equal("Solarized", missing.Theme);
+
+        var blank = new PasteJumpSettings { Theme = "   " };
+        blank.Normalise();
+        Assert.Equal(ThemeNames.System, blank.Theme);
     }
 
     [Fact]
@@ -77,7 +95,7 @@ public class SettingsDefaultsTests
 
         settings.Normalise();
 
-        Assert.Equal(AppTheme.System, settings.Theme);
+        Assert.Equal(ThemeNames.System, settings.Theme);
         Assert.Equal(GridDensity.Cozy, settings.GridDensity);
         Assert.Equal(500, settings.CopyNotificationMs);
     }

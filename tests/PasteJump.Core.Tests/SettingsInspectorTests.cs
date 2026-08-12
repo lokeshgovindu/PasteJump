@@ -105,13 +105,28 @@ public sealed class SettingsInspectorTests
     [Fact]
     public void An_enum_lists_its_legal_values_as_its_type()
     {
-        // More useful to the reader than "Enum": it says what may be written in settings.json.
+        // More useful to the reader than "Enum": it says what may be written in PasteJump.json.
+        var row = SettingsInspector.Describe(new PasteJumpSettings())
+            .Single(r => r.Name == nameof(PasteJumpSettings.GridDensity));
+
+        Assert.Contains("Roomy", row.TypeName, StringComparison.Ordinal);
+        Assert.Contains("Cozy", row.TypeName, StringComparison.Ordinal);
+        Assert.Contains("Compact", row.TypeName, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The theme used to be one of those enums and is a name now, so this page can no longer list what is legal -
+    /// the set includes whatever theme files exist. Asserted rather than left implicit, because the obvious "fix"
+    /// would be to special-case it back into a value list that is complete only until someone writes a theme.
+    /// </summary>
+    [Fact]
+    public void The_theme_is_a_name_so_its_legal_values_are_not_listed()
+    {
         var row = SettingsInspector.Describe(new PasteJumpSettings())
             .Single(r => r.Name == nameof(PasteJumpSettings.Theme));
 
-        Assert.Contains("Light", row.TypeName, StringComparison.Ordinal);
-        Assert.Contains("Dark", row.TypeName, StringComparison.Ordinal);
-        Assert.Contains("System", row.TypeName, StringComparison.Ordinal);
+        Assert.Equal("System", row.Value);
+        Assert.DoesNotContain("Light", row.TypeName, StringComparison.Ordinal);
     }
 
     [Fact]

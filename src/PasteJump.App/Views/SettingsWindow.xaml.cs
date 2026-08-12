@@ -11,6 +11,7 @@ using PasteJump.Core.Formatting;
 using PasteJump.Core.Paste;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
+using PasteJump.Core.Theming;
 
 namespace PasteJump.App.Views;
 
@@ -21,15 +22,27 @@ namespace PasteJump.App.Views;
 public partial class SettingsWindow : Window
 {
     /// <summary>
-    /// Theme options as shown in the combo box. A label-to-enum table rather than binding the enum
-    /// directly, so the wording can say what "System" actually means.
+    /// The three built-in theme choices and how they are worded. A label-to-name table rather than showing the
+    /// stored value directly, so "System" can say what it actually means.
+    /// <para>
+    /// No longer the whole list: themes from <see cref="ThemeCatalog"/> are appended at load, under their own names.
+    /// A user theme is offered by name with no relabelling, which is why the parser refuses these three as names -
+    /// a file called "Dark" would appear twice and be unselectable.
+    /// </para>
     /// </summary>
-    private static readonly (AppTheme Theme, string Label)[] ThemeChoices =
+    private static readonly (string Name, string Label)[] BuiltInThemeChoices =
     [
-        (AppTheme.Light, "Light"),
-        (AppTheme.Dark, "Dark"),
-        (AppTheme.System, "Same as Windows"),
+        (ThemeNames.Light, "Light"),
+        (ThemeNames.Dark, "Dark"),
+        (ThemeNames.System, "Same as Windows"),
     ];
+
+    /// <summary>
+    /// Theme names in the order the combo lists them, filled at load. Parallel to the combo's items, so the
+    /// selected index maps back to a name without parsing the label - which would break the moment a user named a
+    /// theme "Light " with a trailing space.
+    /// </summary>
+    private readonly List<string> _themeNames = [];
 
     /// <summary>
     /// Paste-chord options. Labelled as the user would name the keys, with the reason for the second one
@@ -104,18 +117,31 @@ public partial class SettingsWindow : Window
     /// </summary>
     private readonly ObservableCollection<string> _excluded = [];
 
+    /// <summary>
+    /// The themes on offer beyond the three built-in names, or null when there is no catalogue - which is the case
+    /// in the UI smoke harness, where there is no data folder to read theme files from.
+    /// </summary>
+    private readonly ThemeCatalog? _themes;
+
     /// <param name="clipsPath">The custom folder in force, when <paramref name="clipsLocation"/> is one.</param>
     /// <param name="settingsPath">As <paramref name="clipsPath"/>, for the settings half.</param>
+    /// <param name="themes">
+    /// Refreshed before the list is built, so a theme file added while the application was running appears without
+    /// a restart. Opening this dialog is the moment someone who has just written one will look.
+    /// </param>
     public SettingsWindow(
         PasteJumpSettings settings,
         FormatterRegistry formatters,
         DataLocation clipsLocation = DataLocation.ApplicationFolder,
         DataLocation settingsLocation = DataLocation.ApplicationFolder,
         string? clipsPath = null,
-        string? settingsPath = null)
+        string? settingsPath = null,
+        ThemeCatalog? themes = null)
     {
         _baseline = settings;
         _formatters = formatters;
+        _themes = themes;
+        _themes?.Refresh();
         _baselineClipsLocation = clipsLocation;
         _baselineSettingsLocation = settingsLocation;
         _baselineClipsPath = clipsPath;
@@ -266,9 +292,26 @@ public partial class SettingsWindow : Window
         // reassigned loses any cell edit in progress.
         PasteDelayGrid.ItemsSource = _pasteDelays;
 
-        foreach (var choice in ThemeChoices)
+        // Built-ins first, then whatever the catalogue found, so a folder full of theme files cannot push
+        // "Same as Windows" off the end of the list.
+        foreach (var choice in BuiltInThemeChoices)
         {
+            _themeNames.Add(choice.Name);
             ThemeCombo.Items.Add(choice.Label);
+        }
+
+        foreach (var theme in _themes?.Themes ?? [])
+        {
+            _themeNames.Add(theme.Name);
+            ThemeCombo.Items.Add(theme.Name);
+        }
+
+        // The only place a skipped theme file can be reported. The catalogue deliberately does not fail at start-up
+        // over one, so without this a file with a typo in it would simply never appear and nothing would say why.
+        if (_themes is { Problems.Count: > 0 })
+        {
+            ThemeProblems.Text = "Some theme files were skipped - " + string.Join("; ", _themes.Problems);
+            ThemeProblems.Visibility = Visibility.Visible;
         }
 
         foreach (var choice in TrayLeftClickChoices)
@@ -365,7 +408,14 @@ public partial class SettingsWindow : Window
         TrayLeftClickCombo.SelectedItem = TrayLeftClickChoices
             .First(c => c.Action == source.TrayLeftClick).Label;
 
-        ThemeCombo.SelectedItem = ThemeChoices.First(c => c.Theme == source.Theme).Label;
+        // By index through _themeNames, so a theme whose name happens to look like a label cannot confuse it.
+        // An unknown name - a theme file that has gone - selects "Same as Windows", which is what is actually in
+        // force; the stored setting keeps the old name until the user presses OK, so a missing file does not
+        // silently rewrite their choice.
+        var themeIndex = _themeNames.FindIndex(n => string.Equals(n, source.Theme, StringComparison.OrdinalIgnoreCase));
+        ThemeCombo.SelectedIndex = themeIndex >= 0
+            ? themeIndex
+            : _themeNames.FindIndex(n => string.Equals(n, ThemeNames.System, StringComparison.Ordinal));
         DensityCombo.SelectedItem = DensityChoices.First(c => c.Density == source.GridDensity).Label;
 
         ShowCopyNotificationCheck.IsChecked = source.ShowCopyNotification;
@@ -1370,6 +1420,43 @@ public partial class SettingsWindow : Window
     private void OnImportClicked(object sender, RoutedEventArgs e) => LegacyImportRequested?.Invoke();
 
     /// <summary>
+    /// Writes the palette currently in force as a theme file and opens the folder on it.
+    /// <para>
+    /// Named after the theme in the combo, with a number appended if that file already exists - rather than
+    /// overwriting, which would destroy work, or refusing, which would leave the user to guess a free name. The file
+    /// is a complete copy of the current palette, so it is immediately valid and immediately editable.
+    /// </para>
+    /// </summary>
+    private void OnCreateThemeClicked(object sender, RoutedEventArgs e)
+    {
+        if (_themes is null || ThemeCreationRequested is null)
+        {
+            return;
+        }
+
+        // Named after what the combo is showing, since "from this one" means the theme on screen. " copy" is not
+        // decoration: a built-in name would be refused by the parser, and a user theme of the same name would
+        // replace the original in the catalogue - so the suggestion has to differ either way.
+        var basedOnName = ThemeCombo.SelectedIndex >= 0 && ThemeCombo.SelectedIndex < _themeNames.Count
+            ? _themeNames[ThemeCombo.SelectedIndex]
+            : ThemeNames.System;
+
+        ThemeCreationRequested.Invoke($"{basedOnName} copy");
+    }
+
+    private void OnOpenThemesFolderClicked(object sender, RoutedEventArgs e) => ThemesFolderRequested?.Invoke();
+
+    /// <summary>
+    /// Asks the host to write a theme file. Raised rather than done here because it needs the live palette and the
+    /// shell, neither of which a settings dialog should be reaching for - the same shape as
+    /// <see cref="LegacyImportRequested"/>.
+    /// </summary>
+    public event Action<string>? ThemeCreationRequested;
+
+    /// <summary>Asks the host to open the themes folder in Explorer.</summary>
+    public event Action? ThemesFolderRequested;
+
+    /// <summary>
     /// Puts a retention value changed behind the dialog's back into the box, and into the baseline.
     /// <para>
     /// Needed because the import can offer to switch retention off while this dialog is open. Without this the
@@ -2006,10 +2093,9 @@ public partial class SettingsWindow : Window
         // a fresh install would hold for the same choice.
         settings.DefaultFormatterId = formatter?.Id ?? FormatterRegistry.DefaultId;
 
-        var themeLabel = ThemeCombo.SelectedItem as string;
-        settings.Theme = ThemeChoices
-            .FirstOrDefault(c => string.Equals(c.Label, themeLabel, StringComparison.Ordinal))
-            .Theme;
+        settings.Theme = ThemeCombo.SelectedIndex >= 0 && ThemeCombo.SelectedIndex < _themeNames.Count
+            ? _themeNames[ThemeCombo.SelectedIndex]
+            : ThemeNames.System;
 
         var densityLabel = DensityCombo.SelectedItem as string;
         settings.GridDensity = DensityChoices

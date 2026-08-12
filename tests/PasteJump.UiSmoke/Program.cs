@@ -12,6 +12,7 @@ using PasteJump.Core.Model;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
+using PasteJump.Core.Theming;
 using PasteJump.Interop;
 
 namespace PasteJump.UiSmoke;
@@ -71,7 +72,7 @@ internal static class Program
             var settings = new PasteJumpSettings
             {
                 MaxClips = 500,
-                Theme = AppTheme.Dark,
+                Theme = ThemeNames.Dark,
                 OverlayPreviewMaxWidth = 800,
                 BeepOnCopy = true,
                 IgnoredProcesses = ["keepass.exe", "1password.exe"],
@@ -298,13 +299,47 @@ internal static class Program
                 // running-app picker had. This exists to prove the read works, not to be published.
                 Check("OverlayWindow-TextFile", () => RenderOverlay(TextFileFrame(root)));
             }
+
+            // A shipped theme applied through the real ThemeManager, which is the only exercise of the whole custom
+            // path: catalogue, name resolution, base palette, colours written over it. The two theme passes above
+            // load a palette dictionary directly and prove nothing about any of that.
+            //
+            // Sepia rather than Midnight because it is light-based, so a shot of it can go in the help beside the
+            // others - and because a warm light theme makes it obvious at a glance that more than a light/dark
+            // switch happened.
+            using (var manager = new ThemeManager(app, new ThemeCatalog(paths)))
+            {
+                manager.Apply("Sepia");
+                _theme = "Sepia";
+
+                Check("HistoryWindow-CustomTheme", () =>
+                {
+                    var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
+
+                    window.Loaded += (_, _) => window.SelectRowForSmokeTest(2);
+                    return window;
+                });
+
+                Check("SettingsWindow-CustomTheme", () => new SettingsWindow(settings, formatters, DataLocation.UserProfile));
+
+                if (!manager.IsDark)
+                {
+                    Console.WriteLine("  custom theme: Sepia applied, light-based as declared");
+                }
+                else
+                {
+                    _failures++;
+                    Console.WriteLine("  FAIL  Sepia declares basedOn light but resolved as dark");
+                }
+            }
         }
 
         TryDelete(root);
 
         // Outside the theme loop: the tray icons are three application states, not a light/dark pair, so
-        // running this twice would only assert the same thing again.
+        // running this twice would only assert the same thing again. The palette check does both themes itself.
         Console.WriteLine();
+        VerifyPaletteContract();
         VerifyTrayIcons();
 
         Console.WriteLine();
@@ -474,6 +509,65 @@ internal static class Program
         }
 
         tip.IsOpen = false;
+    }
+
+    /// <summary>
+    /// Checks the real palette dictionaries against <see cref="PaletteKeys"/>, in both themes.
+    /// <para>
+    /// This is the guard that makes user-authored themes safe. The contract in <c>Core</c> is what a theme file is
+    /// validated against, and the XAML is what actually gets loaded - so a key added to one and not the other is a
+    /// theme setting that silently does nothing, or a key nobody can theme. Neither shows up as an error anywhere
+    /// else, because a missing <c>DynamicResource</c> simply resolves to nothing.
+    /// </para>
+    /// <para>
+    /// It also checks the <em>type</em> of each resource, since the builder switches on the declared kind: a key
+    /// listed as a brush but declared as a <c>Color</c> in XAML would produce a theme override that throws at
+    /// render time rather than one that fails here.
+    /// </para>
+    /// </summary>
+    private static void VerifyPaletteContract()
+    {
+        foreach (var themeName in new[] { "Light", "Dark" })
+        {
+            var palette = Load($"Themes/{themeName}.xaml");
+            var declared = palette.Keys.OfType<string>().ToHashSet(StringComparer.Ordinal);
+            var expected = PaletteKeys.Names.ToHashSet(StringComparer.Ordinal);
+
+            var missing = expected.Except(declared).OrderBy(static k => k, StringComparer.Ordinal).ToList();
+            var extra = declared.Except(expected).OrderBy(static k => k, StringComparer.Ordinal).ToList();
+
+            Console.WriteLine($"  palette {themeName,-6} {declared.Count} keys");
+
+            if (missing.Count > 0)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  {themeName}.xaml defines no {string.Join(", ", missing)} - a theme could set it and nothing would happen");
+            }
+
+            if (extra.Count > 0)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  {themeName}.xaml defines {string.Join(", ", extra)}, which PaletteKeys does not list - no theme can change it");
+            }
+
+            foreach (var key in PaletteKeys.All.Where(k => declared.Contains(k.Name)))
+            {
+                var value = palette[key.Name];
+
+                var ok = key.Kind switch
+                {
+                    PaletteEntryKind.Color => value is System.Windows.Media.Color,
+                    PaletteEntryKind.Gradient => value is System.Windows.Media.Brush,
+                    _ => value is System.Windows.Media.SolidColorBrush,
+                };
+
+                if (!ok)
+                {
+                    _failures++;
+                    Console.WriteLine($"  FAIL  {themeName}.xaml's {key.Name} is a {value?.GetType().Name ?? "null"}, which does not match its declared kind {key.Kind}");
+                }
+            }
+        }
     }
 
     /// <summary>
