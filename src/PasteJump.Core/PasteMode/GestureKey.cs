@@ -45,6 +45,16 @@ public enum GestureKey
     CycleFormatter,
     CycleKindFilter,
     TogglePin,
+
+    /// <summary>
+    /// Marks or unmarks the current clip, so several can be pasted joined into one.
+    /// <para>
+    /// Deliberately not an entry point, like everything but <see cref="Paste"/>: it only means anything inside an
+    /// open session.
+    /// </para>
+    /// </summary>
+    ToggleJoinMark,
+
     EditTags,
     PushToClipboard,
     EditClip,
@@ -100,6 +110,7 @@ internal static class GestureKeyExtensions
         GestureKey.CycleFormatter => PasteAction.CycleFormatter,
         GestureKey.CycleKindFilter => PasteAction.CycleKindFilter,
         GestureKey.TogglePin => PasteAction.TogglePin,
+        GestureKey.ToggleJoinMark => PasteAction.ToggleJoinMark,
         GestureKey.EditTags => PasteAction.EditTags,
         GestureKey.PushToClipboard => PasteAction.PushToClipboard,
         GestureKey.EditClip => PasteAction.EditClip,

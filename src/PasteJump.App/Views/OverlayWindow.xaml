@@ -116,6 +116,17 @@
                                    Foreground="{DynamicResource AccentBrush}"
                                    Margin="0,0,8,0"
                                    Visibility="Collapsed" />
+                        <!--
+                            Marks change what releasing Ctrl does, so they are not optional decoration either:
+                            a session that pastes three clips while the preview shows one would read as the wrong
+                            clip being pasted. It carries the count, and a tick when THIS clip is one of them -
+                            the count alone would not say whether pressing the key again adds or removes.
+                        -->
+                        <TextBlock x:Name="JoinChip"
+                                   Style="{StaticResource ChipText}"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   Margin="0,0,8,0"
+                                   Visibility="Collapsed" />
                         <TextBlock x:Name="PopChip"
                                    Style="{StaticResource ChipText}"
                                    Foreground="{DynamicResource DangerBrush}"

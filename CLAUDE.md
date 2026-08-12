@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 815 passing (`dotnet test`) - 763 in Core.Tests, 52 in Interop.Tests |
+| Tests | 833 passing (`dotnet test`) - 781 in Core.Tests, 52 in Interop.Tests |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
@@ -63,17 +63,12 @@ is a different chord and a few applications bind it elsewhere.
 
 In the order they were requested. Both came out of one feature review against Ditto and CopyQ.
 
-1. **Marking clips to join *during the gesture*.** Half of "join several clips into one paste" now exists — see
-   the note below — but only in the history window, by selecting rows. The other half is marking clips while the
-   overlay is up and pasting them joined when Ctrl is released, which needs a letter in `PasteKeyMap`, a set of
-   marked ids on the session, and the overlay showing how many are marked. Note the mark has to survive stepping
-   and searching but not the end of a session, for the same reason `PasteKindFilter` resets.
-2. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
+1. **Encryption at rest** for the clip payloads and blobs. **One decision has to be made first and it is not
    mine:** a DPAPI key ties the store to one Windows account, which ends "copy the exe to a USB stick and it takes
    its history with it" — the property the portable ZIP exists for. A passphrase keeps portability but has to be
    typed at every logon, which is intolerable for a resident app, and a key file beside the data is security
    theatre. Put that choice to the user before writing any of it.
-3. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
+2. **More themes, and user-defined ones.** Today `ThemeManager` swaps a palette dictionary at
    `Application.Resources.MergedDictionaries[0]` and `AppTheme` has exactly three values. A user-authored theme
    means the palette becomes data — a file of named colours — rather than a compiled `ResourceDictionary`, so:
    every key in `Light.xaml`/`Dark.xaml` becomes a contract that a theme file must satisfy (a missing key
@@ -121,7 +116,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      763 tests.
+tests/PasteJump.Core.Tests      781 tests.
 tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -442,6 +437,42 @@ that immediately caught two real bugs. Expect to do the same again.
   restated by whoever draws the dialog. Note the diagnostic that found this: `clip` had 14 rows against a
   `sqlite_sequence` of 55, and history was intact — `PruneHistoryOlderThan` never touches `clip`, and
   `EvictBeyond` was capped at 1000, so a bulk `DELETE FROM clip WHERE pinned = 0` was the only candidate left.
+- **`J` marks clips during the gesture, and releasing Ctrl pastes every marked clip joined.** The other half of
+  joining. Decisions worth keeping:
+  - **Marks win over the cursor.** With anything marked, the commit ignores where the cursor ended up — that is
+    the point of having marked. Checked *before* the ordinary path and independently of whether there is a current
+    clip at all, so a search matching nothing cannot throw a set of marks away.
+  - **Mark order is paste order, and re-marking moves a clip to the end.** This departs from the history window,
+    which uses display order — deliberately: a `DataGrid` cannot report click order, while during a gesture the
+    sequence is knowable and deliberate. Re-marking as "move to the end" is what lets a sequence be corrected
+    without starting again.
+  - **Marking does not move the cursor.** A key that also stepped would make "this one and that one" require
+    counting; the two useful sequences are mark-step-mark and mark-search-mark, both driven by the user.
+  - **Marks are ids, so they survive a search or a kind filter** — narrowing the stack to find the next clip to
+    mark is the obvious way to use this. They do *not* survive the end of a session, and are not governed by
+    `PreserveClipPosition`, exactly as `PasteKindFilter` is not: a surviving mark would make the next ordinary
+    Ctrl+V paste something assembled minutes ago.
+  - **Deleting a marked clip unmarks it.** `MarkedClips` would skip it anyway, but a chip reading `JOIN 3` when
+    two clips remain is a lie about what releasing Ctrl will do.
+  - **Shift-popping a marked session deletes every marked clip.** Consistent with "pop deletes what was pasted",
+    and deliberate twice over on the user's part — they marked each clip and held Shift while releasing Ctrl.
+  - **All marks deleted mid-session passes the keystroke through** rather than swallowing it. Same rule as an
+    empty store, and the same reason: silently breaking Ctrl+V is the worst failure this app has.
+  - **The overlay shows `JOIN n` and a tick when the current clip is one of them.** Not decoration, for the same
+    reason as the kind-filter chip; the tick is separate from the count because the count alone will not say
+    whether pressing `J` again adds this clip or removes it. `J: join` is in the footer hint too, since nothing
+    on screen hints the feature exists until the first clip is marked.
+  Joining is the **host's** job, not the controller's: it needs each clip's payload text (the store) and the
+  separator (a setting), while the controller knows only which clips were chosen. The formatter applies to the
+  joined text rather than per clip, so "trim" trims the block — which matches what the overlay says is about to
+  happen: one clip, pasted once.
+- **Adding a bound letter can break an existing configuration, and `Parse` now stops it.** `J` was free when
+  "mark to join" was given it — but **free is not unused**: anyone who had moved pin to `J` would have lost it
+  silently, because `Rebuild` lets the later entry win. An **explicitly stored binding now beats another action's
+  default**, and the defaulted action is left unbound rather than stealing the letter; it shows as *Off* in the
+  Keys tab, where a free letter can be given to it. This applies to every action added from here on. Note the
+  guard tests that caught this: five failed the moment `J` was bound, including `An_unbound_letter_is_accepted('J')`
+  and the count in `TriggerKeyAndHotkeyTests` — that count is meant to be edited, and is what forces the question.
 - **Selecting several rows and pressing Copy joins them into ONE clip, and the button relabels itself to say
   so.** Four decisions worth keeping, each chosen rather than observed — Ditto's "paste as one" is the closest
   precedent, and Clipjump has nothing like it:
@@ -1030,7 +1061,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 815 tests
+dotnet test                                         # 833 tests
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

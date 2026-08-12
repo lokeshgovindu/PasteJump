@@ -43,6 +43,16 @@ public sealed class PasteModeController
     private int _jumpDirection = 1;
     private long? _preservedClipId;
 
+    /// <summary>
+    /// Clips marked to be pasted joined, in the order they were marked.
+    /// <para>
+    /// A list rather than a set, because the order is the user's: they mark clips in the sequence they want them.
+    /// Ids rather than clips, so a mark survives the window being rebuilt by a search or a kind filter - which it
+    /// must, since narrowing the stack to find the next clip to mark is the obvious way to use this.
+    /// </para>
+    /// </summary>
+    private readonly List<long> _marked = [];
+
     public PasteModeController(
         IClipCatalog catalog,
         IPasteModeHost host,
@@ -69,6 +79,12 @@ public sealed class PasteModeController
 
     /// <summary>Which kinds of clip the window is narrowed to. Reset to <see cref="PasteKindFilter.All"/> per session.</summary>
     public PasteKindFilter KindFilter { get; private set; } = PasteKindFilter.All;
+
+    /// <summary>How many clips are marked to be pasted joined. Zero means an ordinary single-clip paste.</summary>
+    public int MarkedCount => _marked.Count;
+
+    /// <summary>Whether the clip under the cursor is marked, so the overlay can say so.</summary>
+    public bool CurrentIsMarked => Current is { } current && _marked.Contains(current.Id);
 
     public int CursorIndex => _cursor;
 
@@ -206,6 +222,9 @@ public sealed class PasteModeController
             case PasteAction.TogglePin:
                 return TogglePin();
 
+            case PasteAction.ToggleJoinMark:
+                return ToggleJoinMark();
+
             case PasteAction.EditTags:
                 return EndAndDelegate(static (host, clip) => host.RequestTagEditor(clip));
 
@@ -318,6 +337,42 @@ public sealed class PasteModeController
 
         switch (CommitMode)
         {
+            // Marks win over the cursor, and that is the whole point of having marked: the clips the user picked
+            // are what gets pasted, wherever they happen to have left the cursor. Checked before the ordinary
+            // path, and independently of whether there is a Current at all - a search matching nothing must not
+            // throw away a set of marks.
+            case PasteCommitMode.Paste when _marked.Count > 0:
+            {
+                var marked = MarkedClips();
+
+                if (marked.Count == 0)
+                {
+                    // Every marked clip was deleted mid-session. Nothing to paste and nothing was chosen at the
+                    // cursor either, so this is the same case as an emptied window.
+                    _host.PassThroughPaste();
+                    EndSession();
+                    return PasteCommitKind.PassedThrough;
+                }
+
+                var popMarked = ShiftHeld;
+
+                _host.PasteJoined(marked, Formatter);
+
+                if (popMarked)
+                {
+                    // Pop deletes what was pasted, which with marks means all of them. Consistent rather than
+                    // cautious, and it is deliberate on the user's part twice over: they marked each clip, and
+                    // they held Shift while letting go of Ctrl.
+                    foreach (var clip in marked)
+                    {
+                        _catalog.Delete(clip.Id);
+                    }
+                }
+
+                EndSession();
+                return PasteCommitKind.Pasted;
+            }
+
             case PasteCommitMode.Paste when current is not null:
             {
                 var pop = ShiftHeld;
@@ -436,6 +491,55 @@ public sealed class PasteModeController
     }
 
     /// <summary>
+    /// Marks or unmarks this clip for a joined paste, and leaves the session open.
+    /// <para>
+    /// The cursor deliberately does not move. Marking is not stepping, and a key that advanced as well would make
+    /// "mark this one and that one" require counting - the two useful sequences are mark-step-mark and
+    /// mark-search-mark, both of which the user drives.
+    /// </para>
+    /// <para>
+    /// Returns <see cref="PasteCommitKind.None"/>, so the session is not reported as finished: nothing has been
+    /// pasted. Releasing Ctrl is still what commits.
+    /// </para>
+    /// </summary>
+    private PasteCommitKind ToggleJoinMark()
+    {
+        if (Current is not { } current)
+        {
+            return PasteCommitKind.None;
+        }
+
+        // Remove-or-add rather than a set, so unmarking and marking again moves the clip to the END of the
+        // order. That is the useful reading: the mark order is the paste order, so re-marking is how you correct
+        // a sequence without starting again.
+        if (!_marked.Remove(current.Id))
+        {
+            _marked.Add(current.Id);
+        }
+
+        Render();
+        return PasteCommitKind.None;
+    }
+
+    /// <summary>
+    /// The marked clips, in mark order, as they exist now.
+    /// <para>
+    /// Resolved against a fresh catalog snapshot rather than the session's window, for two reasons: the window may
+    /// be narrowed by a search or a kind filter, and a marked clip may have been deleted mid-session by the Delete
+    /// key. Both would otherwise contribute nothing while still being counted.
+    /// </para>
+    /// </summary>
+    private List<Clip> MarkedClips()
+    {
+        var byId = _catalog.Snapshot().ToDictionary(static clip => clip.Id);
+
+        return _marked
+            .Where(byId.ContainsKey)
+            .Select(id => byId[id])
+            .ToList();
+    }
+
+    /// <summary>
     /// The Delete key: remove this clip now and keep browsing.
     /// <para>
     /// The cursor is deliberately left where it is rather than following the clip that was there, which is
@@ -454,6 +558,12 @@ public sealed class PasteModeController
         }
 
         _catalog.Delete(current.Id);
+
+        // Unmarked as well, so the count on the overlay keeps matching what would be pasted. MarkedClips would
+        // skip it anyway, but a chip reading JOIN 3 when only two clips remain is a lie about what is about to
+        // happen.
+        _marked.Remove(current.Id);
+
         RefreshWindow();
 
         _cursor = _window.Count == 0 ? 0 : Math.Clamp(_cursor, 0, _window.Count - 1);
@@ -564,6 +674,12 @@ public sealed class PasteModeController
         ShiftHeld = false;
         _window = [];
         _cursor = 0;
+
+        // Per session, deliberately, and NOT governed by PreserveClipPosition - the same rule PasteKindFilter
+        // follows. A mark that survived would make the next ordinary Ctrl+V paste something assembled minutes
+        // ago, which is the sort of surprise that reads as the wrong clip being pasted.
+        _marked.Clear();
+
         _host.HideOverlay();
     }
 
@@ -702,6 +818,8 @@ public sealed class PasteModeController
             MatchCount = _window.Count,
             PopOnPaste = ShiftHeld && CommitMode == PasteCommitMode.Paste,
             KindFilter = KindFilter,
+            MarkedCount = MarkedCount,
+            CurrentIsMarked = CurrentIsMarked,
             TextFacts = DescribeTextFacts(current),
             TotalBytes = current?.TotalBytes ?? 0,
             IsEmpty = current is null,

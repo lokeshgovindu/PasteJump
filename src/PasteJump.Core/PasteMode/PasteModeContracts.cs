@@ -124,6 +124,20 @@ public enum PasteAction
     /// <summary><c>Space</c> - pin / unpin.</summary>
     TogglePin,
 
+    /// <summary>
+    /// <c>J</c> - mark or unmark this clip, so releasing Ctrl pastes every marked clip joined into one.
+    /// <para>
+    /// The other half of joining, the first being selecting rows in the history window. Distinct from
+    /// <see cref="Multipaste"/>, which pastes clips one after another as separate pastes - that leaves the target
+    /// application to decide what happens between them, and in a spreadsheet it means separate cells.
+    /// </para>
+    /// <para>
+    /// Marks are per session, like <see cref="PasteKindFilter"/> and for the same reason: a mark surviving into
+    /// the next gesture would make an ordinary Ctrl+V paste something the user assembled minutes ago.
+    /// </para>
+    /// </summary>
+    ToggleJoinMark,
+
     /// <summary><c>T</c> - edit tags.</summary>
     EditTags,
 
@@ -202,6 +216,20 @@ public interface IPasteModeHost
 
     /// <summary>Write the clip to the clipboard and synthesise Ctrl+V.</summary>
     void PasteClip(Clip clip, IClipFormatter formatter);
+
+    /// <summary>
+    /// Write the text of several clips, joined, to the clipboard and synthesise Ctrl+V.
+    /// <para>
+    /// The clips arrive in the order they were marked, which the controller records - unlike the history window,
+    /// where the order rows were clicked is not something a <c>DataGrid</c> reports and display order is used
+    /// instead. During the gesture the sequence is knowable and deliberate, so it is honoured.
+    /// </para>
+    /// <para>
+    /// Joining itself is the host's job, not the controller's: it needs each clip's payload text, which means the
+    /// store, and the separator, which is a setting. The controller knows only which clips were chosen.
+    /// </para>
+    /// </summary>
+    void PasteJoined(IReadOnlyList<Clip> clips, IClipFormatter formatter);
 
     /// <summary>Synthesise Ctrl+V without touching the clipboard.</summary>
     void PassThroughPaste();
@@ -283,6 +311,22 @@ public sealed record PasteOverlayModel
     /// </para>
     /// </summary>
     public PasteKindFilter KindFilter { get; init; } = PasteKindFilter.All;
+
+    /// <summary>
+    /// How many clips are marked to be pasted joined. Zero for an ordinary session.
+    /// <para>
+    /// The overlay must show a non-zero count, for the same reason it must show a kind filter: marks change what
+    /// releasing Ctrl does, and a session that pastes three clips when the preview shows one would read as the
+    /// wrong clip being pasted.
+    /// </para>
+    /// </summary>
+    public int MarkedCount { get; init; }
+
+    /// <summary>
+    /// Whether the clip on show is one of the marked ones. Distinct from <see cref="MarkedCount"/> being non-zero:
+    /// the user needs to know whether pressing the key again would add this clip or remove it.
+    /// </summary>
+    public bool CurrentIsMarked { get; init; }
 
     /// <summary>
     /// Lines and characters for a text clip, or null for anything else. Pre-rendered rather than left to the

@@ -285,6 +285,7 @@ internal static class Program
                 // user why most of their stack has gone, so a version of it that failed to render would be the
                 // one defect this feature could have.
                 Check("OverlayWindow-KindFilter", () => RenderOverlay(KindFilterFrame()));
+                Check("OverlayWindow-JoinMark", () => RenderOverlay(JoinMarkFrame()));
                 Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
 
                 // A copied TEXT FILE, whose contents are read off disk. Written as a real file because that is
@@ -611,6 +612,30 @@ internal static class Program
         IsEmpty = false,
         KindFilter = PasteKindFilter.Images,
         SourceExecutable = "SnippingTool.exe",
+    };
+
+    /// <summary>
+    /// Three clips marked to be pasted joined, with the one on show among them - so the chip renders both halves,
+    /// the count and the tick. The tick is not decoration: the count alone would not say whether pressing the key
+    /// again adds this clip or removes it.
+    /// </summary>
+    private static PasteOverlayModel JoinMarkFrame() => new()
+    {
+        Position = 3,
+        Total = 41,
+        PreviewText = "https://github.com/lokeshgovindu/PasteJump",
+        Kind = ClipKind.Text,
+        Pinned = false,
+        FormatterName = "Original",
+        CommitMode = PasteCommitMode.Paste,
+        IsSearching = false,
+        MatchCount = 41,
+        PopOnPaste = false,
+        IsEmpty = false,
+        MarkedCount = 3,
+        CurrentIsMarked = true,
+        TextFacts = "1 line, 41 chars",
+        TotalBytes = 82,
     };
 
     /// <summary>

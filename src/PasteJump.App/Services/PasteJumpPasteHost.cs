@@ -36,6 +36,19 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     private char _triggerKey = 'V';
 
     /// <summary>
+    /// What goes between clips when marked ones are pasted joined, in its escaped settings form.
+    /// <para>
+    /// Held here rather than read from a settings object, like every other setting this host needs: it is
+    /// constructed once at start-up and updated on Apply, and reaching back into the live settings would give it
+    /// a second source of truth for values it already receives.
+    /// </para>
+    /// </summary>
+    private string _joinSeparator = ClipJoiner.DefaultSeparator;
+
+    /// <summary>Sets the separator used when several marked clips are pasted as one.</summary>
+    public void SetJoinSeparator(string separator) => _joinSeparator = separator;
+
+    /// <summary>
     /// Sets the overlay's key reminder and the trigger letter it names. Both together, because the hint has to
     /// name the key that is actually configured.
     /// </summary>
@@ -162,6 +175,43 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
         }
 
         QueueClipboardWrite(payloads, thenPaste: true);
+    }
+
+    /// <summary>
+    /// Writes several clips' text as one, joined, and pastes it.
+    /// <para>
+    /// Read synchronously before returning, exactly as <see cref="PasteClip"/> is and for the same reason: the
+    /// controller may delete every one of these immediately afterwards when Shift is held, so a deferred read
+    /// would race the deletion and paste nothing.
+    /// </para>
+    /// <para>
+    /// The formatter is applied to the <em>joined</em> text rather than to each clip, so "trim whitespace" trims
+    /// the block rather than every line of it, and a formatter that adds a prefix adds one prefix. That is the
+    /// reading that matches what the user sees on the overlay: one clip, about to be pasted once.
+    /// </para>
+    /// </summary>
+    public void PasteJoined(IReadOnlyList<Clip> clips, IClipFormatter formatter)
+    {
+        // Null for anything with no text of its own, which ClipJoiner counts. Decided by kind rather than by
+        // whether text turns up, because a clip with no text still has PREVIEW text and that preview is a
+        // placeholder - "[image]" - which would otherwise be pasted as though it had been copied.
+        var texts = clips.Select(clip => ClipJoiner.HasJoinableText(clip.Kind)
+            ? Win32ClipboardAccess.ExtractText(_store.GetPayloads(clip.Id))
+            : null);
+
+        var result = ClipJoiner.Join(texts, ClipJoiner.ParseSeparator(_joinSeparator));
+
+        if (result.Joined == 0)
+        {
+            // Every marked clip was an image. Nothing to write, so paste whatever is already on the clipboard
+            // rather than clearing it - the same choice PasteClip makes for a clip with no payloads.
+            _dispatcher.BeginInvoke(() => _paster.SendPasteOnly());
+            return;
+        }
+
+        var text = formatter.Apply(result.Text);
+
+        QueueClipboardWrite(Win32ClipboardAccess.TextOnlyPayloads(text), thenPaste: true);
     }
 
     public void PassThroughPaste() => _dispatcher.BeginInvoke(() => _paster.SendPasteOnly());

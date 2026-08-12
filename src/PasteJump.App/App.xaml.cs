@@ -245,6 +245,7 @@ public partial class App : Application
         _pasteHost.Paster.SetPerAppSettleDelays(PerAppSettleDelays.Parse(_settings.PasteSettleDelayPerApp), foreground);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
+        _pasteHost.SetJoinSeparator(_settings.ClipJoinSeparator);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
         _pasteHost.SetKeyHint(
             _settings.ShowOverlayKeyHint,
@@ -1121,6 +1122,7 @@ public partial class App : Application
         _pasteHost.Paster.SetPerAppSettleDelays(PerAppSettleDelays.Parse(_settings.PasteSettleDelayPerApp), _foreground);
         _pasteHost.Paster.SetPasteKeystroke(_settings.PasteKeystroke);
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
+        _pasteHost.SetJoinSeparator(_settings.ClipJoinSeparator);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
         _pasteHost.SetKeyHint(
             _settings.ShowOverlayKeyHint,

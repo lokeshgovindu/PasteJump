@@ -81,6 +81,14 @@ public partial class OverlayWindow : Window
             pairs.Add((kind.ToString(), "filter"));
         }
 
+        // Joining earns a place here despite the hint being deliberately short: it is the one action whose
+        // existence cannot be guessed from anything on screen until a clip is already marked, at which point the
+        // chip explains itself. Left out when switched off, like every other letter.
+        if (map.LetterFor("join") is { } join)
+        {
+            pairs.Add((join.ToString(), "join"));
+        }
+
         pairs.Add(("Esc", "cancel"));
         pairs.Add(("F1", "all keys"));
 
@@ -130,6 +138,21 @@ public partial class OverlayWindow : Window
         else
         {
             KindFilterChip.Visibility = Visibility.Collapsed;
+        }
+
+        // The count is what will be pasted; the tick says whether THIS clip is part of it. Both, because the
+        // count alone leaves the user unable to tell whether pressing the key again would add or remove.
+        if (model.MarkedCount > 0)
+        {
+            JoinChip.Text = model.CurrentIsMarked
+                ? $"JOIN {model.MarkedCount} ✓"
+                : $"JOIN {model.MarkedCount}";
+
+            JoinChip.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            JoinChip.Visibility = Visibility.Collapsed;
         }
 
         if (model.Tags.Count > 0)

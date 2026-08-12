@@ -67,6 +67,10 @@ internal sealed class StubHost : IPasteModeHost
     {
     }
 
+    public void PasteJoined(IReadOnlyList<Clip> clips, IClipFormatter formatter)
+    {
+    }
+
     public void PassThroughPaste()
     {
     }

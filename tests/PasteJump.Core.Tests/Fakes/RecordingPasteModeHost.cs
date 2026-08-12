@@ -56,6 +56,18 @@ internal sealed class RecordingPasteModeHost : IPasteModeHost
         Calls.Add($"paste:{clip.Id}:{formatter.Id}");
     }
 
+    /// <summary>
+    /// Records the ids in the order given, which is the order they were marked. The order is the assertion worth
+    /// making here - joining the text itself is the real host's job, since it needs the store.
+    /// </summary>
+    public void PasteJoined(IReadOnlyList<Clip> clips, IClipFormatter formatter)
+    {
+        JoinedClips.Add(clips);
+        Calls.Add($"joined:{string.Join(",", clips.Select(static c => c.Id))}:{formatter.Id}");
+    }
+
+    public List<IReadOnlyList<Clip>> JoinedClips { get; } = [];
+
     public void PassThroughPaste()
     {
         PassThroughCount++;
