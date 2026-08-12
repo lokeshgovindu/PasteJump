@@ -19,6 +19,15 @@ That gesture — a *jog wheel* for your clipboard — is the whole point.
 Built with .NET 10 and WPF. Ships as **a single self-contained `PasteJump.exe`** — no .NET runtime
 needed on the target machine, nothing to install, and nothing beside it.
 
+Two things beyond the jog wheel are worth knowing about up front:
+
+- **Join several clips into one paste.** Press <kbd>J</kbd> on each clip you want during the gesture, or select
+  several rows in the history window, and they paste as *one* clip rather than one after another. Separator of your
+  choosing; images are left out and counted.
+- **Seventeen themes beyond Light and Dark, and you can write your own.** A theme is a small `.json` file of named colours that inherits
+  everything it does not set, so a three-line file is a valid theme. Solarized, Catppuccin, Nord, Dracula, Tokyo
+  Night, Monokai, Gruvbox, Kanagawa and more are built in, and the theme applies as you step through the list.
+
 ---
 
 ## Why this exists
@@ -92,10 +101,15 @@ powershell -ExecutionPolicy Bypass -File tools/pack-release.ps1
 That produces both packages in `artifacts/release`, each with a SHA256 and each carrying the exe, the CHM
 manual, this README and the licence:
 
-| | Contents | Start-up, warm | On disk |
-|---|---|---|---|
-| **`PasteJump-<ver>-win-x64.zip`** | one `PasteJump.exe` | ~1.26 s | 65 MB |
-| **`PasteJump-<ver>-setup.exe`** | a folder build, installed per-user | **~0.29 s** | 135 MB |
+| | Contents | Download | Start-up, warm | Needs |
+|---|---|---|---|---|
+| **`PasteJump-<ver>-win-x64.zip`** | one `PasteJump.exe` | 60 MB | ~1.26 s | nothing |
+| **`PasteJump-<ver>-win-x64-unpacked.zip`** | the same build, runtime unpacked (257 files) | 59 MB | **~0.29 s** | nothing |
+| **`PasteJump-<ver>-win-x64-net10.zip`** | PasteJump only, 15 files | **2.6 MB** | ~0.29 s | .NET 10 Desktop Runtime |
+| **`PasteJump-<ver>-setup.exe`** | the unpacked build, installed per-user | 45 MB | **~0.29 s** | nothing |
+
+The unpacked ZIP is *no larger* than the single-file one, because a single-file bundle is already compressed and
+zipping it again gains almost nothing - so the shape that starts four times faster costs nothing to download.
 
 The difference is not the app — it is the deployment shape. A single-file build spends about a second on
 every launch extracting its bundle and decompressing assemblies *before any of PasteJump's code runs*, which
@@ -156,6 +170,7 @@ While Ctrl is down:
 | <kbd>P</kbd> · <kbd>Space</kbd> | Pin / unpin (pinned clips sort first and survive Delete All) |
 | <kbd>M</kbd> · <kbd>Q</kbd> | Move this clip to the front of the stack |
 | <kbd>Z</kbd> | Cycle paste format |
+| <kbd>J</kbd> | Mark this clip; releasing <kbd>Ctrl</kbd> pastes every marked clip joined into one |
 | <kbd>K</kbd> | Show only one kind of clip: all → text → images → files |
 | <kbd>T</kbd> | Edit tags |
 | <kbd>S</kbd> | Put the clip on the Windows clipboard *without* pasting |

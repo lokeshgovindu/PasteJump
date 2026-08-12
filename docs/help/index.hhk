@@ -9,8 +9,37 @@
         <param name="Local" value="settings.html">
         </OBJECT>
     <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="joining clips">
+        <param name="Local" value="history-window.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="J, mark to join">
+        <param name="Local" value="gesture.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="separator, joining clips">
+        <param name="Local" value="settings.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="themes">
+        <param name="Local" value="themes.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="theme files, writing">
+        <param name="Local" value="themes.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="palette keys">
+        <param name="Local" value="themes.html">
+        </OBJECT>
+
+    <LI> <OBJECT type="text/sitemap">
         <param name="Name" value="beep on copy">
         <param name="Local" value="settings.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Catppuccin">
+        <param name="Local" value="themes.html">
         </OBJECT>
     <LI> <OBJECT type="text/sitemap">
         <param name="Name" value="clips, compared with history">

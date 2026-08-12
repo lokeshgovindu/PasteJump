@@ -29,6 +29,10 @@
         <param name="Local" value="settings.html">
         </OBJECT>
     <LI> <OBJECT type="text/sitemap">
+        <param name="Name" value="Themes">
+        <param name="Local" value="themes.html">
+        </OBJECT>
+    <LI> <OBJECT type="text/sitemap">
         <param name="Name" value="Importing from Clipjump">
         <param name="Local" value="importing.html">
         </OBJECT>

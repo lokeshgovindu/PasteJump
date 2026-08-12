@@ -1,0 +1,153 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Themes</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+
+<h1>Themes</h1>
+<p class="lead">Seventeen colour schemes ship alongside Light and Dark, and a theme is just a small text file
+&mdash; so you can change one, or write your own, without waiting for anybody.</p>
+
+<h2>Choosing one</h2>
+
+<p><b>Settings, Appearance, Theme.</b> The list starts with the three that are always there and then names every
+other theme:</p>
+
+<table>
+<tr><td class="name">Same as Windows</td>
+<td>The default. Follows the Windows <i>app</i> colour mode and keeps following it if you change it later.</td></tr>
+
+<tr><td class="name">Light, Dark</td>
+<td>The two base palettes. Every other theme is built on one of them.</td></tr>
+
+<tr><td class="name">Light-based</td>
+<td>Sepia, Solarized Light, Catppuccin Latte, GitHub Light.</td></tr>
+
+<tr><td class="name">Dark-based</td>
+<td>Midnight, Solarized Dark, Catppuccin Mocha, Tokyo Night, One Dark, Monokai, Nord, Dracula, Rose Pine,
+Everforest Dark, Kanagawa, Gruvbox Dark, Zenburn.</td></tr>
+</table>
+
+<p><b>The theme applies as you move through the list</b>, including with the arrow keys, so you can see it rather
+than imagine it. Nothing is saved until you press OK or Apply &mdash; Cancel, <code>Esc</code> and the close button
+all put the previous theme back.</p>
+
+<p>Every window follows at once, including any open history window. The <b>notification-area icon does not</b>: it
+follows the Windows taskbar colour, which is a separate Windows setting.</p>
+
+<h2>Writing your own</h2>
+
+<p>Themes live in a <code>themes</code> folder beside your settings, one <code>.json</code> file each. The four
+buttons under the Theme setting are all you need:</p>
+
+<table>
+<tr><td class="name">Duplicate…</td>
+<td>Writes the colours <i>currently in force</i> to a new file and opens it. Every key is listed with the colour it
+has now, and a comment saying what it paints, so you start from something that already works. It never overwrites:
+if the name is taken, a number is added.</td></tr>
+
+<tr><td class="name">Edit…</td>
+<td>Opens this theme's file. A shipped theme has no file until you edit it, so one is written out first under its
+own name &mdash; which means your edit <b>replaces</b> that theme. Light, Dark and Same as Windows cannot be edited
+in place, since they are the palettes everything else is built on; those are copied to a new name instead.</td></tr>
+
+<tr><td class="name">Reload</td>
+<td>Re-reads the folder and applies the selection again. <b>Press this after saving an edit</b> &mdash; nothing else
+tells PasteJump that you have finished typing.</td></tr>
+
+<tr><td class="name">Folder</td>
+<td>Opens the folder, in case you would rather manage the files yourself.</td></tr>
+</table>
+
+<h2>What a theme file looks like</h2>
+
+<p>A name, which palette it is built on, and as many colours as you care to set:</p>
+
+<pre>{
+    "name": "My Theme",
+    "basedOn": "dark",
+
+    "colors": {
+        "AccentBrush": "#6C7BFF",
+        "TextBrush": "#E4E8F5",
+        "SelectionBrush": ["#243056", "#1A2440"]
+    }
+}</pre>
+
+<table>
+<tr><td class="name">name</td>
+<td>What the settings list shows, and how the theme is remembered. Up to 40 characters. It may not be
+<code>Light</code>, <code>Dark</code> or <code>System</code>, since those already mean something. A theme sharing a
+name with one of the seventeen shipped ones <b>replaces</b> it, which is how you tweak Monokai without inventing a
+name for it.</td></tr>
+
+<tr><td class="name">basedOn</td>
+<td><code>light</code> or <code>dark</code>, and it does two jobs. It supplies every colour you leave out, and it
+tells Windows whether to draw dark title bars and window borders &mdash; those are drawn by Windows, not by
+PasteJump, so a dark theme claiming to be light gets a white title bar around dark content. Omitted means
+<code>light</code>.</td></tr>
+
+<tr><td class="name">colors</td>
+<td>Any of the keys listed below. <b>Set as few as you like</b>: anything absent comes from the theme named in
+<code>basedOn</code>, so a three-line file that changes only the accent is perfectly valid.</td></tr>
+</table>
+
+<p>Colours are written as <code>#RRGGBB</code>, <code>#RGB</code> or <code>#AARRGGBB</code> with an alpha channel.
+Names such as <code>red</code> are <b>not</b> accepted &mdash; write the hex instead. Comments and trailing commas
+are allowed, because a file you edit by hand is easier to keep tidy with them.</p>
+
+<div class="warn">
+<p><b>A mistake is reported, not ignored.</b> If a file will not parse, or names a key that does not exist, or has a
+colour PasteJump cannot read, that theme is skipped and the reason appears under the Theme setting. A misspelled key
+is refused for a reason worth knowing: it would otherwise load perfectly and change nothing, and you would have no
+way to tell that from a colour that merely looks wrong. Key names are <b>case-sensitive</b>.</p>
+</div>
+
+<h2>The colours you can set</h2>
+
+<table>
+<tr><th>Key</th><th>What it paints</th></tr>
+<tr><td class="key">SurfaceBrush</td><td>Window background</td></tr>
+<tr><td class="key">SurfaceRaisedBrush</td><td>Raised panels, tooltips and dialogs</td></tr>
+<tr><td class="key">BorderBrush</td><td>Panel edges</td></tr>
+<tr><td class="key">TextBrush</td><td>Ordinary text</td></tr>
+<tr><td class="key">MutedTextBrush</td><td>Secondary text and inline help</td></tr>
+<tr><td class="key">AccentBrush</td><td>Accent: links, chips, the default button's fill</td></tr>
+<tr><td class="key">WarnBrush</td><td>Warnings</td></tr>
+<tr><td class="key">DangerBrush</td><td>Destructive actions, DELETE ALL, the POP chip</td></tr>
+<tr><td class="key">AccentHoverBrush</td><td>Accent fill under the pointer</td></tr>
+<tr><td class="key">AccentPressedBrush</td><td>Accent fill while pressed</td></tr>
+<tr><td class="key">AccentTextBrush</td><td>Text on an accent fill</td></tr>
+<tr><td class="key">ControlBackgroundBrush</td><td>Text boxes, combo boxes, grid headers</td></tr>
+<tr><td class="key">ControlBorderBrush</td><td>Control outlines</td></tr>
+<tr><td class="key">ControlHoverBrush</td><td>Control under the pointer</td></tr>
+<tr><td class="key">ControlPressedBrush</td><td>Control while pressed</td></tr>
+<tr><td class="key">ControlDisabledTextBrush</td><td>Text in a disabled control</td></tr>
+<tr><td class="key">SelectionBrush</td><td>Selected row fill &mdash; one colour, or two for a top-to-bottom
+gradient</td></tr>
+<tr><td class="key">SelectionBorderBrush</td><td>Selected row outline</td></tr>
+<tr><td class="key">SelectionTextBrush</td><td>Text in a selected row</td></tr>
+<tr><td class="key">HoverBorderBrush</td><td>Row under the pointer</td></tr>
+<tr><td class="key">ModifiedRowBrush</td><td>Settings row whose value differs from its default</td></tr>
+<tr><td class="key">ScrollThumbBrush</td><td>Scroll bar thumb</td></tr>
+<tr><td class="key">ScrollThumbHoverBrush</td><td>Scroll bar thumb under the pointer</td></tr>
+<tr><td class="key">SplitterLineBrush</td><td>The line between the list and the preview pane</td></tr>
+<tr><td class="key">ShadowColor</td><td>Overlay and toast drop shadow. A colour rather than a brush, but written the
+same way</td></tr>
+</table>
+
+<p>The selection is worth a word: it is the one place a <i>pair</i> of colours is allowed, drawn as a soft vertical
+gradient with an outline over it. A single colour there is accepted and gives a flat fill. The outline does most of
+the work of making a selected row read as one object, so it is worth setting
+<code>SelectionBorderBrush</code> whenever you change the fill.</p>
+
+<h2>If a theme goes missing</h2>
+
+<p>A theme named in your settings that no longer exists &mdash; a file deleted, a drive not plugged in, a file being
+edited &mdash; falls back to <b>Same as Windows</b> for that session. Your choice is <i>not</i> overwritten, so the
+theme returns when the file does.</p>
+
+</body>
+</html>

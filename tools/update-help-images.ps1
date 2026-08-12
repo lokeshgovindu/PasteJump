@@ -71,6 +71,12 @@ $wanted = [ordered]@{
     # The Remove duplicates confirmation. Worth a picture because the choice that widens the sweep lives
     # inside the prompt rather than on the toolbar, so the button alone does not hint that it exists.
     'MessageDialogOption'       = 'remove-duplicates.png'
+
+    # Joining. Three shots because they are three states nothing else reaches: the relabelled button, the status
+    # line that accounts for what was left out, and the overlay chip during the gesture.
+    'HistoryWindow-Joining'     = 'history-joining.png'
+    'HistoryWindow-Joined'      = 'history-joined.png'
+    'OverlayWindow-JoinMark'    = 'overlay-join-mark.png'
     'ToastWindow'               = 'toast.png'
 }
 

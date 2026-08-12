@@ -41,7 +41,8 @@ gesture can reach rather than what has been logged.</p>
 
 <tr><td class="name">Copy</td>
 <td>Puts the selected entry back on the clipboard <b>and</b> adds it to the stack as the newest clip, so
-<code>Ctrl</code>+<code>V</code> offers it first. <code>Enter</code>, or a double-click, does the same.</td></tr>
+<code>Ctrl</code>+<code>V</code> offers it first. <code>Enter</code>, or a double-click, does the same.
+With <b>more than one row selected</b> it reads <b>Copy Joined</b> instead &mdash; see below.</td></tr>
 
 <tr><td class="name">Delete</td>
 <td>Removes the selected rows from whichever store is shown. The <code>Delete</code> key does the same.</td></tr>
@@ -53,6 +54,47 @@ being shown. See below.</td></tr>
 <tr><td class="name">Clear History / Clear Clips</td>
 <td>Empties the store being shown. Asks first, and says plainly that the other store is not affected.</td></tr>
 </table>
+
+<h2>Joining several entries into one</h2>
+
+<p>Select several rows &mdash; <code>Ctrl</code>+click, or <code>Shift</code>+click for a run &mdash; and Copy
+changes to <b>Copy Joined</b>. Pressing it produces a <b>single</b> clip containing all their text, so it pastes
+once rather than several times. <code>Enter</code> does the same.</p>
+
+<div class="shot">
+<img src="images/history-joining.png" alt="Three rows selected, with the button reading Copy Joined">
+<p>Three rows selected. The button says what it will do; nothing else on screen hints that joining exists.</p>
+</div>
+
+<div class="shot">
+<img src="images/history-joined.png" alt="The status line after joining, reporting what was left out">
+<p>Afterwards the status line accounts for every row you selected, including any it could not use.</p>
+</div>
+
+<table>
+<tr><td class="name">Order</td>
+<td><b>Top to bottom as shown</b>, not the order you clicked. A grid cannot report the order rows were picked in
+&mdash; a <code>Shift</code>+click has no order at all &mdash; so this is the only rule you can predict before
+pressing the button. During the gesture, where the sequence <i>is</i> knowable, the order you marked in is used
+instead.</td></tr>
+
+<tr><td class="name">What goes between</td>
+<td>A new line by default; set <b>Separator When Joining Clips</b> under
+<a href="settings.html">Settings, History</a>. Invisible characters are written as <code>\n</code>,
+<code>\t</code> and <code>\r\n</code>; anything else is used literally, so <code>&quot;, &quot;</code> works as
+typed.</td></tr>
+
+<tr><td class="name">Images are left out</td>
+<td>And counted, so the status line can say so. Two pictures cannot be concatenated into one, and a file copy
+<i>does</i> join &mdash; its text is the paths, which is one of the more useful cases.</td></tr>
+
+<tr><td class="name">Double-click still copies one</td>
+<td>A plain click collapses the selection to the row under the pointer, so by then there is only one row and
+joining cannot be what was meant.</td></tr>
+</table>
+
+<p>The same thing works during the gesture, without opening this window: press <code>J</code> to mark clips and
+release <code>Ctrl</code>. See <a href="gesture.html">the gesture</a>.</p>
 
 <h2>Searching</h2>
 

@@ -53,6 +53,53 @@ Sentence case, Unindent.</td></tr>
 <tr><td class="key">S</td><td>Put the clip on the Windows clipboard <i>without</i> pasting it.</td></tr>
 </table>
 
+<h2>Pasting several clips as one</h2>
+
+<p><code>J</code> marks the clip being shown. Mark as many as you like &mdash; stepping and searching in between
+&mdash; and releasing <code>Ctrl</code> pastes them all as <b>one</b> clip, their text run together.</p>
+
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td class="key">J</td><td>Mark or unmark this clip. The cursor does not move, so
+<code>J</code>&nbsp;<code>V</code>&nbsp;<code>J</code> marks two clips in a row.</td></tr>
+<tr><td class="key">release Ctrl</td><td>With anything marked, pastes the marked clips joined &mdash; wherever the
+cursor happens to be.</td></tr>
+</table>
+
+<div class="shot">
+<img src="images/overlay-join-mark.png" alt="The overlay showing JOIN 3 with a tick">
+<p><b>JOIN&nbsp;3</b> is how many clips will be pasted. The tick means the clip on show is one of them, so you can
+tell whether pressing <code>J</code> again would add it or remove it.</p>
+</div>
+
+<p><b>This is not the same as <code>Enter</code>.</b> <code>Enter</code> pastes clips one after another as separate
+pastes, which leaves the application to decide what happens between them &mdash; in a spreadsheet, separate cells.
+Joining produces a single clip, so it lands as a single paste.</p>
+
+<table>
+<tr><td class="name">Order</td>
+<td>The order you marked them in, not the order they sit in the stack. Marking a clip that is already marked moves
+it to the <i>end</i>, which is how you correct a sequence without starting again.</td></tr>
+
+<tr><td class="name">What goes between</td>
+<td>A new line by default. Change it in <a href="settings.html">Settings, History</a> &mdash; a space, a comma, a
+tab, or any text you like.</td></tr>
+
+<tr><td class="name">Images</td>
+<td>Left out, because two pictures cannot be concatenated into one. They still count towards
+<b>JOIN&nbsp;<i>n</i></b> while marked, so the number always says how many clips you chose.</td></tr>
+
+<tr><td class="name">Marks last one gesture</td>
+<td>They are cleared when the gesture ends, however it ends. A mark surviving into the next
+<code>Ctrl</code>+<code>V</code> would make an ordinary paste produce something you assembled minutes earlier.</td></tr>
+
+<tr><td class="name">With Shift</td>
+<td>Paste popping deletes <i>every</i> marked clip, since it deletes what was pasted.</td></tr>
+</table>
+
+<p>The same thing is available without the gesture: select several rows in the
+<a href="history-window.html">history window</a> and press Copy.</p>
+
 <div class="warn">
 <p><b>Only <code>Ctrl</code>+<code>V</code> starts the gesture &mdash; nothing else.</b> Any additional
 modifier is left entirely alone, because each one belongs to somebody:</p>
@@ -210,8 +257,10 @@ confident wrong count.</p>
 <li>The position in the stack, as <i>clip 3 of 41</i>.</li>
 <li>A preview: the text, or the picture for an image clip, or the file names for a file copy.</li>
 <li>Chips for the current paste format, whether the clip is pinned, whether <code>Shift</code> is
-holding a pop, its tags, and which application it was copied from.</li>
+holding a pop, how many clips are marked to be joined, its tags, and which application it was copied from.</li>
 <li>A banner when <code>X</code> has put you in Cancel, Delete or Delete All.</li>
+<li>A row of key reminders along the bottom, which names the keys <i>you</i> have bound rather than the defaults.
+An action you switch off is left out of it.</li>
 </ul>
 
 <h2>Other keys are held back while the overlay is open</h2>
