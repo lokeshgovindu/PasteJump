@@ -408,6 +408,9 @@ public partial class SettingsWindow : Window
         HistoryPreviewWidthBox.Text = source.HistoryPreviewMaxWidth.ToString(CultureInfo.CurrentCulture);
         ClipJoinSeparatorBox.Text = source.ClipJoinSeparator;
 
+        // Inverted: the setting records that the offer was made, the box asks whether to make it.
+        OfferLegacyImportCheck.IsChecked = !source.LegacyImportCompleted;
+
         PreservePositionCheck.IsChecked = source.PreserveClipPosition;
         OpenSearchCheck.IsChecked = source.OpenSearchImmediately;
         ResetFormatterCheck.IsChecked = source.ResetFormatterOnEntry;
@@ -2059,6 +2062,19 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
+    /// Test hook: reads the controls back exactly as OK does, without saving anything.
+    /// <para>
+    /// This is what lets the harness prove that <em>every</em> setting has a working control. Loading a settings
+    /// object with nothing at its default and then building one back out has to return what went in - and a setting
+    /// missing from <c>ShowValues</c>, missing from <c>TryBuild</c>, or with no control at all each fails that
+    /// round trip in a way nothing else notices. It is the "add it in three places" rule, checked rather than
+    /// remembered.
+    /// </para>
+    /// </summary>
+    public bool TryBuildForSmokeTest(out PasteJumpSettings? settings, out string? error)
+        => TryBuild(out settings, out error);
+
+    /// <summary>
     /// One-shot line shown above the Advanced grid after a reset, cleared by the next refresh. A transient note
     /// rather than a dialog: the grid itself already shows the new value, so this only has to say that nothing
     /// has been written yet.
@@ -2319,7 +2335,9 @@ public partial class SettingsWindow : Window
 
         // Carried forward, not surfaced: re-offering the legacy import after every settings change
         // would be maddening.
-        settings.LegacyImportCompleted = _baseline.LegacyImportCompleted;
+        // From the control now rather than carried forward from the baseline. It was the only setting with no
+        // control at all, which meant editing PasteJump.json by hand was the only way to be asked again.
+        settings.LegacyImportCompleted = OfferLegacyImportCheck.IsChecked != true;
 
         settings.Normalise();
         return true;

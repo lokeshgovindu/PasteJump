@@ -393,6 +393,18 @@
                                    Margin="0,3,0,8"
                                    Text="Copies Clipjump's history archive and its clip stack into PasteJump, so imported clips can be pasted with the gesture and not merely searched. Nothing in the Clipjump folder is modified. Entries already imported are skipped, so running it twice is harmless." />
 
+                        <!--
+                            The one setting that had no control anywhere, so it could only be changed by editing
+                            PasteJump.json by hand. Inverted in the label because the stored value is "the offer has
+                            already been made", which is bookkeeping, while what anyone wants to decide is whether to
+                            be asked. Ticking it again is how someone who declined by accident gets the offer back.
+                        -->
+                        <CheckBox x:Name="OfferLegacyImportCheck"
+                                  Content="Ask about importing Clipjump history at start-up"
+                                  Margin="0,0,0,2" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="PasteJump offers this once, the first time it finds a Clipjump installation, and then remembers that it asked. Tick this to be asked again on the next start-up — useful if the offer was dismissed before you had decided." />
+
                         <Button x:Name="ImportButton"
                                 Click="OnImportClicked"
                                 Content="_Import Clipjump History…"

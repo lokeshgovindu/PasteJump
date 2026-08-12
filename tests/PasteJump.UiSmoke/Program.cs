@@ -354,6 +354,7 @@ internal static class Program
         Console.WriteLine();
         VerifyPaletteContract();
         VerifyTrayIcons();
+        VerifyEverySettingHasAControl(new FormatterRegistry());
 
         Console.WriteLine();
         Console.WriteLine(_failures == 0
@@ -522,6 +523,176 @@ internal static class Program
         }
 
         tip.IsOpen = false;
+    }
+
+    /// <summary>
+    /// Proves every setting has a working control, by round-tripping one through the dialog.
+    /// <para>
+    /// A settings object is built with nothing at its default, loaded into the dialog, and read straight back out
+    /// through the same path OK uses. Anything that does not survive that has no reachable control - and there are
+    /// three ways for that to happen, each invisible otherwise: the setting is missing from <c>ShowValues</c>, so
+    /// the dialog never displays it; missing from <c>TryBuild</c>, so opening the dialog and pressing OK silently
+    /// resets it; or it has no control anywhere and can only be changed by editing the JSON file by hand.
+    /// </para>
+    /// <para>
+    /// The values are generated per property rather than listed, so a new setting is covered the moment it is added
+    /// - the same bargain the Advanced tab strikes with reflection. A few types cannot take an arbitrary value and
+    /// are given a specific one: the trigger key must be a letter no action has claimed, the hotkey must parse, and
+    /// the key map must be a valid set.
+    /// </para>
+    /// <para>
+    /// One limitation to know: a setting <em>carried forward</em> from the baseline rather than read from a control
+    /// passes this check, because the baseline is the object that was loaded. <c>LegacyImportCompleted</c> was the
+    /// only one written that way, and it has a control now - so nothing is currently exempt, and a new setting
+    /// carried forward would be the one case this could not catch.
+    /// </para>
+    /// </summary>
+    private static void VerifyEverySettingHasAControl(FormatterRegistry formatters)
+    {
+        var probe = new PasteJumpSettings();
+        var chosen = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        foreach (var property in typeof(PasteJumpSettings).GetProperties()
+            .Where(static p => p is { CanRead: true, CanWrite: true })
+            .Where(static p => p.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonIgnoreAttribute), inherit: false).Length == 0))
+        {
+            var value = NonDefaultValue(property, probe);
+
+            if (value is null && property.PropertyType != typeof(string))
+            {
+                continue;
+            }
+
+            property.SetValue(probe, value);
+            chosen[property.Name] = value;
+        }
+
+        probe.Normalise();
+
+        var window = new SettingsWindow(probe, formatters, DataLocation.UserProfile);
+
+        try
+        {
+            window.Show();
+            Drain();
+
+            if (!window.TryBuildForSmokeTest(out var rebuilt, out var error))
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  the dialog refused its own values: {error}");
+                return;
+            }
+
+            var lost = new List<string>();
+
+            foreach (var (name, expected) in chosen)
+            {
+                var property = typeof(PasteJumpSettings).GetProperty(name)!;
+                var actual = property.GetValue(rebuilt);
+
+                // Lists compare by content; everything else by value. A string is compared exactly, since a
+                // setting that came back normalised differently is still a setting that was carried.
+                var same = expected is System.Collections.IEnumerable and not string
+                    ? string.Join("|", ((System.Collections.IEnumerable)expected!).Cast<object>())
+                        == string.Join("|", ((System.Collections.IEnumerable)actual!).Cast<object>())
+                    : Equals(expected, actual);
+
+                if (!same)
+                {
+                    lost.Add($"{name} ({expected} -> {actual})");
+                }
+            }
+
+            Console.WriteLine($"  settings round trip: {chosen.Count} checked, {lost.Count} lost");
+
+            if (lost.Count > 0)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  no working control for: {string.Join(", ", lost)}");
+            }
+        }
+        finally
+        {
+            window.Close();
+            Drain();
+        }
+    }
+
+    /// <summary>
+    /// A legal value for this setting that is not its default, or null to skip.
+    /// <para>
+    /// Numbers move within their <see cref="SettingsBounds"/> range where one exists, because a value outside it is
+    /// refused by the dialog and would look like a missing control. Strings are special-cased only where arbitrary
+    /// text is not legal.
+    /// </para>
+    /// </summary>
+    private static object? NonDefaultValue(System.Reflection.PropertyInfo property, PasteJumpSettings defaults)
+    {
+        var current = property.GetValue(defaults);
+        var type = property.PropertyType;
+
+        if (type == typeof(bool))
+        {
+            return !(bool)current!;
+        }
+
+        if (type == typeof(int) || type == typeof(int?))
+        {
+            // Within bounds where the setting has them, and a plain small number where it does not - every numeric
+            // setting here accepts one, and the point is to differ from the default rather than to probe the range.
+            //
+            // Matched by NAME through reflection: SettingsBounds names each bound after the setting it governs, so
+            // this needs no list to be kept in step with either side.
+            var start = current as int? ?? 0;
+            var bound = typeof(SettingsBounds).GetProperty(property.Name)?.GetValue(null) as SettingBound?;
+
+            return bound is { } range
+                ? Math.Clamp(start == range.Max ? start - 1 : start + 1, range.Min, range.Max)
+                : start + 1;
+        }
+
+        if (type.IsEnum)
+        {
+            // The next member along, wrapping - so the value differs whatever the default happens to be.
+            var values = Enum.GetValues(type).Cast<object>().ToList();
+            var index = values.FindIndex(v => Equals(v, current));
+
+            return values[(index + 1) % values.Count];
+        }
+
+        if (type == typeof(List<string>))
+        {
+            return new List<string> { "smoketest.exe" };
+        }
+
+        if (type == typeof(string))
+        {
+            return property.Name switch
+            {
+                // Only letters no action has claimed are accepted, and the dialog offers exactly those.
+                nameof(PasteJumpSettings.PasteModeTriggerKey) => TriggerKey.Available.First(c => c != 'V').ToString(),
+
+                // Must parse as a chord, and must not be one already taken.
+                nameof(PasteJumpSettings.HistoryHotkey) => "Ctrl+Shift+F12",
+
+                // A valid set of bindings rather than arbitrary text: one letter moved, the rest left alone.
+                nameof(PasteJumpSettings.PasteModeKeys) => PasteKeyMap.Parse("tags=Y").ToSettingsString(),
+
+                // A theme that exists, so the combo can select it.
+                nameof(PasteJumpSettings.Theme) => ThemeNames.Dark,
+
+                // Must be a formatter the registry actually knows - an unknown id resolves back to Original, which
+                // this check reports as a lost setting. "plaintext" was tried first and is wrong; it is "plain".
+                nameof(PasteJumpSettings.DefaultFormatterId) => "plain",
+
+                // name=ms pairs.
+                nameof(PasteJumpSettings.PasteSettleDelayPerApp) => "smoketest.exe=90",
+
+                _ => $"{current}x",
+            };
+        }
+
+        return null;
     }
 
     /// <summary>

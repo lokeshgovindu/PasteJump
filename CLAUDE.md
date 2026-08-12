@@ -597,6 +597,20 @@ that immediately caught two real bugs. Expect to do the same again.
   that for free, so a new setting belongs on that class rather than in a field somewhere. The two data
   locations are the exception — they are in `data-location.json` — so `SettingsInspector.Describe` takes
   them as arguments and labels the rows with their file.
+- **Every setting also has a real control, and that is now proved rather than remembered.**
+  `VerifyEverySettingHasAControl` in the UI smoke harness builds a settings object with **nothing** at its default,
+  loads it into the dialog, and reads it straight back through the same `TryBuild` that OK uses. Anything that does
+  not survive the round trip has no reachable control, and there are three ways for that to happen, each invisible
+  otherwise: missing from `ShowValues` (never displayed), missing from `TryBuild` (silently reset by opening the
+  dialog and pressing OK), or no control at all (JSON-only). Values are generated per property, so a new setting is
+  covered the moment it is added; only the few that cannot take arbitrary text are special-cased, and getting one of
+  those wrong shows up as a false failure — `DefaultFormatterId` is `plain`, not `plaintext`, which the check caught.
+  **41 settings, 0 lost.** Advanced stays read-only, deliberately: one place to edit each setting is what stops two
+  editors disagreeing.
+  The one thing this cannot catch is a setting **carried forward** from the baseline rather than read from a control,
+  since the baseline is the object that was loaded. `LegacyImportCompleted` was the only one written that way — it
+  now has a check box on History ("Ask about importing Clipjump history at start-up", inverted, because the stored
+  value is bookkeeping while what a user decides is whether to be asked), so nothing is exempt today.
 - **A setting the settings dialog does not assign in `TryBuild` is silently wiped by opening the dialog.**
   `TryBuild` constructs a *fresh* `PasteJumpSettings` and fills it from the controls, so anything it forgets
   reverts to its default the moment the user presses OK — no error, no visible change until the feature it
