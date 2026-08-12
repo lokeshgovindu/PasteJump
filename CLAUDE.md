@@ -606,7 +606,13 @@ that immediately caught two real bugs. Expect to do the same again.
   covered the moment it is added; only the few that cannot take arbitrary text are special-cased, and getting one of
   those wrong shows up as a false failure — `DefaultFormatterId` is `plain`, not `plaintext`, which the check caught.
   **41 settings, 0 lost.** Advanced stays read-only, deliberately: one place to edit each setting is what stops two
-  editors disagreeing. It carries a **Where** column naming the tab that owns each setting, because a page that
+  editors disagreeing. **Composite settings are broken out into child rows** - the 14 paste-mode key bindings, each
+  per-application delay, each excluded program - because one row reading `back=C;newest=A;search=F;pin=P;join=J;…` in
+  a narrow column does not answer "what are my keys". Children carry `CanReset = false`: resetting one would mean
+  rewriting part of a stored string, and the tab that owns it already does that per row, so the button is hidden
+  rather than offered and inert. They are also excluded from the "changed from default" count - a row for one
+  excluded program is always different from "(none)", and that number is what people check when behaviour surprises
+  them. It carries a **Where** column naming the tab that owns each setting, because a page that
   lists 43 rows and can change none of them otherwise leaves the reader hunting through eight tabs; the filter box
   searches it too. That mapping is the one hand-written table here - a property's control is not named after it
   (`PasteSettleDelayMs` lives in `PasteSettleDelayBox`), so it cannot be derived - and the same harness check fails

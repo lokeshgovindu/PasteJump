@@ -1911,8 +1911,18 @@ public partial class SettingsWindow : Window
 
         var filter = AdvancedFilterBox.Text;
 
+        // The Where column, filled per row. A child row carries no key of its own, so it inherits the tab of the
+        // composite setting above it - which is the right answer anyway: its control lives there too.
+        var lastTab = string.Empty;
+
         var rows = SettingsInspector.Describe(source, SelectedClipsLocation, SelectedSettingsLocation)
-            .Select(static r => r with { Where = TabFor(r.Key) })
+            .Select(r =>
+            {
+                var tab = r.CanReset ? TabFor(r.Key) : lastTab;
+                lastTab = tab;
+
+                return r with { Where = tab };
+            })
             .Where(r => string.IsNullOrWhiteSpace(filter)
                 || r.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
                 || r.Value.Contains(filter, StringComparison.OrdinalIgnoreCase)
@@ -1921,12 +1931,18 @@ public partial class SettingsWindow : Window
 
         AdvancedGrid.ItemsSource = rows;
 
-        var modified = rows.Count(static r => r.IsModified);
+        // Settings and their detail rows counted separately, and only settings counted as "changed". A row for one
+        // excluded program is always different from "(none)", so counting those would report nine changes where the
+        // user has made seven - and that number is the one people check when behaviour surprises them.
+        var settingCount = rows.Count(static r => r.CanReset);
+        var detailCount = rows.Count - settingCount;
+        var modified = rows.Count(static r => r.IsModified && r.CanReset);
 
         // The note wins the line when there is one, because it says something about what just happened; the
         // inventory count is always derivable from the grid itself.
         AdvancedStatus.Text = AdvancedStatusNote
-            ?? $"{rows.Count} setting{(rows.Count == 1 ? string.Empty : "s")}, {modified} changed from default. "
+            ?? $"{settingCount} setting{(settingCount == 1 ? string.Empty : "s")}, {modified} changed from default"
+                + (detailCount == 0 ? ". " : $", and {detailCount} rows of detail beneath them. ")
                 + $"Values are read-only here - change them on the tab named in Where, or in data\\{AppPaths.SettingsFileName} "
                 + $"while PasteJump is closed. Rows marked {DataLocationPointer.FileName} live in that file.";
 

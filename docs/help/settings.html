@@ -327,6 +327,14 @@ check when behaviour is surprising.</p>
 tells you where to. The filter box matches on name, value <i>or</i> tab &mdash; so typing
 <code>appearance</code> lists everything that tab owns.</p>
 
+<p><b>Settings that hold several values are broken out.</b> Three of them do: the paste-mode key bindings, the
+per-application paste delays, and the excluded programs. Each appears as its parent row followed by one indented row
+per part &mdash; so every key binding is listed with the letter in force and the letter it ships with, an action you
+have switched off reads <code>(off)</code>, and each excluded program gets a line of its own. Those indented rows are
+detail rather than settings: they carry no Reset button, because putting one binding back would mean rewriting part
+of a stored string, and the tab that owns it already does that properly. The count at the bottom keeps them separate
+for the same reason.</p>
+
 <p>Values are read-only here, deliberately: one place to edit each setting is what stops two editors disagreeing
 about what is valid. Change them on the tab named in <b>Where</b>, or in <code>PasteJump.json</code> while
 PasteJump is closed. Two things can be done from this page:</p>

@@ -149,9 +149,19 @@
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
-                <DataTrigger Binding="{Binding IsModified}" Value="True">
+                <!--
+                    Both conditions, not just IsModified. The parts of a composite setting - one key binding, one
+                    per-application delay - are shown as their own rows and are frequently "modified", but they
+                    cannot be reset individually: that would mean rewriting part of a string. A button that appeared
+                    and then did nothing would be worse than no button.
+                -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsModified}" Value="True" />
+                        <Condition Binding="{Binding CanReset}" Value="True" />
+                    </MultiDataTrigger.Conditions>
                     <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
+                </MultiDataTrigger>
             </Style.Triggers>
         </Style>
 
