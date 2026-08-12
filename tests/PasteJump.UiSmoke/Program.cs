@@ -93,18 +93,21 @@ internal static class Program
 
                 // The same window showing the clip stack instead. A separate shot because the two views differ
                 // in their columns, their buttons and their status line, so one proves nothing about the other.
-                Check("HistoryWindow-Clips", () =>
-                {
-                    var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
-
-                    window.Loaded += (_, _) =>
+                Check(
+                    "HistoryWindow-Clips",
+                    () =>
                     {
-                        window.ShowClipsForSmokeTest();
-                        window.SelectRowForSmokeTest(0);
-                    };
+                        var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
 
-                    return window;
-                });
+                        window.Loaded += (_, _) =>
+                        {
+                            window.ShowClipsForSmokeTest();
+                            window.SelectRowForSmokeTest(0);
+                        };
+
+                        return window;
+                    },
+                    static (window, _) => VerifyToolTipWrapping(window));
 
                 // Cycles every tab. TabControl only realises the SELECTED tab's content, so without
                 // this the other tabs' templates are never instantiated and a broken one goes unseen -
@@ -378,6 +381,87 @@ internal static class Program
         ExpectSearchHit(window, "tray", "Left-Clicking the Tray Icon");
         ExpectSearchHit(window, "store images", "Store Images");
         ExpectSearchHit(window, "electron", "Pause Before Pasting (ms)");
+    }
+
+    /// <summary>
+    /// Proves a long tooltip wraps inside a bounded width, which nothing else here can.
+    /// <para>
+    /// A tooltip is a popup shown on hover, so it is realised by neither constructing a window nor showing one -
+    /// it was the widest unexercised template in the application, and it was reported: the Remove Duplicates
+    /// explanation rendered as one ~1,000px line running off past the window edge.
+    /// </para>
+    /// <para>
+    /// Measured rather than eyeballed, and the two assertions are different claims. The width proves MaxWidth is
+    /// in force; the inner TextBlock's TextWrapping proves the wrapping actually reached the generated TextBlock,
+    /// which is the part that is easy to get wrong - with MaxWidth alone the text is clipped at the limit instead
+    /// of wrapping, and a screenshot of that looks almost right.
+    /// </para>
+    /// </summary>
+    private static void VerifyToolTipWrapping(Window window)
+    {
+        // The real string from HistoryWindow.xaml, not a lorem ipsum: this is the tooltip that was reported, so
+        // it is the one worth measuring. A copy rather than a reference because reaching the button would mean
+        // walking the tree for it, and a wrong turn there would silently measure something shorter.
+        const string longest =
+            "Collapse entries that are exact duplicates, keeping one of each. Acts on whichever of the two "
+            + "stores is shown. Imports before this version were not idempotent, so importing Clipjump more "
+            + "than once left a copy per run.";
+
+        var tip = new System.Windows.Controls.ToolTip
+        {
+            Content = longest,
+            PlacementTarget = window,
+            StaysOpen = true,
+            IsOpen = true,
+        };
+
+        tip.UpdateLayout();
+        Drain();
+
+        var limit = tip.MaxWidth;
+        var text = FindDescendant<System.Windows.Controls.TextBlock>(tip);
+        var wrapping = text?.TextWrapping;
+
+        Console.WriteLine(
+            $"  tooltip: {tip.ActualWidth:F0}x{tip.ActualHeight:F0} px, limit {limit:F0}, wrapping {wrapping?.ToString() ?? "no TextBlock found"}");
+
+        if (double.IsInfinity(limit) || tip.ActualWidth > limit + 1)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  a long tooltip is {tip.ActualWidth:F0}px wide against a limit of {limit:F0}");
+        }
+
+        if (wrapping is not TextWrapping.Wrap)
+        {
+            _failures++;
+            Console.WriteLine("  FAIL  the tooltip's text does not wrap, so a long one is clipped rather than reflowed");
+        }
+
+        tip.IsOpen = false;
+    }
+
+    /// <summary>First descendant of the given type, or null. Visual tree, so it must be called after layout.</summary>
+    private static T? FindDescendant<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var found = FindDescendant<T>(child);
+
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private static void ExpectSearchHit(SettingsWindow window, string query, string expectedLabel)

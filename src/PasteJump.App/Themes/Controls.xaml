@@ -13,7 +13,8 @@
     until restart.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
     <!-- ============================================================ scroll bars -->
 
@@ -1057,12 +1058,66 @@
         </Setter>
     </Style>
 
+    <!--
+        Tooltips wrap, and they are the one place in this application where that had to be arranged rather than
+        asked for.
+
+        A string assigned to ToolTip is rendered by a TextBlock that ContentPresenter generates, and its
+        TextWrapping defaults to NoWrap - so a sentence of explanation became a single line as wide as it needed
+        to be, about 1,000px for the Remove Duplicates button, running past the window and off towards the other
+        monitor. Neither MaxWidth on its own nor Padding fixes that: without wrapping the text is simply clipped
+        at the limit instead.
+
+        The wrapping is arranged with an implicit DataTemplate for String, declared in the template's own
+        resources. Two alternatives were tried or considered and are worse:
+
+          - An implicit TextBlock STYLE in the same place does nothing, which was measured rather than guessed:
+            the tooltip came out exactly 380px wide with TextWrapping still NoWrap - the width limit honoured and
+            the text clipped at it, which looks almost right in a screenshot. An implicit style does not reach a
+            TextBlock that ContentPresenter generates from its internal template.
+          - Setting ContentTemplate outright would work and applies to *all* content, so the day a tooltip is
+            given a Grid or a StackPanel it would render as the type name - silently. Keying the template on
+            String means element content still goes through ContentPresenter untouched.
+
+        Declared inside ControlTemplate.Resources rather than at dictionary level, and that scoping is the whole
+        safety of it: an implicit String template in Application.Resources would capture the string content of
+        every Button, Label and header in the application.
+
+        MaxWidth is on the ToolTip rather than the TextBlock so the border and padding are inside the limit, and
+        it is deliberately narrow: prose is easier to read in a column than in a line, and every tooltip here is
+        prose. TextFormattingMode=Display for the same reason the overlay and the toast set it - this is 12px
+        text, which WPF's default Ideal mode renders visibly soft.
+    -->
     <Style TargetType="ToolTip">
         <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="MaxWidth" Value="380" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <ControlTemplate.Resources>
+                        <DataTemplate DataType="{x:Type sys:String}">
+                            <TextBlock Text="{Binding}"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextBrush}" />
+                        </DataTemplate>
+                    </ControlTemplate.Resources>
+
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}"
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>
