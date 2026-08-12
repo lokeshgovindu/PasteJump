@@ -1,0 +1,222 @@
+# Mirrors a published GitHub release to SourceForge.
+#
+# Why a mirror rather than a second build: the ZIPs are cut on a development machine (see the note at
+# the bottom of build.yml for why there is no release job), so the bytes people download from GitHub are
+# the only bytes that exist. Building them again here would produce a *different* build of the same
+# commit - a different timestamp at least - and two channels offering files that hash differently is
+# worse than having one channel. So this downloads what was published and forwards exactly that.
+#
+# It runs when a release is PUBLISHED, which is the moment the assets are final and public, and it can be
+# re-run by hand for a release that predates this workflow - or after fixing a credential.
+#
+# "published" rather than "released" is deliberate: the latter skips pre-releases, and a pre-release is
+# exactly the kind of build worth having on a second channel while it is being tried out. The one thing to
+# know about that is at the end of the summary - SourceForge's big green Download button follows the newest
+# file unless a default is pinned, so a pre-release becomes the headline download until it is.
+#
+# ---------------------------------------------------------------------------------------------------
+# One-time setup, without which every run warns and skips rather than failing:
+#
+#   1. Make a key pair for this purpose only, with no passphrase (nothing can type one here):
+#        ssh-keygen -t ed25519 -C "PasteJump CI to SourceForge" -f pastejump-sf -N ""
+#   2. Paste pastejump-sf.pub into https://sourceforge.net/auth/shell_services (SSH keys). SourceForge
+#      can take a few minutes to distribute a new key.
+#   3. Add two repository secrets:
+#        SOURCEFORGE_USERNAME   the SourceForge account name, e.g. lokeshgovindu
+#        SOURCEFORGE_SSH_KEY    the whole private key file, including the BEGIN/END lines
+#   4. Delete the private key from the machine that made it. It is a deployment credential; the copy in
+#      the repository secret is the only one that needs to exist.
+#
+# The account needs release-manager rights on the project. The key is write access to the file area and
+# nothing else - it cannot reach the source repository or the account.
+# ---------------------------------------------------------------------------------------------------
+name: mirror to sourceforge
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to mirror (e.g. 2026.1-pre1)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Do everything except the upload'
+        type: boolean
+        default: false
+
+# Only to read the release and its assets. Nothing here writes to the repository.
+permissions:
+  contents: read
+
+# Two releases published minutes apart would otherwise race for the same file area. Not cancelled in
+# progress, deliberately: an interrupted rsync leaves a half-written file on a public download page.
+concurrency:
+  group: mirror-to-sourceforge
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    # Nothing here is Windows-specific - it moves files that were built elsewhere - and rsync and ssh
+    # are already on this image.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # The project's SourceForge unix name, which is what the file area path is keyed on.
+      SF_PROJECT: pastejump
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
+
+    steps:
+      - name: Check the credentials are configured
+        id: creds
+        env:
+          SF_USER: ${{ secrets.SOURCEFORGE_USERNAME }}
+          SF_KEY: ${{ secrets.SOURCEFORGE_SSH_KEY }}
+        run: |
+          if [ -n "$SF_USER" ] && [ -n "$SF_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            # A warning rather than a failure: a release that succeeded should not be reported as broken
+            # because a mirror is not set up yet. It is loud enough to see in the run list, and the
+            # summary below says what to do about it.
+            echo "::warning title=SourceForge mirror skipped::SOURCEFORGE_USERNAME and SOURCEFORGE_SSH_KEY are not set. See the setup notes in .github/workflows/mirror-to-sourceforge.yml."
+          fi
+
+      - name: Download the published assets
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --dir dist --pattern '*'
+          ls -l dist
+          test -n "$(ls -A dist)" || { echo "::error::$TAG has no assets to mirror."; exit 1; }
+
+      - name: Check the downloads against the hashes in the release notes
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # The release notes publish a SHA256 per file, so they can be used as the manifest they already
+          # are: this proves SourceForge receives the same bytes GitHub advertises, and it costs one
+          # command. A release whose notes carry no hashes is not an error - older ones may not - but it
+          # is worth saying out loud, because then nothing has been verified.
+          gh release view "$TAG" --json body -q .body > notes.md
+
+          missing=0
+          for file in dist/*; do
+            name=$(basename "$file")
+            expected=$(grep -oE "[0-9a-f]{64}[[:space:]]+$name(\$|[[:space:]])" notes.md | head -1 | cut -c1-64 || true)
+            actual=$(sha256sum "$file" | cut -d' ' -f1)
+
+            if [ -z "$expected" ]; then
+              echo "::warning title=No published hash::$name is not listed in the release notes, so its bytes were not verified."
+              missing=1
+            elif [ "$expected" != "$actual" ]; then
+              echo "::error title=Hash mismatch::$name is $actual but the release notes say $expected."
+              exit 1
+            else
+              echo "verified  $name"
+            fi
+          done
+
+          # Uploaded alongside the files, because SourceForge shows only its own MD5 and SHA1 next to a
+          # download and the release notes are on the other site.
+          (cd dist && sha256sum ./* | sed 's|\./||' > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+          echo "unverified_files=$missing" >> "$GITHUB_ENV"
+
+      - name: Pin SourceForge's host key
+        if: steps.creds.outputs.configured == 'true'
+        run: |
+          # Not trust-on-first-use. These are the SHA256 fingerprints SourceForge publishes for
+          # frs.sourceforge.net at
+          # https://sourceforge.net/p/forge/documentation/SSH%20Key%20Fingerprints/
+          # and they were confirmed against a live ssh-keyscan when this workflow was written. If
+          # SourceForge rotates a key this step fails loudly, which is the point - the alternative is
+          # handing a private key to whatever answers on that name.
+          pinned="xB2rnn0NUjZ/E0IXQp4gyPqc7U7gjcw7G26RhkDyk90 QAAxYkf0iI/tc9oGa0xSsVOAzJBZstcO8HqGKfjpxcY 209BDmH3jsRyO9UeGPPgLWPSegKmYCBIya0nR/AWWCY"
+
+          ssh-keyscan -t rsa,ecdsa,ed25519 frs.sourceforge.net > known_hosts 2>/dev/null
+          test -s known_hosts || { echo "::error::ssh-keyscan returned no host keys for frs.sourceforge.net."; exit 1; }
+
+          ssh-keygen -lf known_hosts | while read -r _bits fingerprint _rest; do
+            fp=${fingerprint#SHA256:}
+            case " $pinned " in
+              *" $fp "*) echo "recognised  $fp" ;;
+              *) echo "::error title=Unrecognised host key::frs.sourceforge.net offered $fp, which is not a published SourceForge fingerprint."; exit 1 ;;
+            esac
+          done
+
+      - name: Upload to the file area
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          SF_USER: ${{ secrets.SOURCEFORGE_USERNAME }}
+          SF_KEY: ${{ secrets.SOURCEFORGE_SSH_KEY }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          install -m 600 /dev/null sf_key
+          printf '%s\n' "$SF_KEY" > sf_key
+
+          # A folder per release, matching how AltTab's file area is laid out, named after the tag so the
+          # two channels can be compared at a glance. rsync creates the final directory itself.
+          target="/home/frs/project/$SF_PROJECT/$TAG/"
+
+          # No -z: these are ZIPs, so compressing the stream again costs CPU and saves nothing. No
+          # --delete either, ever - this only ever adds files to a public download area.
+          rsync -rtv ${DRY_RUN:+--dry-run} \
+            -e "ssh -i sf_key -o UserKnownHostsFile=known_hosts -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes" \
+            dist/ "$SF_USER@frs.sourceforge.net:$target"
+
+      - name: Say where it went
+        if: always() && steps.creds.outputs.configured == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # always(), so this also reports a run that failed part way - but then there may be no
+          # downloads to list, and a summary is not worth failing a job over.
+          [ -d dist ] || exit 0
+          {
+            echo "## SourceForge mirror"
+            echo
+            echo "Release **$TAG** to [the $SF_PROJECT file area](https://sourceforge.net/projects/$SF_PROJECT/files/$TAG/)."
+            echo
+            if [ "${DRY_RUN:-false}" = "true" ]; then
+              echo "> Dry run - nothing was uploaded."
+              echo
+            fi
+            if [ "${unverified_files:-0}" = "1" ]; then
+              echo "> Some files had no published hash to check against."
+              echo
+            fi
+            echo '| file | sha256 |'
+            echo '|---|---|'
+            for file in dist/*; do
+              [ "$(basename "$file")" = "SHA256SUMS.txt" ] && continue
+              printf '| `%s` | `%s` |\n' "$(basename "$file")" "$(sha256sum "$file" | cut -c1-16)…"
+            done
+            echo
+            echo "SourceForge offers the newest file as its big Download button unless a default is set"
+            echo "per platform in Files → (file) → Properties. Worth checking after a pre-release."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Explain what was skipped
+        if: steps.creds.outputs.configured != 'true'
+        run: |
+          {
+            echo "## SourceForge mirror skipped"
+            echo
+            echo "\`SOURCEFORGE_USERNAME\` and \`SOURCEFORGE_SSH_KEY\` are not both set, so nothing was uploaded."
+            echo "The header of \`.github/workflows/mirror-to-sourceforge.yml\` has the four setup steps."
+            echo
+            echo "Once they are set, mirror a release that has already been published with:"
+            echo
+            echo '```'
+            echo "gh workflow run mirror-to-sourceforge.yml -f tag=${TAG:-<tag>}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

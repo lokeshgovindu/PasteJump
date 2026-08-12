@@ -1057,6 +1057,32 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   because a live exe is held open and a stale exe beside new DLLs fails at load with nothing useful in the
   message; and it **checks the published version against MSBuild's**, which catches a publish made before the
   last commit — easy to do by accident now that the revision is the commit count.
+- **SourceForge is a mirror, not a second build, and `mirror-to-sourceforge.yml` forwards the bytes GitHub
+  already published.** It triggers on a release being **published**, downloads that release's own assets and
+  rsyncs them to `/home/frs/project/pastejump/<tag>/` — a folder per tag, matching how AltTab's file area is
+  laid out. Building again in CI was the obvious alternative and is the wrong one: the same commit does not
+  produce the same bytes (`PasteJump.App.csproj` stamps a build timestamp, deliberately), so two channels would
+  offer downloads that hash differently, which is indistinguishable from one of them having been tampered with.
+  Note **AltTab automates none of this** — its SourceForge presence is a product page, hand-uploaded binaries and
+  a `version.txt` update manifest — so there was nothing to copy but the folder convention. PasteJump needs no
+  manifest, because its update check reads the GitHub API.
+  Five things worth keeping:
+  - **The release notes are used as the manifest they already are.** Every asset's SHA256 is in there, so the
+    workflow re-hashes what it downloaded and refuses to upload on a mismatch. That is what makes "the same
+    bytes on both channels" checkable rather than merely intended. A file with no published hash is a warning,
+    not a failure — an older release may not have one — and the warning says nothing was verified.
+  - **The host key is pinned to SourceForge's published fingerprints**, not accepted on first use. They are in
+    the workflow with the URL they came from, and were confirmed against a live `ssh-keyscan`. A rotation fails
+    the run loudly, which beats handing a deployment key to whatever answers on that name.
+  - **Missing credentials warn and skip; they do not fail.** A release that went out fine should not be reported
+    as broken because the mirror is not configured, and the step summary prints the four setup steps and the
+    `gh workflow run` line to catch up a release afterwards. The two secrets are `SOURCEFORGE_USERNAME` and
+    `SOURCEFORGE_SSH_KEY`.
+  - **`published`, not `released`, so pre-releases are mirrored too** — and the consequence is that
+    SourceForge's Download button follows the newest file until a default is pinned per platform in the web UI.
+    The summary says so at the end of every run.
+  - **No `--delete`, and no cancel-in-progress.** This only ever adds files to a public download area, and an
+    interrupted rsync would leave a half-written file on a page people download from.
 - **Releases ship UNSIGNED, permanently, and that is a settled decision (2026-08-12).** Free open-source signing
   through SignPath was pursued for AltTab and abandoned — too much asked for, approval unlikely — so do not raise it,
   or self-signing, or a paid certificate, unless the user asks about signing first. The consequence is that SmartScreen
