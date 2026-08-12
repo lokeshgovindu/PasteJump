@@ -790,9 +790,6 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="Leave both empty — the default — to have the overlay appear beside the text caret, or beside the pointer where an application does not report one. Fill in both to pin it to one place on screen instead, in physical pixels from the top-left of the primary monitor. One without the other is not accepted: it would track the caret in one axis and not the other." />
 
-                        <CheckBox x:Name="ShowKeyHintCheck" Content="Show a Key Reminder Along the Bottom" />
-                        <TextBlock Style="{StaticResource CheckHelp}"
-                                   Text="One muted line naming the keys worth knowing when you have lost your place: A returns to the newest clip, X deletes, Esc cancels, and F1 opens the full list. Turn it off once the gesture is in your fingers." />
                         </StackPanel>
                         </Border>
 
@@ -835,6 +832,16 @@
                         <CheckBox x:Name="ShowPinnedCheck" Content="The PINNED Marker" Margin="0,7,0,0" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Pinning itself is unaffected — this only hides the marker. A pinned clip still sorts first and still survives Delete All." />
+
+                        <!--
+                            The key reminder sat in the Paste Overlay group above, which was where it had always
+                            been - and once the other seven switches existed here, its absence from this list read as
+                            a missing switch rather than as one filed elsewhere. It is the eighth part of the same
+                            OverlayParts value, so this is where it belongs.
+                        -->
+                        <CheckBox x:Name="ShowKeyHintCheck" Content="The Key Reminder Along the Bottom" Margin="0,7,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="One muted line naming the keys worth knowing when you have lost your place — A returns to the newest clip, Del deletes, J joins, Esc cancels, F1 opens the full list. It names the keys you have actually bound, and leaves out any action you have switched off. Turn it off once the gesture is in your fingers." />
                         </StackPanel>
                         </Border>
 
