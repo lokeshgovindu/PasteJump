@@ -1120,4 +1120,185 @@
         </Setter>
     </Style>
 
+    <!--
+        THE TRAY MENU.
+
+        These templates exist because without them the menu was the one surface that ignored the theme: a WPF
+        ContextMenu with no style renders in WPF's own light chrome, so right-clicking the tray on Nord or Dracula
+        produced a white menu beside a dark application. Nothing was styled here at all - TrayMenuBuilder's only
+        two colour settings were the invisible owner window's - and it was reported.
+
+        Adapted from AltTab.NET's Themes/Controls.xaml, which had solved the same problem, and every brush below is
+        an existing PaletteKeys entry, so no theme file gained a key. DynamicResource throughout: ThemeManager
+        swaps the palette dictionary wholesale, and a StaticResource here would keep the colour it had at start-up.
+
+        The four-column grid is shared by every item so check marks, labels, glyphs and gesture text line up down
+        the menu rather than each item measuring itself.
+    -->
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="0,4" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="HasDropShadow" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}"
+                            CornerRadius="6"
+                            SnapsToDevicePixels="True">
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Keyed on MenuItem.SeparatorStyleKey, not TargetType alone: a menu's separators are styled by that key, and
+        an ordinary Separator style does not reach them - which shows up as a separator that keeps the default
+        chrome inside an otherwise themed menu.
+    -->
+    <Style TargetType="Separator" x:Key="{x:Static MenuItem.SeparatorStyleKey}">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Margin" Value="8,4" />
+        <Setter Property="Background" Value="{DynamicResource SplitterLineBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Chrome"
+                            Background="{TemplateBinding Background}"
+                            Margin="4,0"
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True">
+                        <Grid Height="26">
+                            <Grid.ColumnDefinitions>
+                                <!-- Glyph or check mark, label, gesture, submenu arrow. -->
+                                <ColumnDefinition Width="26" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="12" />
+                            </Grid.ColumnDefinitions>
+
+                            <!--
+                                One column, two possible occupants, and the check mark wins: it is state, while
+                                the glyph is decoration, and a tick hidden behind an icon would be unreadable.
+                                The glyph inherits Foreground rather than setting its own, which is what makes the
+                                disabled trigger below reach it too.
+                            -->
+                            <ContentPresenter x:Name="Icon"
+                                              Grid.Column="0"
+                                              ContentSource="Icon"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+
+                            <TextBlock x:Name="Check"
+                                       Grid.Column="0"
+                                       Text="&#x2713;"
+                                       FontSize="12"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       Visibility="Collapsed" />
+
+                            <ContentPresenter Grid.Column="1"
+                                              ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,12,0" />
+
+                            <!--
+                                InputGestureText. WPF does not draw it for you inside a custom template, which is
+                                easy to miss: the accelerators simply do not appear and the menu looks subtly less
+                                helpful than it did before it was themed.
+                            -->
+                            <TextBlock x:Name="Gesture"
+                                       Grid.Column="2"
+                                       Text="{TemplateBinding InputGestureText}"
+                                       Margin="0,0,10,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource MutedTextBrush}" />
+
+                            <Path x:Name="Arrow"
+                                  Grid.Column="3"
+                                  Data="M 0,0 L 4,4 L 0,8 Z"
+                                  Fill="{DynamicResource MutedTextBrush}"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Visibility="Collapsed" />
+
+                            <!--
+                                Submenus are drawn even though the tray menu has none today: a nested item that
+                                silently rendered as an unopenable row would be a trap for whoever adds the first
+                                one, and the popup is a dozen lines.
+                            -->
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Placement="Right"
+                                   HorizontalOffset="-4"
+                                   VerticalOffset="-6"
+                                   IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Border Background="{DynamicResource SurfaceRaisedBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        Padding="0,4"
+                                        CornerRadius="6"
+                                        SnapsToDevicePixels="True">
+                                    <StackPanel IsItemsHost="True" />
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Chrome" Property="Background"
+                                    Value="{DynamicResource ControlHoverBrush}" />
+                        </Trigger>
+
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                            <Setter TargetName="Icon" Property="Visibility" Value="Collapsed" />
+                        </Trigger>
+
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible" />
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource ControlDisabledTextBrush}" />
+                            <Setter TargetName="Gesture" Property="Foreground"
+                                    Value="{DynamicResource ControlDisabledTextBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

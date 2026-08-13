@@ -51,6 +51,18 @@
     this app touches the filesystem in several places. Added once here rather than as a using
     directive repeated across every view and service.
   -->
+  <!--
+    The UI smoke harness reaches the tray menu's item list and its builder, both of which are internal and should
+    stay that way: the alternative is making four more types public purely so a test can see them, which is how
+    an application's surface stops describing what other code may use.
+
+    Only the harness. Nothing else in the solution needs it, and the App assembly is not signed, so no public key
+    is involved.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="PasteJump.UiSmoke" />
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="System.IO" />
   </ItemGroup>

@@ -152,6 +152,14 @@ public sealed class ThemeManager : IDisposable
         // The overlay's and toast's borders are drawn by DWM too, from a colour pushed through an API call
         // rather than bound - so they need the same nudge for the same reason.
         WindowInterop.RefreshThemedBorders();
+
+        // And the tray menu, for a third reason: it is a live WPF element, but a CACHED one that sits outside
+        // every visual tree between right-clicks, so the resource-change notification that re-resolves every
+        // DynamicResource in a window never reaches it. It kept the palette it was built under - caught by the
+        // UI smoke harness, which found a Dark menu still painted #FFFFFF. Throwing it away costs one fresh
+        // popup on the next right-click after a theme change, which is the trade the note in TrayMenuBuilder
+        // describes.
+        TrayMenuBuilder.InvalidateForThemeChange();
     }
 
     /// <summary>

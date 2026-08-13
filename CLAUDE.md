@@ -975,6 +975,32 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   UI smoke harness. Put shared resources in `Themes/Shared.xaml`.
 - **`DataGridCell.HorizontalContentAlignment` defaults to `Left`**, which makes the content presenter
   shrink to its content — so a column's right-aligned `ElementStyle` silently does nothing.
+- **The tray menu is themed and carries icons (2026-08-13), and the cache has to be invalidated when the palette
+  changes.** Until then `TrayMenuBuilder` set no colour at all and no theme file mentioned `MenuItem`, so an
+  unstyled WPF `ContextMenu` rendered in WPF's own light chrome — a white menu beside a Dracula window, on all
+  nineteen themes. Reported after the user compared it with **AltTab.NET's `AppMenu`**, whose templates this is
+  adapted from; every brush maps to an existing `PaletteKeys` entry, so no theme file gained a key.
+  - **The cached menu does not follow a theme change by itself, and this is the trap.** A `ContextMenu` held
+    between right-clicks belongs to no visual tree, so the resource invalidation that re-resolves `DynamicResource`
+    inside a window never reaches it: it keeps the palette it was built under. `ThemeManager.ApplyResolved` now
+    calls `TrayMenuBuilder.InvalidateForThemeChange()` alongside `RefreshThemedBorders()` — same class of problem,
+    third instance. The harness caught it before it shipped, reporting a Dark menu still painted `#FFFFFF`.
+  - **Items are rebuilt per show; the `ContextMenu` and the owner window are not.** That split preserves the
+    measured reasons for the cache — a new `Popup` is a new HWND whose first frame can appear unpainted (a reported
+    glitch), and showing a fresh owner cost 36–73 ms against 0.1 ms reused — while letting each item carry its own
+    action. That deleted the ten positional `Action` parameters, the static delegate table they needed, and the
+    two mutated `MenuItem` fields.
+  - **Glyphs come from `Segoe Fluent Icons`, falling back to `Segoe MDL2 Assets`,** and every one was chosen by
+    **rendering four candidates per item and looking at them** — a wrong codepoint is a box or something absurd,
+    never an error. Two changed as a result: `E768` is a play triangle (so it is Resume, not Pause) and `E733` is a
+    clean prohibition sign where `E71A` turned out to be a plain square. The glyph sets **no `Foreground`** so it
+    inherits the item's, which is what greys it out with a disabled row for free.
+  - **`VerifyTrayMenuFollowsPalette` runs inside the harness's real `ThemeManager` loop**, once per shipped theme,
+    precisely so it exercises the invalidation: a check that swapped the palette dictionary itself would pass with
+    that call deleted. Verified by deleting it — 17 failures, one per theme.
+  - The harness reaches these internals through `InternalsVisibleTo("PasteJump.UiSmoke")` rather than four more
+    public types. Note the menu itself is still **not** rendered by the harness (it lives in its own popup HWND);
+    it was eyeballed once, both themes, with a throwaway app that puts the real `MenuItem` templates in a `Border`.
 - **`PasteOverlayModel.Position` is a VIEW coordinate. Never use it to reach into the store (fixed 2026-08-13).**
   Reported as "sometimes I cannot see the preview", with the images filter on. `RefreshWindow` builds `_window`
   from the catalogue filtered by kind *and* search query, and `Render` sets `Position = _cursor + 1` — so position

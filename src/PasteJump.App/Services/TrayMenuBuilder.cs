@@ -1,49 +1,39 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using PasteJump.Interop;
 
 namespace PasteJump.App.Services;
 
 /// <summary>
-/// Builds and shows the tray context menu.
+/// Draws the tray menu described by <see cref="TrayMenu"/>, and shows it.
 /// <para>
-/// A WPF <see cref="ContextMenu"/> needs an activated owner to receive keyboard focus and to
-/// dismiss itself when the user clicks elsewhere. A tray-only app has no such window, so a
-/// throwaway invisible one is created purely to own the menu - otherwise the menu opens and then
-/// refuses to close, which is a common bug in hand-rolled tray apps.
+/// A WPF <see cref="ContextMenu"/> needs an activated owner to receive keyboard focus and to dismiss itself when
+/// the user clicks elsewhere. A tray-only app has no such window, so a throwaway invisible one is created purely
+/// to own the menu - otherwise the menu opens and then refuses to close, which is a common bug in hand-rolled
+/// tray apps.
 /// </para>
 /// <para>
-/// Both the owner <em>and the menu itself</em> are created once and reused. Rebuilding the menu per click was
-/// reported as a visible glitch on repeated right-clicks, and the reason is the same one the owner window was
-/// already cached for: a new <see cref="ContextMenu"/> carries a new <see cref="System.Windows.Controls.Primitives.Popup"/>,
-/// which means a new HWND with nothing rendered in it yet, so its first frame can appear unpainted. Reuse means
-/// the popup is created and rendered exactly once per process.
+/// <b>The owner and the ContextMenu are created once and reused; the items are rebuilt per show.</b> That split
+/// matters and is not arbitrary. Rebuilding the <em>menu</em> per click was reported as a visible glitch on
+/// repeated right-clicks, because a new <see cref="ContextMenu"/> carries a new
+/// <see cref="System.Windows.Controls.Primitives.Popup"/> - a new HWND with nothing rendered in it yet, so its
+/// first frame can appear unpainted. Rebuilding the <em>items</em> inside the same menu keeps that HWND, costs a
+/// fraction of a millisecond for a dozen rows, and is what lets each item carry its own action instead of the
+/// static delegate table this used to need.
+/// </para>
+/// <para>
+/// What it looks like is in <c>Themes/Controls.xaml</c>, not here. Nothing in this file sets a colour: an
+/// unstyled ContextMenu renders in WPF's own light chrome regardless of the theme, and the templates there fix
+/// that.
 /// </para>
 /// </summary>
 internal static class TrayMenuBuilder
 {
-    /// <summary>
-    /// What each item does. Held in a field and replaced on every <see cref="Build"/> call rather than captured
-    /// by the click handlers, because the menu outlives the call that first built it - handlers closing over the
-    /// first set of delegates would silently ignore every later one.
-    /// </summary>
-    private sealed record TrayActions(
-        Action About,
-        Action History,
-        Action Settings,
-        Action Manual,
-        Action Help,
-        Action CheckForUpdates,
-        Action PauseToggle,
-        Action DisableToggle,
-        Action Restart,
-        Action Exit);
-
-    private static TrayActions? _actions;
+    /// <summary>The icon font. Fluent first, MDL2 as the Windows 10 fallback - see <see cref="TrayGlyph"/>.</summary>
+    private static readonly FontFamily GlyphFont = new("Segoe Fluent Icons, Segoe MDL2 Assets");
 
     private static ContextMenu? _menu;
-    private static MenuItem? _pauseItem;
-    private static MenuItem? _disableItem;
 
     /// <summary>
     /// The menu currently open, or null. Used to decide whether a deferred hide is still wanted - see
@@ -51,97 +41,118 @@ internal static class TrayMenuBuilder
     /// </summary>
     private static ContextMenu? _openMenu;
 
-    public static ContextMenu Build(
-        Action onAbout,
-        Action onHistory,
-        Action onSettings,
-        Action onManual,
-        Action onHelp,
-        Action onCheckForUpdates,
-        Action onPauseToggle,
-        Action onDisableToggle,
-        Action onRestart,
-        Action onExit,
-        bool isPaused,
-        bool isDisabled)
+    /// <summary>Fills the shared menu with these items and returns it, ready to show.</summary>
+    public static ContextMenu Build(IReadOnlyList<TrayMenuItem> items)
     {
-        _actions = new TrayActions(
-            onAbout,
-            onHistory,
-            onSettings,
-            onManual,
-            onHelp,
-            onCheckForUpdates,
-            onPauseToggle,
-            onDisableToggle,
-            onRestart,
-            onExit);
+        ArgumentNullException.ThrowIfNull(items);
 
-        _menu ??= Compose();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
 
-        // The only two items whose text depends on state, so the only two that need touching per show. Both
-        // labels name their effect on Ctrl+V, because that is the sole difference between the commands and
-        // "Pause monitoring" beside "Disable PasteJump" was reported as two names for one thing.
-        // Title case for the command, sentence case inside the parentheses: "(Keep Pasting)" reads as a second
-        // command rather than as the explanation it is.
-        _pauseItem!.Header = isPaused ? "_Resume Capture" : "_Pause Capture (keep pasting)";
-        _disableItem!.Header = isDisabled ? "_Enable PasteJump" : "_Disable PasteJump (Ctrl+V passes through)";
+        // Created once: see the note on this class for what a second Popup costs.
+        var reused = _menu is not null;
 
-        return _menu;
+        var menu = _menu ??= CreateMenu();
+
+        menu.Items.Clear();
+
+        foreach (var item in items)
+        {
+            menu.Items.Add(Compose(item));
+        }
+
+        DebugConsole.Log(
+            $"  TrayMenu: {items.Count} items {(reused ? "rebuilt in the existing menu" : "into a new menu")}, "
+                + $"{timer.Elapsed.TotalMilliseconds:0.0} ms");
+
+        return menu;
     }
 
-    private static ContextMenu Compose()
+    /// <summary>
+    /// Drops the cached menu, so the next show builds one under the current palette.
+    /// <para>
+    /// Called by <see cref="ThemeManager"/> when the palette changes, and necessary because of what the cache
+    /// costs: a <see cref="ContextMenu"/> held between right-clicks belongs to no visual tree, so the resource
+    /// invalidation that re-resolves every <c>DynamicResource</c> in an open window never reaches it, and it keeps
+    /// the colours it was built with. The UI smoke harness caught exactly that - a Dark menu still painted
+    /// <c>#FFFFFF</c> - which is why this exists rather than being discovered by a user on theme number twenty.
+    /// </para>
+    /// <para>
+    /// The cost is one fresh popup on the next right-click after a theme change: the same first-frame risk the
+    /// cache exists to avoid, but paid once per theme change rather than once per click. Re-resolving the
+    /// properties by hand instead was the alternative, and it would have to enumerate every brush the style and
+    /// the item template set - a list that would go stale the first time the template gained a colour.
+    /// </para>
+    /// </summary>
+    /// <para>
+    /// Nulling the field is the whole of it. The discarded menu keeps its <c>Closed</c> handler on purpose, so one
+    /// that happened to be open when the theme changed still hides the owner window on the way out -
+    /// unsubscribing here would leave that window shown, invisible and activated.
+    /// </para>
+    public static void InvalidateForThemeChange() => _menu = null;
+
+    /// <summary>One item, or a separator. Recurses for submenus, of which there are none today.</summary>
+    private static object Compose(TrayMenuItem item)
+    {
+        if (item.IsSeparator)
+        {
+            return new Separator();
+        }
+
+        var element = new MenuItem
+        {
+            Header = item.Text,
+            IsEnabled = item.IsEnabled,
+            IsChecked = item.IsChecked,
+        };
+
+        if (item.Emphasised)
+        {
+            element.FontWeight = FontWeights.SemiBold;
+        }
+
+        if (item.Gesture is { Length: > 0 })
+        {
+            element.InputGestureText = item.Gesture;
+        }
+
+        if (item.Glyph is { Length: > 0 })
+        {
+            // No Foreground set on purpose: inheriting the item's means the glyph follows the theme and greys out
+            // with a disabled row, both for free. Setting it here would need a DynamicResource per glyph and would
+            // still miss the disabled case.
+            element.Icon = new TextBlock
+            {
+                Text = item.Glyph,
+                FontFamily = GlyphFont,
+                FontSize = 15,
+            };
+        }
+
+        if (item.Submenu is { Count: > 0 })
+        {
+            foreach (var child in item.Submenu)
+            {
+                element.Items.Add(Compose(child));
+            }
+
+            // A header with children is not itself clickable - clicking it opens the submenu.
+            return element;
+        }
+
+        if (item.Invoke is { } invoke)
+        {
+            // Captured directly, which is only safe because the items are rebuilt on every show. When the menu was
+            // composed once and kept, handlers closing over the first set of delegates silently ignored every
+            // later one, and a static table had to be consulted at click time instead.
+            element.Click += (_, _) => invoke();
+        }
+
+        return element;
+    }
+
+    private static ContextMenu CreateMenu()
     {
         var menu = new ContextMenu();
-
-        // About first and bold, as requested. Note that bold in a context menu conventionally marks the
-        // DEFAULT item - the one a double-click invokes - and that is still "Clipboard history", which
-        // is what a left-click on the tray icon opens. The emphasis here is presentational only; the
-        // tray's own activation behaviour is unchanged.
-        menu.Items.Add(MenuItemFor("_About PasteJump…", static a => a.About, emphasised: true));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(MenuItemFor("Clipboard _History…", static a => a.History));
-        menu.Items.Add(new Separator());
-
-        _pauseItem = MenuItemFor("_Pause Capture (keep pasting)", static a => a.PauseToggle);
-        menu.Items.Add(_pauseItem);
-
-        menu.Items.Add(MenuItemFor("_Settings…", static a => a.Settings));
-
-        // The manual had no route into it from anywhere in the application until now - it shipped in the
-        // download and could only be found in Explorer. It sits above the keys card because it is the general
-        // answer and the card is the specific one, which is also the order the two appear in F1's own window.
-        //
-        // Accelerator is L, not H: "Clipboard _History" already owns H, and History is the item people reach
-        // for by keyboard. A duplicate accelerator does not fail, it just makes the first press select rather
-        // than invoke - which reads as the menu ignoring you.
-        menu.Items.Add(MenuItemFor("He_lp…", static a => a.Manual));
-        menu.Items.Add(MenuItemFor("Paste-Mode _Keys…", static a => a.Help));
-
-        // No "clear clips" item here, deliberately. One was added and then removed: the gesture's X cycle
-        // already reaches DELETE ALL and now confirms before acting, which was the real problem with it, and
-        // the Paste Mode tab names the keys. A destructive item one click away in the tray earned nothing
-        // beyond a mouse-only route, in an application whose whole premise is the keyboard.
-        menu.Items.Add(new Separator());
-
-        // Fourth item from the bottom, in the group with Restart and Exit rather than beside About. It belongs
-        // here: what an update leads to is replacing the program and restarting it, and the ellipsis says it
-        // opens a dialog rather than acting silently. It only ever runs when clicked - see UpdateChecker for
-        // why nothing checks at start-up.
-        menu.Items.Add(MenuItemFor("Check for _Updates…", static a => a.CheckForUpdates));
-
-        // Distinct from Pause above, and the difference is worth the two menu items. Pause stops capturing
-        // but keeps the gesture, so Ctrl+V still opens the overlay on the clips already held. Disable also
-        // releases the keyboard hook, handing Ctrl+V back to Windows untouched - which is what you want in
-        // order to use another clipboard manager, or to rule PasteJump out when something else misbehaves.
-        _disableItem = MenuItemFor("_Disable PasteJump (Ctrl+V passes through)", static a => a.DisableToggle);
-        menu.Items.Add(_disableItem);
-
-        // Restart sits immediately above Exit. Both are the same kind of end-of-session action, and grouping
-        // them leaves Exit at the very bottom where muscle memory expects it - appending Restart last would
-        // have moved Exit and caused mis-clicks.
-        menu.Items.Add(MenuItemFor("_Restart PasteJump", static a => a.Restart));
-        menu.Items.Add(MenuItemFor("E_xit PasteJump", static a => a.Exit));
 
         // Subscribed once, here, rather than per show - which is what the old code did, and it had to
         // unsubscribe again to stop handlers accumulating on a menu that was shown repeatedly.
@@ -274,30 +285,4 @@ internal static class TrayMenuBuilder
         Background = null,
         Opacity = 0,
     };
-
-    private static MenuItem MenuItemFor(
-        string header,
-        Func<TrayActions, Action> action,
-        bool emphasised = false)
-    {
-        var item = new MenuItem { Header = header };
-
-        if (emphasised)
-        {
-            item.FontWeight = FontWeights.SemiBold;
-        }
-
-        // Resolved from the current actions at click time rather than captured, since the menu is reused across
-        // shows. Null only if a click somehow arrives before the first Build, which cannot happen - Build is
-        // what creates the menu.
-        item.Click += (_, _) =>
-        {
-            if (_actions is not null)
-            {
-                action(_actions)();
-            }
-        };
-
-        return item;
-    }
 }

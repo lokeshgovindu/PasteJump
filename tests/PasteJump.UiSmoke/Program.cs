@@ -351,6 +351,11 @@ internal static class Program
                         _failures++;
                         Console.WriteLine($"  FAIL  {theme.Name} declares basedOn {theme.BasedOn} but resolved as {(manager.IsDark ? "dark" : "light")}");
                     }
+
+                    // Here rather than beside the other verifications, because this needs the real ThemeManager:
+                    // the cached menu only picks up a new palette because Apply invalidates it, and a check that
+                    // swapped the dictionary itself would pass with that call deleted.
+                    VerifyTrayMenuFollowsPalette(app, theme.Name);
                 }
 
                 // One settings dialog under a custom theme as well: it holds far more control types than the
@@ -362,6 +367,7 @@ internal static class Program
                 Check("SettingsWindow-CustomTheme", () => new SettingsWindow(settings, formatters, DataLocation.UserProfile));
 
                 Console.WriteLine($"  themes: {BuiltInThemes.All.Count} shipped, each applied and rendered");
+                Console.WriteLine($"  tray menu: followed the palette through {_trayMenuThemesFollowed} of {BuiltInThemes.All.Count} themes");
             }
         }
 
@@ -372,6 +378,7 @@ internal static class Program
         Console.WriteLine();
         VerifyPaletteContract();
         VerifyTrayIcons();
+        VerifyTrayMenu(app);
         VerifyEverySettingHasAControl(new FormatterRegistry());
 
         Console.WriteLine();
@@ -892,6 +899,95 @@ internal static class Program
     /// rule, but only this notices if a regenerated icon set stops carrying a 24 px frame.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The tray menu follows the theme, and every item has an icon.
+    /// <para>
+    /// Both halves were absent until 2026-08-13 and the first was reported: a WPF <c>ContextMenu</c> with no style
+    /// renders in WPF's own light chrome, so the menu stayed white on all nineteen themes while the rest of the
+    /// application changed. Nothing in <c>TrayMenuBuilder</c> had ever set a colour, and nothing in the theme files
+    /// mentioned <c>MenuItem</c> - which is exactly the kind of gap a screenshot of a window cannot show, because
+    /// the menu lives in its own popup HWND.
+    /// </para>
+    /// <para>
+    /// Asserted against the palette rather than against a literal colour, and for both themes, so the check says
+    /// "the menu uses the theme's raised surface" instead of "the menu is #FFFFFF" - which would have passed on the
+    /// broken build.
+    /// </para>
+    /// </summary>
+    private static void VerifyTrayMenu(Application app)
+    {
+        // The real list, not a sample, so an item added without a glyph fails here.
+        var items = TrayMenu.Items(NoOpTrayCommands, isPaused: false, isDisabled: false);
+        var commands = items.Where(static i => !i.IsSeparator).ToList();
+        var withoutGlyph = commands.Where(static i => string.IsNullOrEmpty(i.Glyph)).Select(static i => i.Text).ToList();
+
+        Console.WriteLine($"  tray menu: {commands.Count} items, {items.Count - commands.Count} separators");
+
+        if (withoutGlyph.Count > 0)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  tray menu items with no icon: {string.Join(", ", withoutGlyph)}");
+        }
+
+        // Every state the two toggles can be in, since each swaps a label and one of them swaps its glyph.
+        foreach (var (paused, disabled) in new[] { (true, false), (false, true), (true, true) })
+        {
+            foreach (var item in TrayMenu.Items(NoOpTrayCommands, paused, disabled))
+            {
+                if (!item.IsSeparator && string.IsNullOrEmpty(item.Glyph))
+                {
+                    _failures++;
+                    Console.WriteLine($"  FAIL  tray menu item with no icon when paused={paused} disabled={disabled}: {item.Text}");
+                }
+            }
+        }
+
+    }
+
+    private static int _trayMenuThemesFollowed;
+
+    /// <summary>
+    /// The menu, built now, wears the palette that is in force now. Called once per shipped theme from inside the
+    /// <see cref="ThemeManager"/> loop - see the note at the call site for why it cannot live beside the other
+    /// verifications.
+    /// </summary>
+    private static void VerifyTrayMenuFollowsPalette(Application app, string themeName)
+    {
+        var menu = TrayMenuBuilder.Build(TrayMenu.Items(NoOpTrayCommands, isPaused: false, isDisabled: false));
+        var expected = (System.Windows.Media.SolidColorBrush)app.Resources["SurfaceRaisedBrush"];
+        var actual = menu.Background as System.Windows.Media.SolidColorBrush;
+
+        if (menu.Template is null)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  the tray menu has no template on {themeName} - it renders in WPF's own chrome");
+            return;
+        }
+
+        if (actual is null || actual.Color != expected.Color)
+        {
+            _failures++;
+            Console.WriteLine(
+                $"  FAIL  tray menu background on {themeName} is {(actual is null ? "unset" : actual.Color.ToString())}, "
+                    + $"not that theme's SurfaceRaisedBrush ({expected.Color})");
+            return;
+        }
+
+        _trayMenuThemesFollowed++;
+    }
+
+    private static readonly TrayCommands NoOpTrayCommands = new(
+        About: () => { },
+        History: () => { },
+        Settings: () => { },
+        Manual: () => { },
+        Keys: () => { },
+        CheckForUpdates: () => { },
+        PauseToggle: () => { },
+        DisableToggle: () => { },
+        Restart: () => { },
+        Exit: () => { });
+
     private static void VerifyTrayIcons()
     {
         // 16 and 32 are the two system sizes; 24 is what the shell asks for at 150% scaling and is the one

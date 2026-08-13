@@ -768,18 +768,20 @@ public partial class App : Application
         var started = System.Diagnostics.Stopwatch.StartNew();
 
         var menu = TrayMenuBuilder.Build(
-            onAbout: ShowAbout,
-            onHistory: ShowHistory,
-            onSettings: ShowSettings,
-            onManual: OpenUserManual,
-            onHelp: ShowShortcutHelp,
-            onCheckForUpdates: CheckForUpdates,
-            onPauseToggle: TogglePaused,
-            onDisableToggle: ToggleDisabled,
-            onRestart: RestartFromMenu,
-            onExit: ExitApplication,
-            isPaused: !_settings.MonitorClipboard,
-            isDisabled: !_keyboardHook.IsInstalled);
+            TrayMenu.Items(
+                new TrayCommands(
+                    About: ShowAbout,
+                    History: ShowHistory,
+                    Settings: ShowSettings,
+                    Manual: OpenUserManual,
+                    Keys: ShowShortcutHelp,
+                    CheckForUpdates: CheckForUpdates,
+                    PauseToggle: TogglePaused,
+                    DisableToggle: ToggleDisabled,
+                    Restart: RestartFromMenu,
+                    Exit: ExitApplication),
+                isPaused: !_settings.MonitorClipboard,
+                isDisabled: !_keyboardHook.IsInstalled));
 
         var built = started.Elapsed.TotalMilliseconds;
 
