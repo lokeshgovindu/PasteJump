@@ -1044,16 +1044,6 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Shows the paste-mode key list. Reachable from the tray menu and from <c>F1</c> during the gesture.
-    /// <para>
-    /// It must not take focus, which is why the window sets <c>ShowActivated="False"</c> and why this does not
-    /// call <c>Activate</c>. <c>F1</c> is pressed <em>mid-gesture</em>, with Ctrl still held and the target
-    /// application still expecting the paste - activating a window there moves focus off that application, so
-    /// the paste would land in the help window instead of the document. The user can still click it to focus
-    /// it; nothing here refuses that.
-    /// </para>
-    /// </summary>
-    /// <summary>
     /// Watches the message-only window for another instance asking us to show ourselves.
     /// <para>
     /// Returns null for everything else, which leaves the message to Windows and to the other subscribers -
@@ -1240,6 +1230,24 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Shows the paste-mode key list, with the keyboard. Reachable from the tray menu and from <c>F1</c> during
+    /// the gesture.
+    /// <para>
+    /// It <em>used</em> to be shown deliberately without focus - <c>ShowActivated="False"</c> and no
+    /// <c>Activate</c> - because F1 was pressed mid-gesture with Ctrl still held, and taking focus there would
+    /// have sent the paste into the card instead of the document. That reasoning was already obsolete when it was
+    /// written down: <see cref="PasteMode.PasteModeController"/> routes F1 through <c>EndAndOpenWindow</c>, which
+    /// restores the clipboard and ends the session <em>before</em> the host is asked for a window, precisely so
+    /// that the window can have the keyboard. There is no pending paste to misdirect by the time this runs.
+    /// </para>
+    /// <para>
+    /// What the stale comment cost: every F1 and every tray-menu open produced a window that would not take a
+    /// keypress until it was clicked, which is how it was reported. Note that fixing it needs more than dropping
+    /// the attribute - see <see cref="WindowInterop.BringToFrontAndFocus"/> for why <c>Activate</c> alone is not
+    /// reliable from a process that is not in the foreground, and for the measurements.
+    /// </para>
+    /// </summary>
     private void ShowShortcutHelp()
     {
         if (_helpWindow is null)
@@ -1252,13 +1260,14 @@ public partial class App : Application
                 _keyMap));
             _helpWindow.Closed += (_, _) => _helpWindow = null;
             _helpWindow.Show();
+            WindowInterop.BringToFrontAndFocus(_helpWindow);
             return;
         }
 
-        // Already open. Brought to the front without activating, for the reason above - Activate() was what
-        // this used to do, and during a gesture that is the bug.
-        _helpWindow.Topmost = true;
-        _helpWindow.Topmost = false;
+        // Already open, and the same treatment: a second F1 should put it in front of whatever has covered it and
+        // leave it ready for Esc. The Topmost blip this used to do raised the window without focusing it, which is
+        // the same half-open state by another route.
+        WindowInterop.BringToFrontAndFocus(_helpWindow);
     }
 
     private void OnSettingsApplied(PasteJumpSettings updated)

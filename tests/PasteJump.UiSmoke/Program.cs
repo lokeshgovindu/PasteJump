@@ -609,6 +609,21 @@ internal static class Program
             _failures++;
             Console.WriteLine($"  FAIL  the key card names actions the key map does not have: {string.Join(", ", unknown)}");
         }
+
+        // The card carried ShowActivated="False" for months, so F1 and the tray menu both produced a window that
+        // ignored the keyboard - including Esc, which reaches its Close button only when the window has focus -
+        // until it was clicked. It was reported as such. Asserted here because the attribute is one word in XAML
+        // that nothing else would notice, and because the reasoning that justified it is gone: the controller ends
+        // the gesture before asking for this window, so there is no paste left to misdirect.
+        if (!card.ShowActivated)
+        {
+            _failures++;
+            Console.WriteLine("  FAIL  the key card has ShowActivated=False, so it opens without the keyboard");
+        }
+        else
+        {
+            Console.WriteLine("  key card: opens activated");
+        }
     }
 
     /// <summary>

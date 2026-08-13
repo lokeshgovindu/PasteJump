@@ -975,6 +975,31 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   UI smoke harness. Put shared resources in `Themes/Shared.xaml`.
 - **`DataGridCell.HorizontalContentAlignment` defaults to `Left`**, which makes the content presenter
   shrink to its content — so a column's right-aligned `ElementStyle` silently does nothing.
+- **A window opened from a hook needs more than `Show()` and `Activate()`, and `ShowActivated="False"` is a
+  trap (fixed 2026-08-13).** The F1 card opened unfocused from *both* F1 and the tray menu, so it ignored every
+  keypress — Esc included, since `IsCancel` reaches its Close button only when the window has focus — until it
+  was clicked. Reported by the user. Two separate causes, and the first is the interesting one:
+  - **A stale comment kept the bug alive.** `ShowShortcutHelp` carried a paragraph explaining that the card
+    *must not* take focus, because F1 is pressed mid-gesture with Ctrl still held and a paste pending. That was
+    true once and was already obsolete when it was written: `EndAndOpenWindow` restores the clipboard and ends
+    the session **before** the host is asked for the window, precisely so the window can have the keyboard. The
+    comment was also attached to the wrong member — it sat above `OnMessageWindowMessage`, 200 lines from the
+    method it described. Both fixed. Treat "we deliberately do the strange thing" comments as claims with a date
+    on them.
+  - **`Activate()` alone is not reliable, and it is worth knowing before "fixing" this again.** Windows grants
+    `SetForegroundWindow` only to a process meeting one of a short list of conditions, and a tray app responding
+    to a keyboard hook meets none of them. Measured seven ways of showing a window with another application in
+    front, four runs (a throwaway WPF probe, not kept): `ShowActivated="False"` with no `Activate` — what
+    shipped — **never** took focus; `Activate()` took it in three runs of four; `AttachThreadInput` to the
+    foreground thread around one `SetForegroundWindow` took it in **all four**. So
+    `WindowInterop.BringToFrontAndFocus` tries `Activate()` first and falls back to the attach-and-set pair only
+    when the foreground did not change. Detach in a `finally`: two input queues left attached share keyboard
+    state indefinitely, in both processes.
+  - **The guard is `card.ShowActivated` in the UI smoke harness**, because the defect is one word of XAML that
+    nothing else would notice. Verified it fails by putting the attribute back — 2 failures, not a green run.
+  - **The other three windows still just call `Activate()`** (`HistoryWindow`, `SettingsWindow`, `AboutWindow`),
+    and `H` during a gesture reaches the history window by the same not-foreground route. Nobody has reported it,
+    and the measurements say it works three times in four. If it is ever reported, the helper is already there.
 - **Every window belongs in the taskbar except the overlay and the toast**, and the UI smoke harness now
   fails the run if that stops being true. It matters more here than in most applications: PasteJump has no
   main window, so a window that slips behind another has nothing to return to it. `AboutWindow`,
