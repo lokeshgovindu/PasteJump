@@ -27,7 +27,17 @@ public sealed class PasteKeyMap
     /// renaming an enum member would then silently orphan everyone's saved binding.
     /// </param>
     /// <param name="Description">What it does, for the settings dialog and the key card.</param>
-    /// <param name="DefaultLetter">Today's letter, which is what a fresh install and a Reset get.</param>
+    /// <param name="DefaultLetter">
+    /// Today's letter, which is what a fresh install and a Reset get - or <c>null</c> for an action that ships
+    /// switched off, available to anyone who wants it and costing nothing to anyone who does not.
+    /// <para>
+    /// Only "mark to join" is null, and deliberately. Its letter was in the overlay's key hint, in the F1 card and
+    /// in the way of a letter someone might type into search, in exchange for an action most people will never
+    /// use: pasting twice is quicker than marking twice and pasting once. Off by default is not the feature being
+    /// withdrawn - the Keys tab turns it on like any other letter, and the history window's Copy Joined never
+    /// needed a letter at all.
+    /// </para>
+    /// </param>
     /// <param name="FixedAlias">
     /// A key that fires the action regardless of the letter, shown read-only. This is how nothing that already
     /// works stops working: rebinding pin from <c>P</c> to <c>K</c> leaves <c>Space</c> pinning, and moving
@@ -37,7 +47,7 @@ public sealed class PasteKeyMap
         PasteAction Action,
         string Name,
         string Description,
-        char DefaultLetter,
+        char? DefaultLetter,
         string? FixedAlias = null);
 
     /// <summary>
@@ -53,7 +63,9 @@ public sealed class PasteKeyMap
         new(PasteAction.JumpToNewest, "newest", "Jump to the newest clip", 'A', "Home"),
         new(PasteAction.ToggleSearch, "search", "Open search", 'F'),
         new(PasteAction.TogglePin, "pin", "Pin or unpin the clip", 'P', "Space"),
-        new(PasteAction.ToggleJoinMark, "join", "Mark the clip to be pasted joined with the others", 'J'),
+        // Off by default - see DefaultLetter. Turning it on is picking any free letter in the Keys tab, whose combo
+        // already offers "(off)" as an item; J is simply what it used to be and is still free.
+        new(PasteAction.ToggleJoinMark, "join", "Mark the clip to be pasted joined with the others", null),
         new(PasteAction.PromoteToFront, "front", "Move the clip to the front of the stack", 'M', "Q"),
         new(PasteAction.CycleFormatter, "format", "Cycle the paste format", 'Z'),
         new(PasteAction.CycleKindFilter, "kind", "Show only one kind of clip: all, text, images, files", 'K'),
@@ -230,7 +242,10 @@ public sealed class PasteKeyMap
         // This exists because of what happens when an action is ADDED. "Mark to join" arrived with a default of J,
         // which was free - but free is not the same as unused: anyone who had moved pin to J would have had it
         // silently taken away, since Rebuild lets the later entry win. Nothing that works may stop working, so the
-        // new action starts off instead, visible as "Off" in the Keys tab where it can be given a free letter.
+        // new action starts off instead, visible as "(off)" in the Keys tab where it can be given a free letter.
+        //
+        // Join itself no longer needs this - it ships with no letter at all now - but the next added action will,
+        // and this is the only thing standing between it and someone's existing configuration.
         //
         // Only when there IS a stored string: a fresh install has no explicit bindings and its defaults do not
         // clash with each other.

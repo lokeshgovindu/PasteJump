@@ -156,7 +156,10 @@ public static class SettingsInspector
             // "(off)" rather than blank: an action with no letter is a deliberate state, and an empty cell reads as
             // a rendering fault. Same word the Keys tab uses in its combo.
             var current = letter?.ToString() ?? "(off)";
-            var original = entry.DefaultLetter.ToString();
+
+            // Same word for a default of "no letter", which is what "mark to join" ships as: the Default column has
+            // to be able to say "off" too, or an action that is off and has always been off would read as modified.
+            var original = entry.DefaultLetter?.ToString() ?? "(off)";
 
             yield return new SettingRow(
                 $"    {entry.Name} — {entry.Description}",

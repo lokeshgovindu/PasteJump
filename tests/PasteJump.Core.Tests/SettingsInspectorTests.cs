@@ -126,7 +126,9 @@ public sealed class SettingsInspectorTests
             var row = rows.SingleOrDefault(r => r.Name.StartsWith($"    {entry.Name} ", StringComparison.Ordinal));
 
             Assert.NotNull(row);
-            Assert.Equal(entry.DefaultLetter.ToString(), row.Value);
+            // "(off)" for an action that ships with no letter - "mark to join" - and the row must still read as
+            // unmodified, which is the case the null default could get wrong.
+            Assert.Equal(entry.DefaultLetter?.ToString() ?? "(off)", row.Value);
             Assert.False(row.IsModified);
         }
     }

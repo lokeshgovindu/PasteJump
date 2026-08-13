@@ -63,9 +63,10 @@ public class PasteKeyMapTests
     {
         var map = PasteKeyMap.Default;
 
-        // J is absent: it is bound to "mark to join". Kept as a literal list rather than derived from the map, so
-        // binding a new action forces a decision here about a letter someone may be typing into search.
-        foreach (var letter in "BDGILNRUWY")
+        // J is in the list because "mark to join" ships switched off, so its letter is typeable like any other
+        // unbound one. Kept as a literal list rather than derived from the map, so binding a new action forces a
+        // decision here about a letter someone may be typing into search.
+        foreach (var letter in "BDGIJLNRUWY")
         {
             Assert.Equal(GestureKey.None, map.ForLetter(letter));
         }
@@ -97,14 +98,19 @@ public class PasteKeyMapTests
     /// of J, which was free - but free is not unused, and anyone who had moved pin to J would otherwise have lost
     /// it silently, since the later entry wins when the table is rebuilt.
     /// </para>
+    /// <para>
+    /// Asserted against <c>pin=Z</c> rather than the historical <c>pin=J</c> on purpose. Join ships with no letter
+    /// now, so a J-based assertion would pass whether or not the guard existed - a test that cannot fail. Z is a
+    /// letter another action really does default to (the format cycle), so this still fails if the guard goes.
+    /// </para>
     /// </summary>
     [Fact]
     public void A_stored_binding_beats_another_action_defaulting_to_the_same_letter()
     {
-        var map = PasteKeyMap.Parse("pin=J");
+        var map = PasteKeyMap.Parse("pin=Z");
 
-        Assert.Equal(GestureKey.TogglePin, map.ForLetter('J'));
-        Assert.Null(map.LetterFor("join"));
+        Assert.Equal(GestureKey.TogglePin, map.ForLetter('Z'));
+        Assert.Null(map.LetterFor("format"));
     }
 
     [Fact]
@@ -112,8 +118,32 @@ public class PasteKeyMapTests
     {
         var map = PasteKeyMap.Default;
 
-        Assert.Equal(GestureKey.ToggleJoinMark, map.ForLetter('J'));
+        Assert.Equal(GestureKey.CycleFormatter, map.ForLetter('Z'));
         Assert.Equal(GestureKey.TogglePin, map.ForLetter('P'));
+    }
+
+    /// <summary>
+    /// Joining ships switched off, and turning it on is an ordinary letter choice.
+    /// <para>
+    /// The reason it is off is not that it is broken: it was reported as clutter, in the overlay's key hint and on
+    /// the card, for an action most people will never want - pasting twice beats marking twice and pasting once.
+    /// Everything behind it still works, which is what this asserts, so "off by default" cannot quietly become
+    /// "removed".
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Join_ships_switched_off_and_a_letter_turns_it_on()
+    {
+        Assert.False(PasteKeyMap.Default.IsEnabled("join"));
+        Assert.Equal(GestureKey.None, PasteKeyMap.Default.ForLetter('J'));
+
+        var enabled = PasteKeyMap.Parse("join=J");
+
+        Assert.True(enabled.IsEnabled("join"));
+        Assert.Equal(GestureKey.ToggleJoinMark, enabled.ForLetter('J'));
+
+        // Any free letter, not just the one it used to have.
+        Assert.Equal(GestureKey.ToggleJoinMark, PasteKeyMap.Parse("join=G").ForLetter('G'));
     }
 
     [Fact]

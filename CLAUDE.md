@@ -443,8 +443,25 @@ that immediately caught two real bugs. Expect to do the same again.
   restated by whoever draws the dialog. Note the diagnostic that found this: `clip` had 14 rows against a
   `sqlite_sequence` of 55, and history was intact — `PruneHistoryOlderThan` never touches `clip`, and
   `EvictBeyond` was capped at 1000, so a bulk `DELETE FROM clip WHERE pinned = 0` was the only candidate left.
-- **`J` marks clips during the gesture, and releasing Ctrl pastes every marked clip joined.** The other half of
-  joining. Note the F1 key card's rows are **hand-written XAML** - it says more per action than
+- **Marking clips during the gesture SHIPS SWITCHED OFF (2026-08-13), and that is the user's call, not a bug.**
+  `PasteKeyMap.Entries` gives "join" a `DefaultLetter` of `null`. The complaint was the letter, not the feature:
+  `J: join` in the overlay hint and a row on the card, in exchange for an action their instinct is nobody will use
+  — "they can directly paste na". Worth knowing before reopening it:
+  - **`DefaultLetter` is `char?` now**, so "ships with no letter" is expressible at all. `SettingsInspector` shows
+    `(off)` in the *Default* column for such an action, or a row that is off and always has been reads as modified.
+  - **Nothing was deleted, and nothing needs a second switch.** The overlay hint and `ApplyKeyHint` already omit
+    any action with no letter, so hiding it took no UI code. The Keys tab's per-action combo — which already has
+    `(off)` as an item — *is* the enable/disable control, and adding a separate boolean would allow "enabled with no
+    letter", which means nothing. One control, in the place the other thirteen live.
+  - **The history window's Copy Joined is untouched** and never needed a letter. That is the discoverable half of
+    joining, and it is where a user who wants this will find it.
+  - **`J` is a free letter again** — for the search box and for the trigger. `TriggerKeyAndHotkeyTests` asserts it
+    is offered, because switching an action off has to hand its letter *back* or the free list only ever shrinks.
+  - **One test had to be repointed, not just updated.** `A_stored_binding_beats_another_action_defaulting_to_the
+    _same_letter` used `pin=J`, which now passes whether or not the guard exists. It uses `pin=Z` (the format
+    cycle's default) so it can still fail.
+- **`J`, when it is turned on, marks clips during the gesture and releasing Ctrl pastes every marked clip joined.**
+  The other half of joining. Note the F1 key card's rows are **hand-written XAML** - it says more per action than
   `PasteKeyMap.Description` does - so adding an action means adding a row there too. `J` was added to the map and not
   to the card, and a user reported it; `VerifyKeyCardIsComplete` now compares what the card rendered against
   `PasteKeyMap.Entries` and fails the build instead. It works by recording each name the card asks `Keys` for, so
@@ -470,8 +487,8 @@ that immediately caught two real bugs. Expect to do the same again.
     empty store, and the same reason: silently breaking Ctrl+V is the worst failure this app has.
   - **The overlay shows `JOIN n` and a tick when the current clip is one of them.** Not decoration, for the same
     reason as the kind-filter chip; the tick is separate from the count because the count alone will not say
-    whether pressing `J` again adds this clip or removes it. `J: join` is in the footer hint too, since nothing
-    on screen hints the feature exists until the first clip is marked.
+    whether pressing `J` again adds this clip or removes it. The footer hint lists the letter too — when there is
+    one — since nothing on screen hints the feature exists until the first clip is marked.
   Joining is the **host's** job, not the controller's: it needs each clip's payload text (the store) and the
   separator (a setting), while the controller knows only which clips were chosen. The formatter applies to the
   joined text rather than per clip, so "trim" trims the block — which matches what the overlay says is about to

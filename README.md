@@ -23,9 +23,10 @@ needed on the target machine, nothing to install, and nothing beside it.
 
 Two things beyond the jog wheel are worth knowing about up front:
 
-- **Join several clips into one paste.** Press <kbd>J</kbd> on each clip you want during the gesture, or select
-  several rows in the history window, and they paste as *one* clip rather than one after another. Separator of your
-  choosing; images are left out and counted.
+- **Join several clips into one paste.** Select several rows in the history window and Copy becomes *Copy Joined* —
+  they paste as *one* clip rather than one after another, with a separator of your choosing; images are left out and
+  counted. There is a key for doing the same during the gesture, **switched off by default** because most people
+  paste twice rather than mark twice: give it a letter under *Settings → Keys*.
 - **Seventeen themes beyond Light and Dark, and you can write your own.** A theme is a small `.json` file of named colours that inherits
   everything it does not set, so a three-line file is a valid theme. Solarized, Catppuccin, Nord, Dracula, Tokyo
   Night, Monokai, Gruvbox, Kanagawa and more are built in, and the theme applies as you step through the list.
@@ -172,7 +173,7 @@ While Ctrl is down:
 | <kbd>P</kbd> · <kbd>Space</kbd> | Pin / unpin (pinned clips sort first and survive Delete All) |
 | <kbd>M</kbd> · <kbd>Q</kbd> | Move this clip to the front of the stack |
 | <kbd>Z</kbd> | Cycle paste format |
-| <kbd>J</kbd> | Mark this clip; releasing <kbd>Ctrl</kbd> pastes every marked clip joined into one |
+| *(no key)* | Mark this clip; releasing <kbd>Ctrl</kbd> pastes every marked clip joined into one. Off by default — give it a letter under *Settings → Keys* |
 | <kbd>K</kbd> | Show only one kind of clip: all → text → images → files |
 | <kbd>T</kbd> | Edit tags |
 | <kbd>S</kbd> | Put the clip on the Windows clipboard *without* pasting |
