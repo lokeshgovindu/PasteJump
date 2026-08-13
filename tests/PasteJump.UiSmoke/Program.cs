@@ -305,6 +305,16 @@ internal static class Program
                 // than leaving an empty strip, and that what is left is the preview plus the chips that change what
                 // releasing Ctrl does - here the JOIN count, which no setting can hide.
                 Check("OverlayWindow-Minimal", () => RenderOverlay(JoinMarkFrame(), OverlayParts.Minimal));
+
+                // Key hints off, everything else on. The one combination that exercises the suppression in
+                // SetChipNamingItsKey: the chips still show their state but must NOT name their keys, because the
+                // parenthetical is a key hint wherever it sits. Every other case has hints on or the chips off, so
+                // without this shot the rule would go unrendered - and a chip reading "Original (Z)" with hints
+                // switched off is precisely the kind of thing nobody notices until a user does.
+                Check("OverlayWindow-NoKeyHint", () => RenderOverlay(
+                    KindFilterFrame(),
+                    OverlayParts.All with { KeyHint = false }));
+
                 Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
 
                 // A copied TEXT FILE, whose contents are read off disk. Written as a real file because that is

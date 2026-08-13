@@ -975,6 +975,17 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   UI smoke harness. Put shared resources in `Themes/Shared.xaml`.
 - **`DataGridCell.HorizontalContentAlignment` defaults to `Left`**, which makes the content presenter
   shrink to its content — so a column's right-aligned `ElementStyle` silently does nothing.
+- **A chip that shows cycling state names its own key (2026-08-13):** `Original (Z)`, `images only (K)`, letter
+  accented and brackets muted, the same colours the footer hint uses. Asked for because the formatter chip said
+  `Original` and nothing on screen said how to change it — the footer lists stepping and leaving, not the chips,
+  so F1 was the only answer. Three conditions keep it honest: the letter comes from the **key map** so a rebound
+  key shows its own letter, a `null` letter (action switched off) leaves a plain name, and the whole parenthetical
+  is **suppressed when key hints are off**, because it is a key hint wherever it sits. Deliberately not on the
+  JOIN chip — that appears only once a clip is marked, so its reader has already found the key. `K: filter` stays
+  in the footer as well: the chip only exists while a filter is on, so the footer is what makes the feature
+  discoverable, and a footer that changed per frame would be worse than two redundant characters.
+  `OverlayWindow-NoKeyHint` is the shot that covers the suppression — every other case has hints on or the chips
+  off, so without it the rule would go unrendered.
 - **The tray menu is themed and carries icons (2026-08-13), and the cache has to be invalidated when the palette
   changes.** Until then `TrayMenuBuilder` set no colour at all and no theme file mentioned `MenuItem`, so an
   unstyled WPF `ContextMenu` rendered in WPF's own light chrome — a white menu beside a Dracula window, on all

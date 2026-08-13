@@ -64,13 +64,20 @@ public partial class OverlayWindow : Window
     /// </summary>
     public void ApplyKeyHint(bool show, char triggerKey, PasteKeyMap? keyMap = null)
     {
+        var map = keyMap ?? PasteKeyMap.Default;
+
+        // Recorded before the early return below, because the chips need them on every frame while this runs only
+        // when the settings change. Null when the action is switched off, which is what stops a chip naming a key
+        // that does nothing.
+        _showKeyHint = show;
+        _formatKey = map.LetterFor("format");
+        _kindKey = map.LetterFor("kind");
+
         if (!show)
         {
             KeyHintText.Visibility = Visibility.Collapsed;
             return;
         }
-
-        var map = keyMap ?? PasteKeyMap.Default;
 
         // Ordered by how often someone reaching for the hint needs them: getting back to the top, moving, and the
         // two ways out. F1 last, because it is the answer when none of the others were enough.
@@ -127,6 +134,56 @@ public partial class OverlayWindow : Window
         }
     }
 
+    private bool _showKeyHint;
+    private char? _formatKey;
+    private char? _kindKey;
+
+    /// <summary>
+    /// A state chip that names the key which changes it: <c>Original (Z)</c>, <c>images only (K)</c>.
+    /// <para>
+    /// Asked for because the formatter chip said <c>Original</c> and nothing on screen said how to make it anything
+    /// else - the footer hint lists the keys for stepping and leaving, not for the chips, and F1 was the only
+    /// answer. The rule that came out of it is worth keeping general: <b>a chip that shows cycling state names its
+    /// own key</b>, so the thing you are looking at is the thing that tells you.
+    /// </para>
+    /// <para>
+    /// Three conditions, each of which stops the chip lying. The letter comes from the key map, so a rebound format
+    /// key shows its new letter; a <c>null</c> letter means the action is switched off and the chip stays a plain
+    /// name; and the whole parenthetical is suppressed when key hints are off, because that is what the setting
+    /// asks for and this is a key hint wherever it happens to sit.
+    /// </para>
+    /// <para>
+    /// Runs rather than one string, and the same colours the footer uses - accent for the letter, muted for the
+    /// brackets - so the two read as one idea. The name itself inherits whatever the chip's style set, which is how
+    /// the accent-coloured kind filter chip keeps its colour while its brackets go muted.
+    /// </para>
+    /// <para>
+    /// Deliberately NOT applied to the JOIN chip. That one only appears once a clip is marked, so whoever is
+    /// looking at it has already found the key; naming it there would be clutter of exactly the kind that got the
+    /// join key taken out of the footer.
+    /// </para>
+    /// </summary>
+    private void SetChipNamingItsKey(System.Windows.Controls.TextBlock chip, string text, char? key)
+    {
+        chip.Inlines.Clear();
+        chip.Inlines.Add(new System.Windows.Documents.Run(text));
+
+        if (!_showKeyHint || key is not { } letter)
+        {
+            return;
+        }
+
+        var muted = (System.Windows.Media.Brush)FindResource("MutedTextBrush");
+
+        chip.Inlines.Add(new System.Windows.Documents.Run(" (") { Foreground = muted });
+        chip.Inlines.Add(new System.Windows.Documents.Run(letter.ToString())
+        {
+            Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush"),
+            FontWeight = FontWeights.SemiBold,
+        });
+        chip.Inlines.Add(new System.Windows.Documents.Run(")") { Foreground = muted });
+    }
+
     /// <summary>Applies a frame and positions the window at the anchor, clamped to the work area.</summary>
     public void Render(PasteOverlayModel model, int anchorX, int anchorY)
     {
@@ -143,7 +200,7 @@ public partial class OverlayWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        FormatterChip.Text = model.FormatterName;
+        SetChipNamingItsKey(FormatterChip, model.FormatterName, _formatKey);
         FormatterChip.Visibility = _parts.Formatter ? Visibility.Visible : Visibility.Collapsed;
 
         PinnedChip.Visibility = model.Pinned && _parts.Pinned ? Visibility.Visible : Visibility.Collapsed;
@@ -152,7 +209,7 @@ public partial class OverlayWindow : Window
         // Describe() returns null for "all", which is the state that needs no chip.
         if (model.KindFilter.Describe() is { } filter)
         {
-            KindFilterChip.Text = filter;
+            SetChipNamingItsKey(KindFilterChip, filter, _kindKey);
             KindFilterChip.Visibility = Visibility.Visible;
         }
         else
