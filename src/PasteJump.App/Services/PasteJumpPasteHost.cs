@@ -371,30 +371,29 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
         timer.Start();
     }
 
+    /// <summary>
+    /// The bitmap behind an image clip, or null when there is not one to draw.
+    /// <para>
+    /// By id. This used to resolve the clip by <c>model.Position</c> against <c>GetOrdered</c>, which was wrong
+    /// whenever a kind filter or a search was active - position is a coordinate in the filtered window, so
+    /// pressing <c>K</c> for images only made "clip 7" the 7th image while this read the 7th clip in the store.
+    /// Reported as "sometimes I cannot see the preview": that is the case where the store's 7th clip is text, so
+    /// this returned null and the overlay drew its <c>[image]</c> placeholder. The quieter case drew a different
+    /// image altogether. See <see cref="PasteOverlayModel.ClipId"/>.
+    /// </para>
+    /// <para>
+    /// Also cheaper than what it replaces, which read up to <c>Position</c> rows from the store on every tap of
+    /// the trigger key to find one of them.
+    /// </para>
+    /// </summary>
     private byte[]? TryLoadImageBytes(PasteOverlayModel model)
     {
-        // The overlay model carries no clip id, so resolve the current clip by position from the
-        // store. Cheap: this is a single indexed read of at most a few hundred rows.
-        if (model.IsEmpty || model.Position < 1)
+        if (model.IsEmpty || model.Kind != ClipKind.Image || model.ClipId is not { } clipId)
         {
             return null;
         }
 
-        var clips = _store.GetOrdered(model.Position);
-
-        if (clips.Count < model.Position)
-        {
-            return null;
-        }
-
-        var clip = clips[model.Position - 1];
-
-        if (clip.Kind != ClipKind.Image)
-        {
-            return null;
-        }
-
-        var payloads = _store.GetPayloads(clip.Id);
+        var payloads = _store.GetPayloads(clipId);
 
         var dib = payloads.FirstOrDefault(static p => p.FormatId == 8)
             ?? payloads.FirstOrDefault(static p => p.FormatId == 17);

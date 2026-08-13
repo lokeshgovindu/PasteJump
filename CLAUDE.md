@@ -975,6 +975,26 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   UI smoke harness. Put shared resources in `Themes/Shared.xaml`.
 - **`DataGridCell.HorizontalContentAlignment` defaults to `Left`**, which makes the content presenter
   shrink to its content — so a column's right-aligned `ElementStyle` silently does nothing.
+- **`PasteOverlayModel.Position` is a VIEW coordinate. Never use it to reach into the store (fixed 2026-08-13).**
+  Reported as "sometimes I cannot see the preview", with the images filter on. `RefreshWindow` builds `_window`
+  from the catalogue filtered by kind *and* search query, and `Render` sets `Position = _cursor + 1` — so position
+  N in what the user sees is not clip N in the store. `PasteJumpPasteHost.TryLoadImageBytes` was doing
+  `_store.GetOrdered(model.Position)[model.Position - 1]`, and its own comment said why: *"the overlay model
+  carries no clip id"*. Measured against the user's live store — 195 image clips, filter on — filtered clip 7 was
+  stack position **31**, while position 7 held a text clip, so the preview vanished and the `[image]` placeholder
+  was drawn instead.
+  - **The quieter half is worse.** Where the same-numbered stack slot happened to hold a *different image*, the
+    overlay drew that one — a real, wrong picture with nothing on screen to suggest it. Filtered clips 2 and 6
+    both did this in the user's data.
+  - **The fix is `ClipId` on the model**, set from `current?.Id`, and the host loads payloads by id. That also
+    deleted the last position-based store lookup in the app, and is cheaper: it no longer reads up to `Position`
+    rows on every tap of the trigger key.
+  - **`OverlayClipIdentityTests` asserts the trap, not just the fix.** Each test checks the id names the clip
+    *and* that position points at something else once a filter or search is on — asserting only the id would pass
+    on a build where the two happened to agree, which is the build that hid this. Verified by setting
+    `ClipId = null`: three of four fail.
+  - All 195 image clips in the user's store carry a DIB (format 8 or 17), so decoding was never the problem. Ruled
+    out by querying metadata — format ids and counts only, never clip content.
 - **A window opened from a hook needs more than `Show()` and `Activate()`, and `ShowActivated="False"` is a
   trap (fixed 2026-08-13).** The F1 card opened unfocused from *both* F1 and the tray menu, so it ignored every
   keypress — Esc included, since `IsCancel` reaches its Close button only when the window has focus — until it

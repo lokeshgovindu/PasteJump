@@ -278,6 +278,24 @@ public interface IPasteModeHost
 /// <summary>Everything the overlay needs to render one frame. Immutable by design.</summary>
 public sealed record PasteOverlayModel
 {
+    /// <summary>
+    /// Which clip this frame is showing, or null when there is none.
+    /// <para>
+    /// The only safe way for a host to reach the clip a frame describes, and it exists because the absence of it
+    /// caused a real bug: with no id on the model, the host resolved the clip by <see cref="Position"/> against
+    /// the store's own order, and <see cref="Position"/> is a coordinate in the <em>filtered</em> window. Pressing
+    /// <c>K</c> to show images only made "clip 7" the 7th image - stack position 31 in the reported case - while
+    /// the host read stack position 7, found a text clip, and drew the <c>[image]</c> placeholder. Where position
+    /// 7 happened to hold a different image it drew that one instead, silently.
+    /// </para>
+    /// <para>
+    /// <b><see cref="Position"/> and <see cref="Total"/> are for display only.</b> They describe where the cursor
+    /// is in what the user is looking at, which is deliberately not the store's order - see
+    /// <c>PasteModeController.RefreshWindow</c>, where the kind filter and the search query compose.
+    /// </para>
+    /// </summary>
+    public long? ClipId { get; init; }
+
     public required int Position { get; init; }
 
     public required int Total { get; init; }

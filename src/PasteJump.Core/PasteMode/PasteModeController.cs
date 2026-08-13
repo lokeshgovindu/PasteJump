@@ -805,6 +805,9 @@ public sealed class PasteModeController
 
         _host.ShowOverlay(new PasteOverlayModel
         {
+            // The id, not just the position. Position is where the cursor sits in the FILTERED window, so it
+            // cannot be used to reach the clip - see the note on PasteOverlayModel.ClipId.
+            ClipId = current?.Id,
             Position = _window.Count == 0 ? 0 : _cursor + 1,
             Total = _window.Count,
             PreviewText = BuildPreviewText(current),
