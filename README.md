@@ -135,6 +135,10 @@ dotnet test
 
 ### The help file
 
+**[Read the manual here on GitHub](docs/manual/README.md)** — the same ten topics that ship with the program,
+generated from the HTML so the two cannot disagree. GitHub does not render HTML held in a repository, which is
+why that copy exists; the rendered originals are [on the website](https://lokeshgovindu.github.io/PasteJump/help/overview.html).
+
 A compiled HTML Help manual is built separately, since it needs an external tool that a build machine may not
 have:
 
@@ -145,6 +149,11 @@ powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
 
 Sources are in `docs/help`; the result is `artifacts/help/PasteJump.chm` (~540 KB, nine topics, twenty
 screenshots). It needs `hhc.exe` from Microsoft's HTML Help Workshop.
+
+`build-help.ps1` also refreshes `docs/manual` — the GitHub-readable copy — by running
+`tools/generate-markdown-help.py`. That script is the only thing that writes those files, and CI runs it with
+`--check` so a manual edited in HTML but not regenerated fails the build rather than shipping two versions of
+the truth.
 
 The screenshots are **produced by the UI smoke harness**, not taken by hand, so they cannot drift from the
 real XAML — `update-help-images.ps1` runs it and copies the light-theme shots into `docs/help/images`. They are

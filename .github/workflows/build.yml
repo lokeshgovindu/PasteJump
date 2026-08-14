@@ -64,6 +64,13 @@ jobs:
       - name: Test
         run: dotnet test PasteJump.slnx -c Release --no-build
 
+      - name: The Markdown manual matches the HTML it is generated from
+        # docs/manual is generated output that happens to be committed, so that GitHub has something it
+        # can render - it does not render HTML held in a repository. This is what stops it going stale:
+        # regenerate, and fail if the result differs from what was committed. Cheap, and it needs no
+        # HTML Help Workshop, unlike the .chm the same source builds.
+        run: python tools/generate-markdown-help.py --check
+
       - name: UI smoke
         # Opens every window for real, renders each one, and asserts the things no unit test can see:
         # that each template still resolves, that every theme defines every palette key, that every

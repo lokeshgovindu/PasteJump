@@ -111,6 +111,22 @@ $size = [math]::Round((Get-Item $final).Length / 1KB, 1)
 Write-Host ""
 Write-Host "Wrote $final ($size KB)" -ForegroundColor Green
 
+# The GitHub-readable copy, regenerated from the same HTML this .chm was just compiled from - so the
+# two cannot describe different programs. Here rather than left to be remembered: docs/manual is
+# generated output that happens to be committed, and CI fails the build when it is stale
+# (generate-markdown-help.py --check), which is a fine safety net and a poor workflow.
+Write-Host ""
+Write-Host "Regenerating the Markdown manual..."
+
+$markdown = Join-Path $PSScriptRoot 'generate-markdown-help.py'
+& py -3 $markdown
+
+if ($LASTEXITCODE -ne 0) {
+    # A warning, not a throw: the .chm above is built and valid, and refusing to finish would throw
+    # away the expensive half of this script over the cheap half.
+    Write-Warning "The Markdown manual could not be regenerated (exit $LASTEXITCODE). Run tools/generate-markdown-help.py by hand."
+}
+
 if ($Show) {
     # hh.exe, not Invoke-Item: a .chm opened from a path Windows considers untrusted shows blank pages
     # rather than an error, and going through the viewer directly is one less thing to misread.

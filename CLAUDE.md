@@ -45,7 +45,8 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | Build | Release, 0 warnings, 0 errors |
 | Tests | 893 in Debug (`dotnet test`) - 841 in Core.Tests, 52 in Interop.Tests; **891 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
-| CI | `.github/workflows/build.yml` — build, tests and the window renders on a clean `windows-latest` |
+| CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
+| Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
 **The count differs by configuration, and that is the point rather than an oddity.** `StartupTrace.Mark` is
@@ -981,7 +982,24 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   header the decoder needs. Measured on the reported clip — DIB 202,812 plus five further formats (`49161`,
   `49171`, `49349`, `50025`, `50026`) totalling 7,076 — so the footer now reads
   `198.1 KB picture · 205 KB in 6 formats`, and the format count is what explains the gap.
-  - **The preview footer is gone (2026-08-14) and the resolution lives in the header.** Showing `895 × 462` on the
+  - **`docs/manual` is GENERATED. Edit the HTML in `docs/help`, never the Markdown (2026-08-14).** GitHub does not
+  render HTML held in a repository, so the manual was only readable through the Pages site - asked about, and the
+  answer was not to write it twice: ~12,600 words over ten pages would be stale within a week.
+  `tools/generate-markdown-help.py` converts it, `build-help.ps1` runs the converter after compiling the `.chm`,
+  and CI runs it with `--check` so committed output that disagrees with the HTML fails the build. Verified the
+  check fails by appending a line to a generated file.
+  - **HTML stays the source** because `toc.hhc`, `index.hhk` and `pastejump.hhp` all name those files - it is what
+    the shipped `.chm` compiles from. Inverting the pipeline would mean rebuilding and re-verifying the manual for
+    no reader-visible gain. The index order and page titles come from `toc.hhc`, so the Markdown index cannot
+    become a second opinion about the manual's shape.
+  - **`html.parser`, not regular expressions.** The pages nest inline markup inside table cells
+    (`<td class="key"><code>Ctrl</code>+<code>V</code></td>`), where a regex pass produces plausible-looking wrong
+    output. The vocabulary is small and ours - `p.lead`, `div.shot`, `div.note`, `div.warn`, `td.name`, `td.key` -
+    which is what makes the conversion faithful rather than approximate.
+  - **A headerless two-column table becomes a definition list**, not a table with a blank header: GitHub demands a
+    header row, and nine of the manual's tables are glossaries that would each carry an empty grey strip. Whether
+    the first row was `<th>` is recorded while parsing, never inferred from how the text looks.
+- **The preview footer is gone (2026-08-14) and the resolution lives in the header.** Showing `895 × 462` on the
     left and a byte count on the right, one row under a header that already carried a byte count, was reported as
     a duplicate - and it was: the two differed only by the clip's other clipboard formats. The header now reads
     `#18 · Image · 895 × 462 · 1.6 MB · 2026-08-13 21:19`, resolution next to the kind because it says what sort
