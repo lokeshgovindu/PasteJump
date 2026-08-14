@@ -142,7 +142,9 @@ internal static class Program
                     },
                     static (window, _) =>
                     {
-                        if (((HistoryWindow)window).PreviewShowsPictureForSmokeTest)
+                        var history = (HistoryWindow)window;
+
+                        if (history.PreviewShowsPictureForSmokeTest)
                         {
                             Console.WriteLine("  clips view: an image clip previews its picture");
                         }
@@ -150,6 +152,18 @@ internal static class Program
                         {
                             _failures++;
                             Console.WriteLine("  FAIL  an image clip in the Clips view shows no picture in the preview pane");
+                        }
+
+                        // The tooltip's own path. It draws in a popup this harness cannot capture, so what is
+                        // asserted is the thumbnail resolving at all - the half that fails silently.
+                        if (history.SelectedRowHasThumbnailForSmokeTest)
+                        {
+                            Console.WriteLine("  clips view: an image row resolves a tooltip thumbnail");
+                        }
+                        else
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  an image row resolved no tooltip thumbnail");
                         }
                     });
 

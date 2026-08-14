@@ -975,6 +975,33 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   UI smoke harness. Put shared resources in `Themes/Shared.xaml`.
 - **`DataGridCell.HorizontalContentAlignment` defaults to `Left`**, which makes the content presenter
   shrink to its content — so a column's right-aligned `ElementStyle` silently does nothing.
+- **The image preview zooms and pans, and the two byte counts now say what they are (2026-08-14).** Asked for after
+  the pane showed **205 KB** in the header and **198.1 KB** in the footer for one clip. Both were right and neither
+  said so: 205 KB is `total_bytes`, everything the clip stores, and 198.1 KB is its `CF_DIB` plus the 14-byte file
+  header the decoder needs. Measured on the reported clip — DIB 202,812 plus five further formats (`49161`,
+  `49171`, `49349`, `50025`, `50026`) totalling 7,076 — so the footer now reads
+  `198.1 KB picture · 205 KB in 6 formats`, and the format count is what explains the gap.
+  - **`LayoutTransform`, never `RenderTransform`, for the zoom.** Only a layout transform changes the size the
+    `ScrollViewer` measures; with a render transform the picture would grow while the scroller still believed the
+    old size, leaving most of a zoomed image unreachable.
+  - **Fit is `null`, not a number.** The scale it implies changes with the pane, so storing one would go stale the
+    moment the splitter moved. `Stretch` stays `None` throughout and the fit scale is computed, which is also what
+    lets the readout say `Fit · 83%` honestly. Capped at 1 — never upscale in Fit, as `StretchDirection=DownOnly`
+    used to guarantee.
+  - **The fit scale cannot be computed during selection.** Selection runs before layout, the viewport is 0, and the
+    first attempt produced `Fit · 0%` with the picture apparently gone — caught by rendering it. It waits for
+    `LayoutUpdated`, which fires once per layout pass and so cannot spin, rather than guessing a size.
+  - **Ctrl+wheel zooms about the pointer**, which needs the content point recomputed after the new layout (a
+    dispatcher hop at `Loaded` priority). Zooming about the origin throws the detail being examined off the edge.
+  - **Zoom resets to Fit on every new row.** 400% is something you did to one picture, not a preference; inheriting
+    it opens the next row showing a corner of itself.
+  - **Tooltip thumbnails are lazy by binding**, not preloaded: `HistoryRow.Thumbnail` calls a resolver delegate on
+    first read, so hovering one row reads one image and scrolling past a thousand reads none. `DecodePixelWidth`
+    keeps a 3 MB screenshot from ever becoming a full bitmap on the way to a tooltip, and the *failure* is cached
+    too or an undecodable clip retries on every hover. Image rows only — a file copy would mean disk I/O while the
+    pointer crosses a list.
+  - Column widths were **measured from renders, twice**: 112px truncated `2026-08-14 09:42` and 66px truncated
+    `562.5 KB`, both at Cozy, which is the worst case since Compact has less padding.
 - **A clip's picture comes from its PAYLOADS; a history entry's comes from a BLOB (fixed 2026-08-14).** The
   preview pane tested only for `row.BlobHash`, which a clip row never has, so selecting an image in the **Clips**
   view fell through to the text branch and drew the `[image]` placeholder while the same image previewed fine in

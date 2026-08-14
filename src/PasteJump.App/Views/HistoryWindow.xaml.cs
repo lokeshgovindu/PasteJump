@@ -79,6 +79,43 @@ public sealed class HistoryRow
     }
 
     /// <summary>
+    /// Resolves this row's thumbnail, set by whoever built the row. Null for rows that cannot have one.
+    /// <para>
+    /// A delegate rather than the picture itself, because the row is a view-model with no access to the store and
+    /// no business acquiring one - and because loading every thumbnail up front would read a megabyte per image
+    /// row to fill a list nobody has hovered over yet.
+    /// </para>
+    /// </summary>
+    public Func<HistoryRow, BitmapSource?>? ThumbnailResolver { get; init; }
+
+    private BitmapSource? _thumbnail;
+    private bool _thumbnailTried;
+
+    /// <summary>
+    /// A small picture for the row tooltip, loaded on first read and then remembered.
+    /// <para>
+    /// Lazy by binding: nothing asks for this until WPF realises the tooltip, so hovering one row reads one image
+    /// and scrolling past a thousand reads none. The failure is remembered too - <see cref="_thumbnailTried"/> -
+    /// or a row whose picture cannot be decoded would retry on every hover.
+    /// </para>
+    /// </summary>
+    public BitmapSource? Thumbnail
+    {
+        get
+        {
+            if (_thumbnailTried)
+            {
+                return _thumbnail;
+            }
+
+            _thumbnailTried = true;
+            _thumbnail = ThumbnailResolver?.Invoke(this);
+
+            return _thumbnail;
+        }
+    }
+
+    /// <summary>
     /// Grid-safe preview. Newlines are collapsed because a DataGrid row renders embedded line
     /// breaks as a single tall row, making a multi-line clip swamp the list.
     /// </summary>
@@ -336,6 +373,17 @@ public partial class HistoryWindow : Window
     }
 
     /// <summary>
+    /// Test hook: whether the selected row resolved a tooltip thumbnail.
+    /// <para>
+    /// The tooltip itself lives in a popup the harness cannot render, so this asserts the part that can break
+    /// quietly: the resolver reaching the store and the bytes decoding. A tooltip that shows no picture looks
+    /// exactly like one for a text row.
+    /// </para>
+    /// </summary>
+    public bool SelectedRowHasThumbnailForSmokeTest =>
+        (EntriesGrid.SelectedItem as HistoryRow)?.Thumbnail is not null;
+
+    /// <summary>
     /// Test hook: whether the preview pane is showing a picture rather than text.
     /// <para>
     /// Exists because a screenshot is not an assertion. An image clip whose picture failed to load looks like a
@@ -345,7 +393,7 @@ public partial class HistoryWindow : Window
     /// </para>
     /// </summary>
     public bool PreviewShowsPictureForSmokeTest =>
-        PreviewImage.Visibility == Visibility.Visible && PreviewImage.Source is not null;
+        PreviewImageHost.Visibility == Visibility.Visible && PreviewImage.Source is not null;
 
     /// <summary>
     /// Selects a row by index. Exists for the UI smoke harness, so a screenshot can show the selected
@@ -435,6 +483,7 @@ public partial class HistoryWindow : Window
                 Kind = clip.Kind,
                 IsClip = true,
                 Pinned = clip.Pinned,
+                ThumbnailResolver = TryLoadRowThumbnail,
             });
         }
 
@@ -460,6 +509,7 @@ public partial class HistoryWindow : Window
                 Bytes = entry.TotalBytes,
                 Kind = entry.Kind,
                 BlobHash = entry.BlobHash,
+                ThumbnailResolver = TryLoadRowThumbnail,
             });
         }
 
@@ -669,16 +719,16 @@ public partial class HistoryWindow : Window
 
         PreviewHeader.Text = $"#{row.Number}  ·  {row.KindText}  ·  {row.SizeText}  ·  {row.LocalTimeText}";
 
-        if (row.Kind == ClipKind.Image && TryReadImageBytes(row) is { } bytes)
+        if (row.Kind == ClipKind.Image && TryReadImageBytes(row) is { } picture)
         {
-            var bitmap = TryDecode(bytes);
+            var bitmap = TryDecode(picture.Bytes);
 
             if (bitmap is not null)
             {
                 // Whole pane: the picture is the content, and there is no path to show above it. A stored image
                 // is decoded in full, so its own dimensions are the true ones here.
                 PreviewScroller.Visibility = Visibility.Collapsed;
-                ShowImage(bitmap, null, bytes.LongLength, bitmap.PixelWidth, bitmap.PixelHeight);
+                ShowImage(bitmap, null, DescribeImageBytes(row, picture), bitmap.PixelWidth, bitmap.PixelHeight);
                 return;
             }
         }
@@ -690,7 +740,7 @@ public partial class HistoryWindow : Window
         // case where both halves of the pane are wanted at once.
         if (row.Kind == ClipKind.Files && TryLoadFirstImageFile(row.Preview) is { } file)
         {
-            ShowImage(file.Bitmap, file.Path, file.FileBytes, file.PixelWidth, file.PixelHeight);
+            ShowImage(file.Bitmap, file.Path, FormatBytes(file.FileBytes), file.PixelWidth, file.PixelHeight);
             return;
         }
 
@@ -712,11 +762,23 @@ public partial class HistoryWindow : Window
     /// hundred lines below, and only history rows reach <c>TryBuildImagePayloads</c>. The two paths had drifted.
     /// </para>
     /// </summary>
-    private byte[]? TryReadImageBytes(HistoryRow row)
+    /// <param name="Bytes">A decodable bitmap file.</param>
+    /// <param name="PictureBytes">How big just the picture is, which is not what the row's Size column says.</param>
+    /// <param name="FormatCount">
+    /// How many clipboard formats the clip stores, or zero for a history entry, which keeps one.
+    /// </param>
+    private sealed record PreviewPicture(byte[] Bytes, long PictureBytes, int FormatCount);
+
+    private PreviewPicture? TryReadImageBytes(HistoryRow row)
     {
         if (!row.IsClip)
         {
-            return row.BlobHash is { Length: > 0 } hash ? _store.Blobs.TryRead(hash) : null;
+            if (row.BlobHash is not { Length: > 0 } hash || _store.Blobs.TryRead(hash) is not { } blob)
+            {
+                return null;
+            }
+
+            return new PreviewPicture(blob, blob.LongLength, 0);
         }
 
         var payloads = _store.GetPayloads(row.Id);
@@ -726,7 +788,9 @@ public partial class HistoryWindow : Window
 
         // A DIB is raw pixels with a header the imaging stack will not read; the converter prepends the 14-byte
         // file header that turns it into something BitmapDecoder accepts. Same call the overlay makes.
-        return dib is null ? null : DibConverter.TryCreateBitmapFile(dib.Data);
+        var file = dib is null ? null : DibConverter.TryCreateBitmapFile(dib.Data);
+
+        return file is null ? null : new PreviewPicture(file, file.LongLength, payloads.Count);
     }
 
     /// <summary>
@@ -737,12 +801,314 @@ public partial class HistoryWindow : Window
     /// half the pane when there is a thumbnail to show.
     /// </para>
     /// </summary>
-    private void ShowImage(BitmapSource? bitmap, string? path, long? storedBytes, int pixelWidth, int pixelHeight)
+    /// <summary>How wide a tooltip thumbnail is decoded. Medium: big enough to recognise, small enough to be free.</summary>
+    private const int TooltipThumbnailWidth = 260;
+
+    /// <summary>
+    /// The picture for a row's tooltip, or null when the row has none.
+    /// <para>
+    /// <b>Decoded small, not shrunk small.</b> <c>DecodePixelWidth</c> makes the decoder produce a 260px image
+    /// directly, so a 3 MB screenshot never becomes a full-size bitmap in memory on the way to a tooltip. Loading
+    /// the full picture and letting the Image element scale it would cost the same as the preview pane, per hover.
+    /// </para>
+    /// <para>
+    /// Only image rows, deliberately. A file copy would mean reading from disk while the pointer moves across a
+    /// list, which is the one thing a hover must not do.
+    /// </para>
+    /// </summary>
+    private BitmapSource? TryLoadRowThumbnail(HistoryRow row)
+    {
+        if (row.Kind != ClipKind.Image || TryReadImageBytes(row) is not { } picture)
+        {
+            return null;
+        }
+
+        try
+        {
+            var bitmap = new BitmapImage();
+
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.DecodePixelWidth = TooltipThumbnailWidth;
+            bitmap.StreamSource = new MemoryStream(picture.Bytes);
+            bitmap.EndInit();
+            bitmap.Freeze();
+
+            return bitmap;
+        }
+        catch (Exception)
+        {
+            // A clip whose bytes will not decode is not an error worth reporting from a tooltip - the pane it was
+            // hovering over says the same thing more usefully.
+            return null;
+        }
+    }
+
+    // ---- image zoom and pan
+
+    /// <summary>
+    /// Zoom, or null while fitting to the pane.
+    /// <para>
+    /// Null rather than a flag plus a number, because "fitting" is not a zoom level: the scale it implies changes
+    /// with the pane, so storing one would go stale the moment the splitter moved. The readout asks for the
+    /// effective scale instead - see <see cref="ApplyZoom"/>.
+    /// </para>
+    /// </summary>
+    private double? _zoom;
+
+    /// <summary>Where a pan started, in scroller coordinates, or null when no drag is in progress.</summary>
+    private Point? _panFrom;
+    private double _panOffsetX;
+    private double _panOffsetY;
+
+    private const double MinZoom = 0.05;
+    private const double MaxZoom = 8.0;
+
+    /// <summary>
+    /// Applies <see cref="_zoom"/>, or the fit scale when it is null, and updates the readout.
+    /// <para>
+    /// <b>Never upscales in Fit mode.</b> A 16x16 icon blown up to fill the pane is a blurred mess that also
+    /// misrepresents what was copied, so the fit scale is capped at 1 - which is what the old
+    /// <c>StretchDirection="DownOnly"</c> did, kept deliberately.
+    /// </para>
+    /// </summary>
+    private void ApplyZoom()
+    {
+        if (PreviewImage.Source is not { } source)
+        {
+            return;
+        }
+
+        // Selection runs before layout, so on the first frame the scroller has no viewport yet - and a fit scale
+        // divided by a viewport of zero came out at 0.3%, which read as the picture having disappeared. Caught by
+        // rendering it. Wait for the layout pass rather than guessing a size: LayoutUpdated fires once per pass,
+        // so this re-enters exactly as often as the layout actually changes and cannot spin.
+        if (_zoom is null && (ImageScroller.ViewportWidth <= 1 || ImageScroller.ViewportHeight <= 1))
+        {
+            ImageScale.ScaleX = 1;
+            ImageScale.ScaleY = 1;
+            ZoomReadout.Text = "Fit";
+
+            ImageScroller.LayoutUpdated -= OnLayoutSettledForFit;
+            ImageScroller.LayoutUpdated += OnLayoutSettledForFit;
+            return;
+        }
+
+        var scale = _zoom ?? FitScale(source);
+
+        ImageScale.ScaleX = scale;
+        ImageScale.ScaleY = scale;
+
+        ZoomReadout.Text = _zoom is null
+            ? $"Fit · {scale * 100:0}%"
+            : $"{scale * 100:0}%";
+
+        // In Fit mode there is nothing to scroll to, and leaving the bars enabled lets a rounding error put a
+        // scrollbar on a picture that is entirely visible.
+        var fitting = _zoom is null;
+        ImageScroller.HorizontalScrollBarVisibility = fitting ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+        ImageScroller.VerticalScrollBarVisibility = fitting ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+
+        ZoomFitButton.IsEnabled = !fitting;
+        ZoomActualButton.IsEnabled = _zoom is not 1.0;
+    }
+
+    private void OnLayoutSettledForFit(object? sender, EventArgs e)
+    {
+        ImageScroller.LayoutUpdated -= OnLayoutSettledForFit;
+        ApplyZoom();
+    }
+
+    private double FitScale(System.Windows.Media.ImageSource source)
+    {
+        var available = new Size(
+            Math.Max(1, ImageScroller.ViewportWidth),
+            Math.Max(1, ImageScroller.ViewportHeight));
+
+        if (source.Width <= 0 || source.Height <= 0)
+        {
+            return 1;
+        }
+
+        return Math.Min(1, Math.Min(available.Width / source.Width, available.Height / source.Height));
+    }
+
+    private void SetZoom(double? zoom)
+    {
+        _zoom = zoom is { } value ? Math.Clamp(value, MinZoom, MaxZoom) : null;
+        ApplyZoom();
+    }
+
+    private void OnZoomFit(object sender, RoutedEventArgs e) => SetZoom(null);
+
+    private void OnZoomActual(object sender, RoutedEventArgs e) => SetZoom(1);
+
+    private void OnZoomIn(object sender, RoutedEventArgs e) => ZoomBy(1.25);
+
+    private void OnZoomOut(object sender, RoutedEventArgs e) => ZoomBy(1 / 1.25);
+
+    /// <summary>
+    /// Multiplies the zoom, starting from whatever Fit currently resolves to.
+    /// <para>
+    /// Starting from the fit scale rather than from 1 is what makes the first click on <b>+</b> feel like a step
+    /// rather than a jump: a large screenshot fits at 30%, and zooming from 100% would skip four steps of the
+    /// range the user can actually see.
+    /// </para>
+    /// </summary>
+    private void ZoomBy(double factor)
+    {
+        if (PreviewImage.Source is not { } source)
+        {
+            return;
+        }
+
+        SetZoom((_zoom ?? FitScale(source)) * factor);
+    }
+
+    /// <summary>
+    /// Ctrl+wheel zooms about the pointer; a plain wheel scrolls, which is the ScrollViewer's own job.
+    /// <para>
+    /// Zooming about the pointer rather than the top left is the difference between a usable zoom and one that
+    /// throws the detail you were looking at off the edge. The content point under the cursor is worked out before
+    /// the scale changes and then put back underneath it afterwards, which needs the layout to have run - hence
+    /// the dispatcher hop.
+    /// </para>
+    /// </summary>
+    private void OnImageMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0 || PreviewImage.Source is not { } source)
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        var before = _zoom ?? FitScale(source);
+        var pointer = e.GetPosition(ImageScroller);
+
+        // Where in the picture the cursor is, in unscaled pixels.
+        var contentX = (ImageScroller.HorizontalOffset + pointer.X) / before;
+        var contentY = (ImageScroller.VerticalOffset + pointer.Y) / before;
+
+        SetZoom(before * (e.Delta > 0 ? 1.25 : 1 / 1.25));
+
+        var after = _zoom ?? FitScale(source);
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            ImageScroller.ScrollToHorizontalOffset((contentX * after) - pointer.X);
+            ImageScroller.ScrollToVerticalOffset((contentY * after) - pointer.Y);
+        }, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>Drag to pan, but only when there is something to pan - in Fit mode a drag would do nothing.</summary>
+    private void OnImagePanStart(object sender, MouseButtonEventArgs e)
+    {
+        ImageScroller.Focus();
+
+        if (_zoom is null || e.ClickCount > 1)
+        {
+            return;
+        }
+
+        _panFrom = e.GetPosition(ImageScroller);
+        _panOffsetX = ImageScroller.HorizontalOffset;
+        _panOffsetY = ImageScroller.VerticalOffset;
+
+        ImageScroller.CaptureMouse();
+        ImageScroller.Cursor = Cursors.ScrollAll;
+    }
+
+    private void OnImagePanMove(object sender, MouseEventArgs e)
+    {
+        if (_panFrom is not { } from)
+        {
+            return;
+        }
+
+        var now = e.GetPosition(ImageScroller);
+
+        ImageScroller.ScrollToHorizontalOffset(_panOffsetX - (now.X - from.X));
+        ImageScroller.ScrollToVerticalOffset(_panOffsetY - (now.Y - from.Y));
+    }
+
+    private void OnImagePanEnd(object sender, MouseButtonEventArgs e)
+    {
+        _panFrom = null;
+        ImageScroller.ReleaseMouseCapture();
+        ImageScroller.Cursor = null;
+    }
+
+    /// <summary>Double-click toggles Fit and 100%, which is what every picture viewer does.</summary>
+    private void OnImageDoubleClick(object sender, MouseButtonEventArgs e) => SetZoom(_zoom is null ? 1 : null);
+
+    /// <summary>
+    /// The keyboard equivalents, live only while the scroller has focus - which a click on the picture gives it.
+    /// Scoped that way on purpose: bound at window level, <c>0</c> and <c>1</c> would fight the grid and the search
+    /// box for keys that mean something else there.
+    /// </summary>
+    private void OnImageKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.D0 or Key.NumPad0:
+                SetZoom(null);
+                break;
+
+            case Key.D1 or Key.NumPad1:
+                SetZoom(1);
+                break;
+
+            case Key.OemPlus or Key.Add:
+                ZoomBy(1.25);
+                break;
+
+            case Key.OemMinus or Key.Subtract:
+                ZoomBy(1 / 1.25);
+                break;
+
+            default:
+                return;
+        }
+
+        e.Handled = true;
+    }
+
+    /// <summary>The fit scale depends on the pane, so it has to be recomputed when the pane changes size.</summary>
+    private void OnImageViewportChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_zoom is null)
+        {
+            ApplyZoom();
+        }
+    }
+
+    /// <summary>
+    /// What the footer says about an image's size, and why it is a sentence rather than a number.
+    /// <para>
+    /// Two different quantities were being shown three inches apart with no labels, and it was reported as a
+    /// contradiction - reasonably. For the clip in the report: the header said <b>205 KB</b>, which is
+    /// <c>total_bytes</c>, everything the clip stores; the footer said <b>198.1 KB</b>, which is its <c>CF_DIB</c>
+    /// plus the 14-byte file header. The other 7,076 bytes were the five further formats it was copied with
+    /// (<c>49161</c>, <c>49171</c>, <c>49349</c>, <c>50025</c>, <c>50026</c>), which are what make a paste
+    /// reproduce the copy exactly. Both numbers were right; neither said what it was.
+    /// </para>
+    /// <para>
+    /// So the footer now names both and their relationship, and the format count is the part that explains the
+    /// gap. A history entry keeps one flattened record, so it gets the plain size it always had.
+    /// </para>
+    /// </summary>
+    private static string DescribeImageBytes(HistoryRow row, PreviewPicture picture) =>
+        picture.FormatCount > 1
+            ? $"{FormatBytes(picture.PictureBytes)} picture  ·  {row.SizeText} in {picture.FormatCount} formats"
+            : FormatBytes(picture.PictureBytes);
+
+    private void ShowImage(BitmapSource? bitmap, string? path, string? bytesCaption, int pixelWidth, int pixelHeight)
     {
         if (bitmap is null)
         {
             PreviewImage.Source = null;
-            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewImageHost.Visibility = Visibility.Collapsed;
             PreviewFooter.Visibility = Visibility.Collapsed;
             PreviewTextRow.Height = new GridLength(1, GridUnitType.Star);
             PreviewImageRow.Height = new GridLength(0);
@@ -750,7 +1116,13 @@ public partial class HistoryWindow : Window
         }
 
         PreviewImage.Source = bitmap;
-        PreviewImage.Visibility = Visibility.Visible;
+        PreviewImageHost.Visibility = Visibility.Visible;
+
+        // Back to Fit for every new picture. Carrying a zoom across selections was tried mentally and rejected:
+        // 400% on a screenshot is not a preference, it is something you did to one picture, and inheriting it
+        // means the next row opens showing a corner of itself.
+        _panFrom = null;
+        SetZoom(null);
 
         // With a path above it the text gets only what it needs; without one it gets nothing.
         PreviewTextRow.Height = path is null ? new GridLength(0) : GridLength.Auto;
@@ -759,7 +1131,7 @@ public partial class HistoryWindow : Window
         // The file's dimensions, passed in rather than read off the bitmap: a thumbnail has been resized, so
         // its own PixelWidth is the size we asked for and not the image's.
         PreviewDimensions.Text = $"{pixelWidth} × {pixelHeight}";
-        PreviewBytes.Text = storedBytes is { } bytes ? FormatBytes(bytes) : string.Empty;
+        PreviewBytes.Text = bytesCaption ?? string.Empty;
         PreviewFooter.Visibility = Visibility.Visible;
     }
 

@@ -113,6 +113,29 @@ loaded at once is under <b>Settings, History</b>.</p>
 selected entry is a copy of an image <i>file</i>, the pane shows the picture below the path, with its
 resolution on the left and its size on the right.</p>
 
+<p><b>Hovering a row</b> shows the same facts as a tooltip, and for an image it shows a medium-sized thumbnail
+too &mdash; enough to find the picture you are after without selecting each one in turn. The thumbnail is read
+only when the tooltip appears, so scrolling a long list costs nothing.</p>
+
+<h3>Zooming a picture</h3>
+
+<p>A picture opens <b>fitted</b> to the pane and never enlarged beyond its own size, so what you see is what was
+copied. The row of controls underneath changes that.</p>
+
+<table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td class="key">Fit</td><td>Back to fitting the pane. Also <code>0</code>.</td></tr>
+<tr><td class="key">100%</td><td>One screen pixel per image pixel, which is the setting to judge sharpness by.
+Also <code>1</code>, or a double-click on the picture.</td></tr>
+<tr><td class="key">− / +</td><td>Out and in, a quarter at a time, starting from whatever you are looking at.</td></tr>
+<tr><td class="key">Ctrl + scroll</td><td>Zooms around the pointer, so the detail under it stays under it.</td></tr>
+<tr><td class="key">drag</td><td>Pans, once zoomed in far enough for there to be anything to pan.</td></tr>
+</table>
+
+<p>The readout on the right says the scale in force &mdash; <b>Fit&nbsp;·&nbsp;83%</b> while fitting, or the plain
+percentage once you have chosen one. The keys work when the picture has the focus, which a click on it gives.
+Changing rows returns to Fit: a zoom is something you did to one picture, not a preference.</p>
+
 <h2>Removing duplicates</h2>
 
 <p>Importing from Clipjump was not idempotent before this version: the dialog said entries already

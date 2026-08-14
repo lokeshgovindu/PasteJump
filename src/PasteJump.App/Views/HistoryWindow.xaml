@@ -156,10 +156,10 @@
         <!-- Split: list on the left, preview on the right -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*" MinWidth="300" />
+                <ColumnDefinition Width="4*" MinWidth="300" />
                 <!-- 6px is the grab area, not the visible divider: the seam drawn inside it is 1px. -->
                 <ColumnDefinition Width="6" />
-                <ColumnDefinition Width="2*" MinWidth="200" />
+                <ColumnDefinition Width="3*" MinWidth="240" />
             </Grid.ColumnDefinitions>
 
             <!--
@@ -181,7 +181,7 @@
                          display index that shifts under every sort. -->
                     <DataGridTextColumn Header="No."
                                         Binding="{Binding Number}"
-                                        Width="52"
+                                        Width="44"
                                         SortMemberPath="Number"
                                         ElementStyle="{StaticResource MutedCellText}" />
 
@@ -196,7 +196,7 @@
 
                     <DataGridTextColumn Header="Kind"
                                         Binding="{Binding KindText}"
-                                        Width="70"
+                                        Width="60"
                                         SortMemberPath="Kind"
                                         ElementStyle="{StaticResource CellText}" />
 
@@ -204,13 +204,13 @@
                          swapped in and out, so the column layout does not shift when the view changes. -->
                     <DataGridTextColumn Header=""
                                         Binding="{Binding PinnedText}"
-                                        Width="58"
+                                        Width="52"
                                         SortMemberPath="Pinned"
                                         ElementStyle="{StaticResource MutedCellText}" />
 
                     <DataGridTextColumn Header="When"
                                         Binding="{Binding LocalTimeText}"
-                                        Width="150"
+                                        Width="132"
                                         SortMemberPath="CapturedUtc"
                                         ElementStyle="{StaticResource CellText}" />
 
@@ -218,7 +218,7 @@
                          formatted string - otherwise "9 B" sorts after "10 KB". -->
                     <DataGridTextColumn Header="Size"
                                         Binding="{Binding SizeText}"
-                                        Width="86"
+                                        Width="78"
                                         SortMemberPath="Bytes"
                                         ElementStyle="{StaticResource NumericCellText}">
                         <DataGridTextColumn.HeaderStyle>
@@ -232,8 +232,39 @@
 
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                        <!-- Per-row tooltip showing the full, untruncated preview. -->
-                        <Setter Property="ToolTip" Value="{Binding TooltipText}" />
+                        <!--
+                            Per-row tooltip: the full untruncated preview, and for an image row a medium thumbnail
+                            above it, so hovering the list is enough to find a picture without selecting each one.
+
+                            The thumbnail loads only when the tooltip is realised, because that is when this binding
+                            first asks for it - see HistoryRow.Thumbnail. A DataTrigger hides the Image when there
+                            is none, which beats a converter for one comparison against null.
+                        -->
+                        <Setter Property="ToolTip">
+                            <Setter.Value>
+                                <ToolTip>
+                                    <StackPanel MaxWidth="420">
+                                        <Image Source="{Binding Thumbnail}"
+                                               Stretch="Uniform"
+                                               StretchDirection="DownOnly"
+                                               HorizontalAlignment="Left"
+                                               MaxHeight="200"
+                                               Margin="0,0,0,6">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Thumbnail}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
+                                        <TextBlock Text="{Binding TooltipText}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </ToolTip>
+                            </Setter.Value>
+                        </Setter>
                     </Style>
                 </DataGrid.RowStyle>
             </DataGrid>
@@ -300,13 +331,93 @@
                                      ToolTip="Full content of the selected entry. Read-only, but selectable." />
                         </ScrollViewer>
 
-                        <Image x:Name="PreviewImage"
-                               Grid.Row="1"
-                               Margin="10"
-                               Stretch="Uniform"
-                               StretchDirection="DownOnly"
-                               Visibility="Collapsed"
-                               ToolTip="Image for this entry" />
+                        <!--
+                            The picture, in a scroller so it can be zoomed past the pane and panned.
+
+                            LayoutTransform rather than RenderTransform, deliberately: only a layout transform
+                            changes the size the ScrollViewer measures, so the scrollbars and the pannable extent
+                            follow the zoom for free. With a render transform the image would grow visually and the
+                            scroller would still believe it was the old size, leaving most of a zoomed picture
+                            unreachable.
+
+                            Stretch=None at all times - fitting is done by computing a scale rather than by letting
+                            the Image stretch, so the percentage readout can tell the truth in Fit mode too.
+                        -->
+                        <Grid x:Name="PreviewImageHost" Grid.Row="1" Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <ScrollViewer x:Name="ImageScroller"
+                                          Grid.Row="0"
+                                          Margin="10,10,10,0"
+                                          Focusable="True"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Auto"
+                                          PreviewMouseWheel="OnImageMouseWheel"
+                                          MouseLeftButtonDown="OnImagePanStart"
+                                          MouseMove="OnImagePanMove"
+                                          MouseLeftButtonUp="OnImagePanEnd"
+                                          MouseDoubleClick="OnImageDoubleClick"
+                                          KeyDown="OnImageKeyDown"
+                                          SizeChanged="OnImageViewportChanged">
+                                <Image x:Name="PreviewImage"
+                                       Stretch="None"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Scroll with Ctrl to zoom, drag to pan, double-click for 100%">
+                                    <Image.LayoutTransform>
+                                        <ScaleTransform x:Name="ImageScale" />
+                                    </Image.LayoutTransform>
+                                </Image>
+                            </ScrollViewer>
+
+                            <!--
+                                Zoom controls. Only ever visible with a picture, since the host they live in is
+                                collapsed otherwise - so a text clip's pane gains nothing to ignore.
+                            -->
+                            <StackPanel Grid.Row="1"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,6,0,4">
+                                <Button x:Name="ZoomFitButton"
+                                        Content="_Fit"
+                                        Click="OnZoomFit"
+                                        MinWidth="46"
+                                        Padding="8,2"
+                                        Margin="0,0,4,0"
+                                        FontSize="11"
+                                        ToolTip="Fit the picture to the pane (0)" />
+                                <Button x:Name="ZoomActualButton"
+                                        Content="100%"
+                                        Click="OnZoomActual"
+                                        MinWidth="46"
+                                        Padding="8,2"
+                                        Margin="0,0,4,0"
+                                        FontSize="11"
+                                        ToolTip="Show every pixel, one for one (1)" />
+                                <Button Content="−"
+                                        Click="OnZoomOut"
+                                        MinWidth="28"
+                                        Padding="8,2"
+                                        Margin="0,0,4,0"
+                                        FontSize="11"
+                                        ToolTip="Zoom out (Ctrl+scroll down)" />
+                                <Button Content="+"
+                                        Click="OnZoomIn"
+                                        MinWidth="28"
+                                        Padding="8,2"
+                                        Margin="0,0,8,0"
+                                        FontSize="11"
+                                        ToolTip="Zoom in (Ctrl+scroll up)" />
+                                <TextBlock x:Name="ZoomReadout"
+                                           VerticalAlignment="Center"
+                                           MinWidth="42"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           FontSize="11" />
+                            </StackPanel>
+                        </Grid>
                     </Grid>
 
                     <!--
