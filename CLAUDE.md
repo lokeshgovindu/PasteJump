@@ -975,6 +975,26 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   UI smoke harness. Put shared resources in `Themes/Shared.xaml`.
 - **`DataGridCell.HorizontalContentAlignment` defaults to `Left`**, which makes the content presenter
   shrink to its content — so a column's right-aligned `ElementStyle` silently does nothing.
+- **A clip's picture comes from its PAYLOADS; a history entry's comes from a BLOB (fixed 2026-08-14).** The
+  preview pane tested only for `row.BlobHash`, which a clip row never has, so selecting an image in the **Clips**
+  view fell through to the text branch and drew the `[image]` placeholder while the same image previewed fine in
+  the History view. Reported. `HistoryRow.IsClip`'s own doc had promised the intended behaviour all along — *"its
+  image preview comes from the payloads"* — and it was never implemented.
+  - **Copy was never affected, which is how it survived.** Copy branches on `IsClip` and reads
+    `_store.GetPayloads(row.Id)` directly; only history rows reach `TryBuildImagePayloads`. Two paths from one pane,
+    and only one of them knew about clips.
+  - **`CfDibV5` (17) is read as a fallback** beside `CfDib` (8), because an application that offers only V5 would
+    otherwise look like a clip with no picture in it.
+  - **The harness could not have caught this: the seed contained no image CLIP at all** — every image in it was a
+    history entry or a copied file. It now seeds a real `CF_DIB` (WPF's BMP encoder, then `TryExtractDib`, which
+    is shorter and more faithful than hand-built headers).
+  - **The assertion matters more than the shot**, and this is the general lesson: a failed picture looks like a
+    pane with `[image]` in it, which is *indistinguishable from a correctly rendered text clip* to anything
+    comparing screenshots. `PreviewShowsPictureForSmokeTest` asks the window instead. Verified by restoring the
+    blob-only line — 2 failures.
+  - **Select rows by kind, not by index, in the harness.** `SelectFirstRowOfKindForSmokeTest` exists because
+    earlier cases copy and join, both of which add a clip and move one to the front: a fixed row number meant the
+    seeded image in the Light pass and something else in the Dark one, so the check passed once and failed once.
 - **A chip that shows cycling state names its own key (2026-08-13):** `Original (Z)`, `images only (K)`, letter
   accented and brackets muted, the same colours the footer hint uses. Asked for because the formatter chip said
   `Original` and nothing on screen said how to change it — the footer lists stepping and leaving, not the chips,

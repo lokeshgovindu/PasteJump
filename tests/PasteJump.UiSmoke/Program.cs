@@ -112,6 +112,47 @@ internal static class Program
                     },
                     static (window, _) => VerifyToolTipWrapping(window));
 
+                // An image CLIP selected in the Clips view, which is the case that was broken: a clip has no blob,
+                // and this pane tested only for one, so it drew the [image] placeholder instead of the picture.
+                // Reported by the user, and invisible to the harness until now because nothing seeded an image clip.
+                //
+                // The assertion is what matters more than the shot. A failed picture looks like a pane with
+                // "[image]" in it, which is indistinguishable from a correctly rendered text clip to anything
+                // comparing screenshots - so this asks the window directly.
+                Check(
+                    "HistoryWindow-ClipsImage",
+                    () =>
+                    {
+                        var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
+
+                        window.Loaded += (_, _) =>
+                        {
+                            window.ShowClipsForSmokeTest();
+
+                            // By kind, not by index: the joining case above adds a clip and moves one to the front,
+                            // so a fixed row number means different clips in the two theme passes.
+                            if (!window.SelectFirstRowOfKindForSmokeTest(ClipKind.Image))
+                            {
+                                _failures++;
+                                Console.WriteLine("  FAIL  no image clip in the stack - the seed no longer covers this case");
+                            }
+                        };
+
+                        return window;
+                    },
+                    static (window, _) =>
+                    {
+                        if (((HistoryWindow)window).PreviewShowsPictureForSmokeTest)
+                        {
+                            Console.WriteLine("  clips view: an image clip previews its picture");
+                        }
+                        else
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  an image clip in the Clips view shows no picture in the preview pane");
+                        }
+                    });
+
                 // Several rows selected, then joined. Two shots because they are two different states and each
                 // is only reachable here: the Copy button relabels itself to "Copy Joined" with more than one row
                 // selected, and the status line a join produces is written nowhere else. They cannot be one shot,
@@ -1469,6 +1510,16 @@ internal static class Program
     /// </summary>
     private static void Seed(ClipStore store)
     {
+        // FIRST, so it sorts oldest and the existing Clips shot keeps a text clip at row 0.
+        //
+        // An image CLIP, which the seed had never contained - every image here was a history entry or a copied
+        // file. That gap is why the Clips view could show [image] instead of a picture for as long as it did: with
+        // no image in the stack, no shot and no check went anywhere near the branch. A clip carries clipboard
+        // formats rather than a blob, so this seeds a real CF_DIB.
+        store.Add(
+            new ClipboardSnapshot([new ClipPayload(8, null, SampleDib())], "[image]", ClipKind.Image, "SnippingTool.exe"),
+            allowDuplicates: true);
+
         for (var i = 1; i <= 5; i++)
         {
             var text = i == 3
@@ -1495,6 +1546,26 @@ internal static class Program
             FileListPreview.Describe([imagePath]),
             null,
             new FileInfo(imagePath).Length);
+    }
+
+    /// <summary>
+    /// The sample picture as a <c>CF_DIB</c>, which is how a clip stores an image.
+    /// <para>
+    /// Round-tripped through WPF's own BMP encoder rather than hand-built: a DIB is a BMP file minus its 14-byte
+    /// file header, so encoding and then stripping is both shorter and more faithful than assembling headers here -
+    /// and it is exactly the shape the capture path produces.
+    /// </para>
+    /// </summary>
+    private static byte[] SampleDib()
+    {
+        var encoder = new System.Windows.Media.Imaging.BmpBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(new MemoryStream(SamplePng())));
+
+        using var bmp = new MemoryStream();
+        encoder.Save(bmp);
+
+        return PasteJump.Core.Imaging.DibConverter.TryExtractDib(bmp.ToArray())
+            ?? throw new InvalidOperationException("The sample BMP could not be reduced to a DIB.");
     }
 
     /// <summary>

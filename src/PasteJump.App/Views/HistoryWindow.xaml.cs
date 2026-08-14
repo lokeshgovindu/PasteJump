@@ -116,6 +116,13 @@ public partial class HistoryWindow : Window
     private const uint CfDib = 8;
 
     /// <summary>
+    /// <c>CF_DIBV5</c>, the format Windows offers for an image with an alpha channel. Read as a fallback wherever
+    /// <see cref="CfDib"/> is, because a clip captured from an application that offered only V5 has no plain DIB and
+    /// would otherwise look like a clip with no picture in it at all.
+    /// </summary>
+    private const uint CfDibV5 = 17;
+
+    /// <summary>
     /// Same labels as the Settings dialog's own density combo, deliberately: two controls for one setting
     /// that named the options differently would read as two different settings.
     /// </summary>
@@ -304,6 +311,41 @@ public partial class HistoryWindow : Window
     /// buttons and status line, so a screenshot of one says nothing about the other.
     /// </summary>
     public void ShowClipsForSmokeTest() => ViewCombo.SelectedIndex = 0;
+
+    /// <summary>
+    /// Test hook: selects the first row of a given kind, and reports whether there was one.
+    /// <para>
+    /// By kind rather than by index, because an index is not stable across a harness run: earlier cases copy and
+    /// join, both of which add a clip and move one to the front, so "row 5" was the seeded image in the first
+    /// theme pass and something else in the second. That produced a check which passed once and failed once, which
+    /// is worse than one that simply fails.
+    /// </para>
+    /// </summary>
+    public bool SelectFirstRowOfKindForSmokeTest(ClipKind kind)
+    {
+        for (var i = 0; i < EntriesGrid.Items.Count; i++)
+        {
+            if (EntriesGrid.Items[i] is HistoryRow row && row.Kind == kind)
+            {
+                SelectRowForSmokeTest(i);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Test hook: whether the preview pane is showing a picture rather than text.
+    /// <para>
+    /// Exists because a screenshot is not an assertion. An image clip whose picture failed to load looks like a
+    /// pane with <c>[image]</c> in it, which is also what a correctly rendered <em>text</em> clip looks like to
+    /// anything comparing pixels - so the Clips view could lose its previews entirely, as it had, without any
+    /// shot going missing or any check going red.
+    /// </para>
+    /// </summary>
+    public bool PreviewShowsPictureForSmokeTest =>
+        PreviewImage.Visibility == Visibility.Visible && PreviewImage.Source is not null;
 
     /// <summary>
     /// Selects a row by index. Exists for the UI smoke harness, so a screenshot can show the selected
@@ -627,17 +669,16 @@ public partial class HistoryWindow : Window
 
         PreviewHeader.Text = $"#{row.Number}  ·  {row.KindText}  ·  {row.SizeText}  ·  {row.LocalTimeText}";
 
-        if (row.Kind == ClipKind.Image && row.BlobHash is { Length: > 0 })
+        if (row.Kind == ClipKind.Image && TryReadImageBytes(row) is { } bytes)
         {
-            var bytes = _store.Blobs.TryRead(row.BlobHash);
-            var bitmap = bytes is null ? null : TryDecode(bytes);
+            var bitmap = TryDecode(bytes);
 
             if (bitmap is not null)
             {
                 // Whole pane: the picture is the content, and there is no path to show above it. A stored image
                 // is decoded in full, so its own dimensions are the true ones here.
                 PreviewScroller.Visibility = Visibility.Collapsed;
-                ShowImage(bitmap, null, bytes!.LongLength, bitmap.PixelWidth, bitmap.PixelHeight);
+                ShowImage(bitmap, null, bytes.LongLength, bitmap.PixelWidth, bitmap.PixelHeight);
                 return;
             }
         }
@@ -654,6 +695,38 @@ public partial class HistoryWindow : Window
         }
 
         ShowImage(null, null, null, 0, 0);
+    }
+
+    /// <summary>
+    /// The picture behind an image row, as a decodable bitmap file, or null when there is not one.
+    /// <para>
+    /// <b>Two stores, two places a picture lives, and that is the whole of this method.</b> A history entry keeps
+    /// one flattened record plus a blob addressed by hash; a clip keeps every clipboard format it was copied with,
+    /// and no blob. So a clip row has no <see cref="HistoryRow.BlobHash"/> - and this pane used to test only for
+    /// that, which meant selecting an image in the Clips view fell through to the text branch and drew the
+    /// <c>[image]</c> placeholder. Reported, and the row class had documented the intended behaviour all along:
+    /// "its image preview comes from the payloads". It never did.
+    /// </para>
+    /// <para>
+    /// Note that Copy was never affected, which is why this survived: it takes a clip's payloads directly, several
+    /// hundred lines below, and only history rows reach <c>TryBuildImagePayloads</c>. The two paths had drifted.
+    /// </para>
+    /// </summary>
+    private byte[]? TryReadImageBytes(HistoryRow row)
+    {
+        if (!row.IsClip)
+        {
+            return row.BlobHash is { Length: > 0 } hash ? _store.Blobs.TryRead(hash) : null;
+        }
+
+        var payloads = _store.GetPayloads(row.Id);
+
+        var dib = payloads.FirstOrDefault(static p => p.FormatId == CfDib)
+            ?? payloads.FirstOrDefault(static p => p.FormatId == CfDibV5);
+
+        // A DIB is raw pixels with a header the imaging stack will not read; the converter prepends the 14-byte
+        // file header that turns it into something BitmapDecoder accepts. Same call the overlay makes.
+        return dib is null ? null : DibConverter.TryCreateBitmapFile(dib.Data);
     }
 
     /// <summary>
