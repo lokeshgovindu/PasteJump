@@ -1073,7 +1073,19 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     the padding) so it lands on the column boundary, is dimmed to 0.45, and collapses on the selected row. Not on
     hover, unlike the row hairline: rules blinking out of one row at a time as the pointer travels is worse than
     the rules.
-  - **A `ScrollViewer` eats `MouseLeftButtonDown`, so pan handlers must use the `Preview` events.** Its class
+  - **The tunnelling pan handler also stole the SCROLL BARS' presses (fixed 2026-08-14).** Reported as "scroll bars
+  are not working", and they were not: they rendered, `ComputedHorizontalScrollBarVisibility` said `Visible`, and
+  1462x774 was scrollable - but the pan handler on the ScrollViewer's `PreviewMouseLeftButtonDown` saw every press
+  in the pane before the thumb did and called `CaptureMouse`. Dragging a bar panned the picture. The guard is about
+  **where the press landed**, not about the pan state, because both are true at once: the picture overflows, and the
+  pointer is on a bar.
+  - **The first test for it was vacuous, and a counter proved it.** It raised a synthetic
+    `PreviewMouseLeftButtonDown` on the scroll bar and asserted no pan began - and it passed with the guard
+    *deleted*, because a manually raised tunnelling event does not route the way real input does: the handler was
+    entered **0 times**. Lesson worth keeping: when a test of routing passes, count the handler entries before
+    believing it. The check now asks the extracted `ShouldStartPan` predicate about the real `ScrollBar` in the
+    visual tree, and about `PreviewImage` for the other direction. Verified it fails with the guard neutered.
+- **A `ScrollViewer` eats `MouseLeftButtonDown`, so pan handlers must use the `Preview` events.** Its class
     handler focuses the control and marks the event handled, and **class handlers run before instance handlers** -
     so a handler attached to `MouseLeftButtonDown` is never called. This is what kept drag-to-pan broken after the
     gate below was fixed, and it was reported twice. `TryStartPanForSmokeTest` raises a real press and asserts a pan

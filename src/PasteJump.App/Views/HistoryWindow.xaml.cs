@@ -4,6 +4,8 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PasteJump.App.Services;
@@ -394,6 +396,66 @@ public partial class HistoryWindow : Window
     /// Calling the handler would prove only that the arithmetic works, which was never the problem.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Test hook: the scroll state at the current zoom, for diagnosing "the scroll bars do not work".
+    /// </summary>
+    public string DescribeScrollForSmokeTest =>
+        $"extent {ImageScroller.ExtentWidth:0}x{ImageScroller.ExtentHeight:0}  "
+        + $"viewport {ImageScroller.ViewportWidth:0}x{ImageScroller.ViewportHeight:0}  "
+        + $"scrollable {ImageScroller.ScrollableWidth:0}x{ImageScroller.ScrollableHeight:0}  "
+        + $"bars {ImageScroller.ComputedHorizontalScrollBarVisibility}/{ImageScroller.ComputedVerticalScrollBarVisibility}";
+
+    /// <summary>
+    /// Test hook: raises a left-button press that ORIGINATES on the vertical scroll bar, and reports whether a pan
+    /// began. It must not: the bar owns that press.
+    /// <para>
+    /// Raised on the scroll bar itself rather than on the scroller, because that is what sets
+    /// <c>OriginalSource</c> - and a tunnelling event raised there still routes through the handler under test, so
+    /// this reproduces the reported failure exactly rather than approximating it.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// Test hook: whether a press landing on the real scroll bar would start a pan. It must not.
+    /// <para>
+    /// This asks the predicate rather than raising an event, and the first attempt did the latter: it raised a
+    /// synthetic <c>PreviewMouseLeftButtonDown</c> on the scroll bar and asserted no pan began. That test passed
+    /// with the guard <em>deleted</em> - a counter proved the handler was never entered at all, because a manually
+    /// raised tunnelling event does not route the way real input does. A check that cannot fail is worse than none,
+    /// so this exercises the decision against the actual visual tree instead: the bar really is inside a
+    /// <see cref="ScrollBar"/>, and the picture really is not.
+    /// </para>
+    /// </summary>
+    public bool WouldPanFromScrollBarForSmokeTest()
+    {
+        var bar = FindDescendant<ScrollBar>(ImageScroller)
+            ?? throw new InvalidOperationException("The image preview has no scroll bar, so nothing is being tested.");
+
+        return ShouldStartPan(bar);
+    }
+
+    /// <summary>Test hook: the other direction - a press on the picture itself must still pan.</summary>
+    public bool WouldPanFromPictureForSmokeTest() => ShouldStartPan(PreviewImage);
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+
+            if (child is T match)
+            {
+                return match;
+            }
+
+            if (FindDescendant<T>(child) is { } deeper)
+            {
+                return deeper;
+            }
+        }
+
+        return null;
+    }
+
     public bool TryStartPanForSmokeTest()
     {
         var press = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
@@ -1098,6 +1160,20 @@ public partial class HistoryWindow : Window
     {
         ImageScroller.Focus();
 
+        // A PRESS ON A SCROLL BAR BELONGS TO THE SCROLL BAR. This handler is on the ScrollViewer's tunnelling
+        // PreviewMouseLeftButtonDown - which is what makes drag-to-pan work at all, since the ScrollViewer's own
+        // class handler eats the bubbling event - but tunnelling means it also sees presses on the scroll bars
+        // before the thumb does. Capturing the mouse there panned the picture instead of moving the thumb, so the
+        // bars rendered, reported themselves visible, and did nothing: reported as "scroll bars are not working".
+        //
+        // The fix has to be about WHERE the press landed rather than about the pan state, because both are true at
+        // once: the picture overflows (so panning is legal) and the pointer is on a bar (so it is not this
+        // handler's press).
+        if (!ShouldStartPan(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
         if (!CanPan || e.ClickCount > 1)
         {
             return;
@@ -1132,6 +1208,37 @@ public partial class HistoryWindow : Window
     }
 
     private void UpdatePanCursor() => ImageScroller.Cursor = CanPan ? Cursors.Hand : null;
+
+    /// <summary>
+    /// Whether an element sits inside a <typeparamref name="T"/>, walking the visual tree upwards.
+    /// <para>
+    /// The visual tree rather than the logical one, because a scroll bar's thumb and its repeat buttons are
+    /// template parts: they have the bar as a visual parent and nothing useful as a logical one.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// Whether a press that landed on <paramref name="origin"/> is this handler's to act on.
+    /// <para>
+    /// Only the scroll bars are excluded, and they have to be: the pan handler is on the ScrollViewer's tunnelling
+    /// press - the only place it works, since the ScrollViewer's class handler eats the bubbling one - so it sees
+    /// presses on the bars before the thumb does, and capturing the mouse there left them visible and inert.
+    /// </para>
+    /// </summary>
+    private static bool ShouldStartPan(DependencyObject? origin)
+        => origin is null || !HasAncestor<ScrollBar>(origin);
+
+    private static bool HasAncestor<T>(DependencyObject from) where T : DependencyObject
+    {
+        for (var node = from; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is T)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Double-click toggles Fit and 100%, which is what every picture viewer does.</summary>
     private void OnImageDoubleClick(object sender, MouseButtonEventArgs e) => SetZoom(_zoom is null ? 1 : null);

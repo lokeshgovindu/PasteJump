@@ -161,6 +161,8 @@ internal static class Program
                         history.ZoomPreviewForSmokeTest(4);
                         Drain();
 
+                        Console.WriteLine($"  preview at 400%: {history.DescribeScrollForSmokeTest}");
+
                         if (!history.PreviewCanPanForSmokeTest)
                         {
                             _failures++;
@@ -174,6 +176,25 @@ internal static class Program
                         {
                             _failures++;
                             Console.WriteLine("  FAIL  a left-button press on a zoomed picture does not start a pan");
+                        }
+
+                        // And the other half of the same routing problem: the pan handler is on the ScrollViewer's
+                        // TUNNELLING press, so it also sees presses on the scroll bars before the thumb does.
+                        // Capturing the mouse there left the bars visible and inert - reported as "scroll bars are
+                        // not working".
+                        if (history.WouldPanFromScrollBarForSmokeTest())
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  a press on a scroll bar would start a pan, so the bars cannot be dragged");
+                        }
+                        else if (!history.WouldPanFromPictureForSmokeTest())
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  a press on the picture would not start a pan, so dragging cannot work either");
+                        }
+                        else
+                        {
+                            Console.WriteLine("  preview: the scroll bars own their presses, the picture owns its own");
                         }
 
                         // The tooltip's own path. It draws in a popup this harness cannot capture, so what is
