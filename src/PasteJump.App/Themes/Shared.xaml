@@ -49,6 +49,31 @@
     </Style>
 
     <!--
+        The magnifier at the left-hand end of a search box - four of them now: the settings search, the Advanced
+        filter, the history search and the overlay's search row.
+
+        Defined here for the same reason the clear button is: four copies of a font name and a codepoint would drift,
+        and the first one to drift would be the one nobody looks at. IsHitTestVisible="False" so it cannot swallow
+        the click that should put the caret in the box behind it.
+
+        E721 was chosen by rendering it beside E094, E11A and E1A3 - all magnifiers, this one the cleanest at 14px.
+        Ideal formatting and grayscale rendering for the reason the tray menu's icons carry them: Display mode snaps
+        an icon's outline to the pixel grid and distorts it, and ClearType puts colour fringes on a monochrome glyph.
+    -->
+    <Style x:Key="SearchGlyph" TargetType="TextBlock">
+        <Setter Property="Text" Value="&#xE721;" />
+        <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="Grayscale" />
+    </Style>
+
+    <!--
         The clear button that sits at the right-hand end of a search box. Defined here rather than per window so the
         three of them - the settings search, the Advanced filter and the history search - cannot drift apart.
 

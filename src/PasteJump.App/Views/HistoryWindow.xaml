@@ -131,7 +131,7 @@
                  left over. Filling the remainder is what a search field should do anyway. -->
             <Grid Grid.Column="2">
                 <TextBox x:Name="SearchBox" MinHeight="32" VerticalAlignment="Center"
-                         Padding="5,2,24,2"
+                         Padding="26,2,24,2"
                          TextChanged="OnSearchTextChanged"
                          ToolTip="Search history by content. Ctrl+E, Ctrl+K or Ctrl+F to jump here; Esc to clear." />
 
@@ -143,10 +143,14 @@
                         Visibility="Collapsed"
                         Click="OnSearchClearClicked" />
 
+                <TextBlock Style="{StaticResource SearchGlyph}" />
+
+                <!-- 27, not the 7 this used to be plus the new padding: the text origin is Padding plus the 1px
+                     border, which also quietly fixes a one-pixel disagreement with the settings dialog's cue. -->
                 <TextBlock x:Name="SearchCue"
                            Text="Search history…  (Ctrl+K)"
                            Foreground="{DynamicResource MutedTextBrush}"
-                           Margin="7,0,0,0"
+                           Margin="27,0,0,0"
                            Padding="0"
                            VerticalAlignment="Center"
                            IsHitTestVisible="False" />

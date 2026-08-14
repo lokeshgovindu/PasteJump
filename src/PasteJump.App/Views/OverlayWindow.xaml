@@ -179,13 +179,25 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0"
-                               Text="Search"
-                               Foreground="{DynamicResource AccentBrush}"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0" />
+                    <!--
+                        The magnifier and the word share column 0, in a StackPanel - the query already owns column 1
+                        and the match count column 2. Putting the glyph in a column of its own looked like the
+                        smaller change and was not: it moved the label into the query's column, where the two drew
+                        on top of each other.
+                    -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource SearchGlyph}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   Margin="0,0,5,0" />
+
+                        <TextBlock Text="Search"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0" />
+                    </StackPanel>
 
                     <TextBlock x:Name="SearchQueryText"
                                Grid.Column="1"
