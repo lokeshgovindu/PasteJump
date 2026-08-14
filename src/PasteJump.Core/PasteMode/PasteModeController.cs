@@ -75,6 +75,16 @@ public sealed class PasteModeController
     /// <summary>Set by the hook as Shift goes up and down. Shift on release deletes after pasting.</summary>
     public bool ShiftHeld { get; set; }
 
+    /// <summary>
+    /// True when <c>Delete</c> put this session into Cancel, so that letting go of Ctrl pastes nothing.
+    /// <para>
+    /// Distinguishing this from a Cancel the user chose with <c>X</c> is the whole reason it exists: moving the
+    /// cursor afterwards means "I want this one after all" and puts the mode back, while a Cancel the user asked
+    /// for must survive everything they do next. Without the flag one of those two has to be got wrong.
+    /// </para>
+    /// </summary>
+    private bool _cancelArmedByDelete;
+
     public string SearchQuery { get; private set; } = string.Empty;
 
     /// <summary>Which kinds of clip the window is narrowed to. Reset to <see cref="PasteKindFilter.All"/> per session.</summary>
@@ -158,10 +168,12 @@ public sealed class PasteModeController
         switch (action)
         {
             case PasteAction.Advance:
+                ChoosingAgain();
                 Advance();
                 break;
 
             case PasteAction.Back:
+                ChoosingAgain();
                 Step(-1);
                 break;
 
@@ -173,15 +185,21 @@ public sealed class PasteModeController
                     PasteCommitMode.Delete => PasteCommitMode.DeleteAll,
                     _ => PasteCommitMode.Cancel,
                 };
+
+                // The user now owns the mode, whatever a Delete set it to, so nothing may put it back.
+                _cancelArmedByDelete = false;
                 Render();
                 break;
 
             case PasteAction.JumpToNewest:
+                ChoosingAgain();
                 _cursor = 0;
                 Render();
                 break;
 
             case PasteAction.JumpToOldest:
+                ChoosingAgain();
+
                 // Clamped rather than assumed: the window is empty when a search matches nothing, and -1
                 // would then be handed to Current.
                 _cursor = Math.Max(0, _window.Count - 1);
@@ -274,6 +292,8 @@ public sealed class PasteModeController
             return PasteCommitKind.None;
         }
 
+        ChoosingAgain();
+
         Step(_jumpDirection * digit);
         return PasteCommitKind.None;
     }
@@ -285,6 +305,10 @@ public sealed class PasteModeController
         {
             return;
         }
+
+        // Typing to find a clip is choosing one, so it undoes a Cancel that Delete armed for the same reason
+        // stepping does.
+        ChoosingAgain();
 
         SearchQuery = query ?? string.Empty;
         RefreshWindow();
@@ -540,6 +564,25 @@ public sealed class PasteModeController
     }
 
     /// <summary>
+    /// The user has moved to another clip, so a Cancel that <c>Delete</c> armed is undone.
+    /// <para>
+    /// "Delete this one, then paste that one" has to keep working, and moving the cursor is the only signal for it
+    /// that cannot be misread. A Cancel the user chose with <c>X</c> is untouched - see
+    /// <see cref="_cancelArmedByDelete"/>.
+    /// </para>
+    /// </summary>
+    private void ChoosingAgain()
+    {
+        if (!_cancelArmedByDelete)
+        {
+            return;
+        }
+
+        _cancelArmedByDelete = false;
+        CommitMode = PasteCommitMode.Paste;
+    }
+
+    /// <summary>
     /// The Delete key: remove this clip now and keep browsing.
     /// <para>
     /// The cursor is deliberately left where it is rather than following the clip that was there, which is
@@ -563,6 +606,22 @@ public sealed class PasteModeController
         // skip it anyway, but a chip reading JOIN 3 when only two clips remain is a lie about what is about to
         // happen.
         _marked.Remove(current.Id);
+
+        // RELEASING CTRL AFTER A DELETE NOW PASTES NOTHING, and this is a reversal - the previous behaviour was
+        // deliberate and wrong. Deleting leaves the cursor on the clip that moved up, so a release pasted THAT
+        // one: a user who pressed Ctrl+V, deleted the clip they did not want, and let go got the next clip
+        // inserted into their document. Reported as a bug, and it is one - the destructive key is not a request
+        // to paste something else.
+        //
+        // Cancel rather than a private "do nothing" state, because Cancel is already exactly this - restore the
+        // clipboard, paste nothing - and because the overlay already draws a banner for it, so the change in what
+        // release will do is visible rather than a surprise. A mode the user chose with X is left alone; only the
+        // default Paste is overridden.
+        if (CommitMode == PasteCommitMode.Paste)
+        {
+            CommitMode = PasteCommitMode.Cancel;
+            _cancelArmedByDelete = true;
+        }
 
         RefreshWindow();
 
@@ -589,6 +648,8 @@ public sealed class PasteModeController
     /// </summary>
     private PasteCommitKind CycleKindFilter()
     {
+        ChoosingAgain();
+
         var landed = Current?.Id;
 
         KindFilter = KindFilter.Next();
@@ -670,6 +731,7 @@ public sealed class PasteModeController
         _preservedClipId = _options.PreserveClipPosition ? Current?.Id : null;
         State = PasteSessionState.Idle;
         CommitMode = PasteCommitMode.Paste;
+        _cancelArmedByDelete = false;
         SearchQuery = string.Empty;
         ShiftHeld = false;
         _window = [];

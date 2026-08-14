@@ -999,6 +999,21 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   - **A headerless two-column table becomes a definition list**, not a table with a blank header: GitHub demands a
     header row, and nine of the manual's tables are glossaries that would each carry an empty grey strip. Whether
     the first row was `<th>` is recorded while parsing, never inferred from how the text looks.
+- **Delete arms CANCEL: after pressing Delete, releasing Ctrl pastes nothing (2026-08-14). This reverses an
+  earlier deliberate decision.** Reported as a bug, and it was one. Deleting leaves the cursor on the clip that
+  moved up, so releasing pasted *that* one - a user who pressed Ctrl+V, deleted the clip they did not want, and let
+  go got its neighbour inserted into their document. The old rule was "Delete acts now, X only arms", on the
+  reasoning that a Delete which rearmed the commit mode "would take a second clip when Ctrl came up"; that had it
+  backwards, because leaving the mode alone is what took a clip.
+  - **`PasteCommitMode.Cancel`, not a new private state**, because Cancel already means restore-and-paste-nothing
+    *and* the overlay already draws a banner for it - so the change in what release will do is visible rather than
+    a surprise.
+  - **`_cancelArmedByDelete` distinguishes an automatic Cancel from one the user chose with `X`.** Moving the cursor
+    (`ChoosingAgain`: step, jump, digit, search, kind filter) undoes the automatic one so "delete this, paste that"
+    still works in one gesture; a Cancel the user asked for survives everything. Pressing `X` clears the flag - the
+    mode is theirs from then on. Without that distinction one of the two cases has to be wrong.
+  - Four tests, and the old one was **rewritten rather than deleted**: `Delete_then_releasing_Ctrl_pastes_nothing`
+    carries the history of the reversal so nobody restores the old behaviour thinking it was an oversight.
 - **The preview footer is gone (2026-08-14) and the resolution lives in the header.** Showing `895 × 462` on the
     left and a byte count on the right, one row under a header that already carried a byte count, was reported as
     a duplicate - and it was: the two differed only by the clip's other clipboard formats. The header now reads

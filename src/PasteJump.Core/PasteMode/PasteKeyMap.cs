@@ -112,7 +112,7 @@ public sealed class PasteKeyMap
         ("-", "Reverse the direction the number keys jump in, numpad included"),
         ("Space", "Pin or unpin the clip"),
         ("Q", "Move the clip to the front of the stack"),
-        ("Delete", "Delete this clip now and carry on browsing"),
+        ("Delete", "Delete this clip now, carry on browsing, and paste nothing on release"),
         ("Enter", "Paste and stay open, to paste several clips in a row"),
         ("Backspace", "Delete a character while searching"),
         ("Shift", "Hold it, then release Ctrl, to delete the clip after pasting"),

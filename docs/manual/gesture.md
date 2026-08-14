@@ -120,7 +120,7 @@ Search is the exception to "keep `Ctrl` held": releasing it while searching does
 
 | Key | Action |
 | --- | --- |
-| **Delete** | Delete the clip being shown, straight away, and carry on browsing. Nothing is pasted and the overlay stays up, so a run of presses walks forward through the stack clearing as it goes. |
+| **Delete** | Delete the clip being shown, straight away, and carry on browsing. Nothing is pasted and the overlay stays up, so a run of presses walks forward through the stack clearing as it goes. Afterwards **releasing `Ctrl` pastes nothing** — the banner says **CANCEL** — because deleting a clip is not a request to paste the one that moved up into its place. Step to another clip and releasing pastes again, so "delete this one, paste that one" still works in one gesture. |
 | **X** | Cycle what releasing `Ctrl` will do: Cancel, then Delete this clip, then Delete All. A coloured banner shows the current mode. Pressing `X` repeatedly cycles those three and never returns to pasting. |
 | **Esc** | Cancel immediately and restore the previous clipboard. |
 

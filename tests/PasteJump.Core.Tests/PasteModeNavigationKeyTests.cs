@@ -192,24 +192,106 @@ public class PasteModeNavigationKeyTests
     }
 
     /// <summary>
-    /// Delete acts now; X only arms. Keeping them independent matters because a Delete key that also rearmed
-    /// the commit mode would take a second clip when Ctrl came up.
+    /// The reported bug, in the order it was reported: Ctrl+V, Delete, release - and nothing may be pasted.
+    /// <para>
+    /// This asserts the OPPOSITE of what it used to. The previous rule was "Delete acts now, X only arms", on the
+    /// reasoning that a Delete key which also rearmed the commit mode would take a second clip when Ctrl came up.
+    /// That reasoning had it exactly backwards in practice: deleting leaves the cursor on the clip that moved up,
+    /// so releasing pasted THAT one - the user deleted the clip they did not want and got its neighbour inserted
+    /// into their document. The destructive key is not a request to paste something else.
+    /// </para>
     /// </summary>
     [Fact]
-    public void Delete_does_not_change_what_releasing_Ctrl_will_do()
+    public void Delete_then_releasing_Ctrl_pastes_nothing()
     {
         var (controller, catalog, host) = Build(clipCount: 3);
 
         controller.Begin();
         controller.Handle(PasteAction.DeleteCurrentClip);
 
-        Assert.Equal(PasteCommitMode.Paste, controller.CommitMode);
+        // Cancel, not a private state of its own: it is already "restore the clipboard and paste nothing", and the
+        // overlay draws a banner for it - so what releasing Ctrl will now do is visible on screen.
+        Assert.Equal(PasteCommitMode.Cancel, controller.CommitMode);
+        Assert.Equal(PasteCommitMode.Cancel, host.LastFrame!.CommitMode);
 
         var remaining = catalog.Snapshot().Count;
+        var kind = controller.ModifierReleased();
+
+        Assert.Equal(PasteCommitKind.Cancelled, kind);
+        Assert.Empty(host.PastedClips);
+
+        // Invariant 2: the clipboard the user had goes back.
+        Assert.Equal(1, host.RestoreCount);
+
+        // And nothing else was deleted on the way out - the one Delete press is the only deletion.
+        Assert.Equal(remaining, catalog.Snapshot().Count);
+    }
+
+    /// <summary>
+    /// "Delete this one, then paste that one" still works: moving the cursor after a Delete means the next
+    /// release pastes again. Without this the fix above would trade one surprise for another.
+    /// </summary>
+    [Fact]
+    public void Delete_then_stepping_to_another_clip_pastes_again()
+    {
+        var (controller, _, host) = Build(clipCount: 3);
+
+        controller.Begin();
+        controller.Handle(PasteAction.DeleteCurrentClip);
+        controller.Handle(PasteAction.Advance);
+
+        Assert.Equal(PasteCommitMode.Paste, controller.CommitMode);
+
+        var chosen = controller.Current!.Id;
         controller.ModifierReleased();
 
         Assert.Single(host.PastedClips);
-        Assert.Equal(remaining, catalog.Snapshot().Count);
+        Assert.Equal(chosen, host.PastedClips[0].Id);
+    }
+
+    /// <summary>
+    /// A Cancel the user asked for with <c>X</c> survives everything they do next, which is what makes the
+    /// automatic one safe to undo. Both states are Cancel; only one of them is the application's to change.
+    /// </summary>
+    [Fact]
+    public void A_cancel_chosen_by_the_user_is_not_undone_by_moving_the_cursor()
+    {
+        var (controller, _, host) = Build(clipCount: 3);
+
+        controller.Begin();
+        controller.Handle(PasteAction.CycleCommitMode);      // Paste -> Cancel
+
+        Assert.Equal(PasteCommitMode.Cancel, controller.CommitMode);
+
+        controller.Handle(PasteAction.Advance);
+        controller.Handle(PasteAction.JumpToNewest);
+
+        Assert.Equal(PasteCommitMode.Cancel, controller.CommitMode);
+
+        controller.ModifierReleased();
+
+        Assert.Empty(host.PastedClips);
+    }
+
+    /// <summary>
+    /// And <c>X</c> after a Delete hands the mode back to the user: the next thing they press must not put it
+    /// back to Paste behind them.
+    /// </summary>
+    [Fact]
+    public void Cycling_the_commit_mode_after_a_delete_takes_ownership_of_it()
+    {
+        var (controller, _, host) = Build(clipCount: 3);
+
+        controller.Begin();
+        controller.Handle(PasteAction.DeleteCurrentClip);    // arms Cancel
+        controller.Handle(PasteAction.CycleCommitMode);      // Cancel -> Delete, chosen deliberately
+        controller.Handle(PasteAction.Advance);
+
+        Assert.Equal(PasteCommitMode.Delete, controller.CommitMode);
+
+        controller.ModifierReleased();
+
+        Assert.Empty(host.PastedClips);
     }
 
     [Fact]
