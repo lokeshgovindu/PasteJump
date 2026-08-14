@@ -911,6 +911,11 @@ public partial class HistoryWindow : Window
 
         ZoomFitButton.IsEnabled = !fitting;
         ZoomActualButton.IsEnabled = _zoom is not 1.0;
+
+        // The cursor is how a user learns that dragging does something here - the alternative is a feature nobody
+        // tries. Set after the scale, and again once layout has run, since the extent it depends on is not known
+        // until then.
+        Dispatcher.BeginInvoke(UpdatePanCursor, DispatcherPriority.Loaded);
     }
 
     private void OnLayoutSettledForFit(object? sender, EventArgs e)
@@ -1001,12 +1006,23 @@ public partial class HistoryWindow : Window
         }, DispatcherPriority.Loaded);
     }
 
-    /// <summary>Drag to pan, but only when there is something to pan - in Fit mode a drag would do nothing.</summary>
+    /// <summary>Whether the picture is bigger than the pane, and so has anything to pan.</summary>
+    /// <remarks>
+    /// The condition is <b>overflow, not zoom</b>, and the first version got this wrong: it tested
+    /// <c>_zoom is null</c>, so dragging did nothing in Fit mode - which is the mode every picture opens in, so it
+    /// looked as though panning had not been implemented. Reported as exactly that. Overflow is also the right test
+    /// in the other direction: at 100% a small icon still fits, and a drag on it should not jerk the view.
+    /// </remarks>
+    private bool CanPan =>
+        ImageScroller.ExtentWidth > ImageScroller.ViewportWidth + 1
+        || ImageScroller.ExtentHeight > ImageScroller.ViewportHeight + 1;
+
+    /// <summary>Drag to pan, whenever the picture is larger than the pane.</summary>
     private void OnImagePanStart(object sender, MouseButtonEventArgs e)
     {
         ImageScroller.Focus();
 
-        if (_zoom is null || e.ClickCount > 1)
+        if (!CanPan || e.ClickCount > 1)
         {
             return;
         }
@@ -1036,8 +1052,10 @@ public partial class HistoryWindow : Window
     {
         _panFrom = null;
         ImageScroller.ReleaseMouseCapture();
-        ImageScroller.Cursor = null;
+        UpdatePanCursor();
     }
+
+    private void UpdatePanCursor() => ImageScroller.Cursor = CanPan ? Cursors.Hand : null;
 
     /// <summary>Double-click toggles Fit and 100%, which is what every picture viewer does.</summary>
     private void OnImageDoubleClick(object sender, MouseButtonEventArgs e) => SetZoom(_zoom is null ? 1 : null);

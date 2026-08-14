@@ -1000,8 +1000,23 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     keeps a 3 MB screenshot from ever becoming a full bitmap on the way to a tooltip, and the *failure* is cached
     too or an undecodable clip retries on every hover. Image rows only — a file copy would mean disk I/O while the
     pointer crosses a list.
-  - Column widths were **measured from renders, twice**: 112px truncated `2026-08-14 09:42` and 66px truncated
-    `562.5 KB`, both at Cozy, which is the worst case since Compact has less padding.
+  - Column widths are **measured, not guessed** (2026-08-14). Two rounds of renders were needed first - 112px
+    truncated `2026-08-14 09:42`, 66px truncated `562.5 KB` - so they now come from `FormattedText` with the real
+    typefaces plus the cell's 20px padding and the room the sort glyph takes when that column is sorted. The floor
+    on **Kind** is its own header, not its content: `Image` needs 53px but `Kind` + glyph + padding needs 57, and
+    going narrower clips the header the moment someone sorts by it. Reducing it further would mean not reserving
+    the glyph, which trades a visible clip for 5px.
+  - **Column rules are drawn in the cell and the header templates, not by `GridLinesVisibility`.** Same reasoning
+    as the row hairline that was already there: WPF's grid-line brushes are flat, full-bleed and paint straight
+    through a selected row. The rule sits in the cell's right padding (`Margin="0,5,-10,5"`, the negative matching
+    the padding) so it lands on the column boundary, is dimmed to 0.45, and collapses on the selected row. Not on
+    hover, unlike the row hairline: rules blinking out of one row at a time as the pointer travels is worse than
+    the rules.
+  - **Panning was gated on the wrong condition** and was reported as missing. It tested `_zoom is null`, so a drag
+    did nothing in Fit mode - the mode every picture opens in. The test is **overflow**
+    (`ExtentWidth > ViewportWidth`), which is also right at 100% on a small icon, where there is nothing to move.
+    The pointer turns into a hand when a drag will do something, because a feature nobody can tell is there is one
+    nobody tries.
 - **A clip's picture comes from its PAYLOADS; a history entry's comes from a BLOB (fixed 2026-08-14).** The
   preview pane tested only for `row.BlobHash`, which a clip row never has, so selecting an image in the **Clips**
   view fell through to the text branch and drew the `[image]` placeholder while the same image previewed fine in

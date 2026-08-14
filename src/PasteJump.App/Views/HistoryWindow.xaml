@@ -156,10 +156,10 @@
         <!-- Split: list on the left, preview on the right -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="4*" MinWidth="300" />
+                <ColumnDefinition Width="1*" MinWidth="300" />
                 <!-- 6px is the grab area, not the visible divider: the seam drawn inside it is 1px. -->
                 <ColumnDefinition Width="6" />
-                <ColumnDefinition Width="3*" MinWidth="240" />
+                <ColumnDefinition Width="1*" MinWidth="240" />
             </Grid.ColumnDefinitions>
 
             <!--
@@ -181,7 +181,7 @@
                          display index that shifts under every sort. -->
                     <DataGridTextColumn Header="No."
                                         Binding="{Binding Number}"
-                                        Width="44"
+                                        Width="48"
                                         SortMemberPath="Number"
                                         ElementStyle="{StaticResource MutedCellText}" />
 
@@ -196,7 +196,7 @@
 
                     <DataGridTextColumn Header="Kind"
                                         Binding="{Binding KindText}"
-                                        Width="60"
+                                        Width="56"
                                         SortMemberPath="Kind"
                                         ElementStyle="{StaticResource CellText}" />
 
@@ -204,13 +204,13 @@
                          swapped in and out, so the column layout does not shift when the view changes. -->
                     <DataGridTextColumn Header=""
                                         Binding="{Binding PinnedText}"
-                                        Width="52"
+                                        Width="64"
                                         SortMemberPath="Pinned"
                                         ElementStyle="{StaticResource MutedCellText}" />
 
                     <DataGridTextColumn Header="When"
                                         Binding="{Binding LocalTimeText}"
-                                        Width="132"
+                                        Width="116"
                                         SortMemberPath="CapturedUtc"
                                         ElementStyle="{StaticResource CellText}" />
 
@@ -218,7 +218,7 @@
                          formatted string - otherwise "9 B" sorts after "10 KB". -->
                     <DataGridTextColumn Header="Size"
                                         Binding="{Binding SizeText}"
-                                        Width="78"
+                                        Width="74"
                                         SortMemberPath="Bytes"
                                         ElementStyle="{StaticResource NumericCellText}">
                         <DataGridTextColumn.HeaderStyle>

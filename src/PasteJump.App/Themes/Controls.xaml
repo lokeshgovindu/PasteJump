@@ -574,6 +574,12 @@
             <Setter.Value>
                 <ControlTemplate TargetType="DataGridColumnHeader">
                     <Grid>
+                        <!--
+                            The right border carries the column rule up into the header, so the rules do not start
+                            below it and read as unfinished. Same brush as the cell's, at the same opacity: the
+                            header's own bottom border is a full-strength line, and a column rule matching THAT
+                            would turn the head of the list into a grid.
+                        -->
                         <Border x:Name="Chrome"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{DynamicResource BorderBrush}"
@@ -598,6 +604,15 @@
                                       Grid.Column="1"
                                       Style="{StaticResource SortGlyph}"
                                       Data="M 0,0 L 3.5,4 L 7,0" />
+
+                                <!-- Sits in the padding, like the cell's, so it lands on the column boundary. -->
+                                <Rectangle Grid.Column="1"
+                                           Width="1"
+                                           HorizontalAlignment="Right"
+                                           Margin="0,6,-10,6"
+                                           Fill="{DynamicResource BorderBrush}"
+                                           Opacity="0.45"
+                                           SnapsToDevicePixels="True" />
                             </Grid>
                         </Border>
 
@@ -655,9 +670,42 @@
             <Setter.Value>
                 <ControlTemplate TargetType="DataGridCell">
                     <Border Background="Transparent" Padding="{TemplateBinding Padding}">
-                        <ContentPresenter VerticalAlignment="Center"
-                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                        <Grid>
+                            <ContentPresenter VerticalAlignment="Center"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+
+                            <!--
+                                Column separator, drawn in the cell rather than by GridLinesVisibility for the same
+                                reason the row hairline is: WPF's VerticalGridLinesBrush is a flat, full-height line
+                                with no control over inset or opacity, and it paints straight through a selected
+                                row - which reads as a defect rather than as a rule.
+
+                                Inset top and bottom, dimmed, and hidden under selection, so the eye gets columns
+                                without the list turning into a spreadsheet. The rule sits in the PADDING, outside
+                                the content: Margin's right value is the negative of the cell's own right padding,
+                                which puts it on the cell boundary rather than 10px inside it.
+                            -->
+                            <Rectangle x:Name="ColumnRule"
+                                       Width="1"
+                                       HorizontalAlignment="Right"
+                                       Margin="0,5,-10,5"
+                                       Fill="{DynamicResource BorderBrush}"
+                                       Opacity="0.45"
+                                       SnapsToDevicePixels="True" />
+                        </Grid>
                     </Border>
+
+                    <ControlTemplate.Triggers>
+                        <!--
+                            Gone on the selected row. Not on hover, unlike the row hairline: hover moves with the
+                            pointer, and rules blinking out of one row at a time as it travels down the list is
+                            more distracting than the rules themselves. Selection is where the contrast problem is
+                            real, since the accent fill is what the line would cut across.
+                        -->
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="ColumnRule" Property="Visibility" Value="Collapsed" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
