@@ -427,6 +427,23 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="What goes between clips when several rows are selected in the history window and copied as one. Write invisible characters as \n for a new line, \r\n, \t for a tab, and \\ for a backslash; anything else is used literally, so &quot;, &quot; or &quot; — &quot; work as typed. Emptying the box restores a new line, since joining with nothing runs the clips together." />
 
+                        <!--
+                            Moved here from Appearance, where it was the odd one out: everything else on that tab is
+                            about how the application LOOKS, while this is about the history window's own list - the
+                            same setting its own toolbar offers. Both places still write the one setting and each
+                            follows the other while open.
+                        -->
+                        <Grid Style="{StaticResource SettingRow}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="190" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="History List Density" />
+                            <ComboBox x:Name="DensityCombo" Grid.Column="1" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Text="Row spacing in the history window. Compact fits the most rows on screen; Roomy is the easiest to hit with a mouse. An open history window follows the change without reopening." />
+
                         <Border Style="{StaticResource SettingGroup}">
                         <StackPanel>
                         <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="Import from Clipjump" />
@@ -678,6 +695,16 @@
                 <ScrollViewer Style="{StaticResource TabScroller}">
                     <StackPanel>
 
+                        <!--
+                            The theme block is a group like the three below it. It was the one part of this tab
+                            sitting loose above them, which made the first box look like the start of the settings
+                            rather than the second of four - and the combo, its four buttons and the warning line
+                            are one subject, so a box is what says so.
+                        -->
+                        <Border Style="{StaticResource SettingGroup}">
+                        <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeadingInGroup}" Text="Theme" />
+
                         <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -733,17 +760,11 @@
                                    Style="{StaticResource SettingHelp}"
                                    Foreground="{DynamicResource WarnBrush}"
                                    Visibility="Collapsed" />
+                        </StackPanel>
+                        </Border>
 
-                        <Grid Style="{StaticResource SettingRow}" Margin="0,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="190" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="History List Density" />
-                            <ComboBox x:Name="DensityCombo" Grid.Column="1" />
-                        </Grid>
-                        <TextBlock Style="{StaticResource SettingHelp}"
-                                   Text="Row spacing in the history window. Compact fits the most rows on screen; Roomy is the easiest to hit with a mouse. An open history window follows the change without reopening." />
+                        <!-- History List Density used to sit here, loose under the theme buttons. It is a setting
+                             about the history window, so it lives on the History tab now. -->
 
                         <Border Style="{StaticResource SettingGroup}">
                         <StackPanel>

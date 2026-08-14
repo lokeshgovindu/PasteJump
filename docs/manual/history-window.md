@@ -88,4 +88,4 @@ Imports from this version onwards cannot create duplicates in the first place, s
 
 ## Row density
 
-The **Density** control sets row spacing: Compact fits the most rows, Roomy is the easiest to hit with a mouse. It is the same setting as the one under **Settings, Appearance** — it is repeated here because this is the window whose appearance it changes, and each place follows the other while both are open.
+The **Density** control sets row spacing: Compact fits the most rows, Roomy is the easiest to hit with a mouse. It is the same setting as the one under **Settings, History** — it is repeated here because this is the window whose appearance it changes, and each place follows the other while both are open.

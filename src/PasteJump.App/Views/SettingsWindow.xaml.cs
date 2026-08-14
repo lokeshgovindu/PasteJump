@@ -2021,7 +2021,9 @@ public partial class SettingsWindow : Window
 
         // Appearance
         [nameof(PasteJumpSettings.Theme)] = "Appearance",
-        [nameof(PasteJumpSettings.GridDensity)] = "Appearance",
+        // History, not Appearance: it governs the history window's own list, which is also where its second
+        // control lives. Moved 2026-08-14.
+        [nameof(PasteJumpSettings.GridDensity)] = "History",
         [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
