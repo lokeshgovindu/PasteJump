@@ -1006,13 +1006,28 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     on **Kind** is its own header, not its content: `Image` needs 53px but `Kind` + glyph + padding needs 57, and
     going narrower clips the header the moment someone sorts by it. Reducing it further would mean not reserving
     the glyph, which trades a visible clip for 5px.
+  - **A column rule may not be inset, and may not vanish under selection.** Both were tried and both were
+    reported as the rules looking *broken*: a 1px line inset 5px top and bottom is a dotted line once it repeats
+    down a list, and collapsing it on the selected row punches a gap through every rule at once. Full height now,
+    and on the selected row it switches to `SelectionTextBrush` at 0.28 rather than disappearing. The row hairline
+    can afford an inset because it runs across the row it belongs to; a vertical rule has to meet the one above it.
+  - **The empty column between Kind and When is gone (2026-08-14).** It carried `PINNED`, so it was blank for every
+    history row and every unpinned clip, and it was reported as wasted width. Pinned rows are tinted with
+    `ModifiedRowBrush` - the same idea the Advanced tab uses for a changed row - and the tooltip now says `PINNED`
+    in words, so the state is never carried by colour alone.
   - **Column rules are drawn in the cell and the header templates, not by `GridLinesVisibility`.** Same reasoning
     as the row hairline that was already there: WPF's grid-line brushes are flat, full-bleed and paint straight
     through a selected row. The rule sits in the cell's right padding (`Margin="0,5,-10,5"`, the negative matching
     the padding) so it lands on the column boundary, is dimmed to 0.45, and collapses on the selected row. Not on
     hover, unlike the row hairline: rules blinking out of one row at a time as the pointer travels is worse than
     the rules.
-  - **Panning was gated on the wrong condition** and was reported as missing. It tested `_zoom is null`, so a drag
+  - **A `ScrollViewer` eats `MouseLeftButtonDown`, so pan handlers must use the `Preview` events.** Its class
+    handler focuses the control and marks the event handled, and **class handlers run before instance handlers** -
+    so a handler attached to `MouseLeftButtonDown` is never called. This is what kept drag-to-pan broken after the
+    gate below was fixed, and it was reported twice. `TryStartPanForSmokeTest` raises a real press and asserts a pan
+    begins; calling the handler directly would prove the arithmetic and miss the routing, which was the whole
+    defect. Verified by putting the bubbling event back - 2 failures.
+  - **Panning was ALSO gated on the wrong condition** and was reported as missing. It tested `_zoom is null`, so a drag
     did nothing in Fit mode - the mode every picture opens in. The test is **overflow**
     (`ExtentWidth > ViewportWidth`), which is also right at 100% on a small icon, where there is nothing to move.
     The pointer turns into a hand when a drag will do something, because a feature nobody can tell is there is one

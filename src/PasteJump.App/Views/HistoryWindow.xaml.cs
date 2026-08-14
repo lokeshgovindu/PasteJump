@@ -74,7 +74,11 @@ public sealed class HistoryRow
         {
             var text = Preview.Length > 1200 ? Preview[..1200] + "…" : Preview;
 
-            return $"{KindText} · {SizeText} · {LocalTimeText}\n\n{text}";
+            // Pinned is stated here in words because the list now shows it as a tint, and a state carried by
+            // colour alone is one that anyone who cannot see the tint cannot read at all.
+            var pinned = Pinned ? "PINNED · " : string.Empty;
+
+            return $"{pinned}{KindText} · {SizeText} · {LocalTimeText}\n\n{text}";
         }
     }
 
@@ -371,6 +375,46 @@ public partial class HistoryWindow : Window
 
         return false;
     }
+
+    /// <summary>
+    /// Test hook: zooms the preview, so a test can create something to pan.
+    /// </summary>
+    public void ZoomPreviewForSmokeTest(double scale) => SetZoom(scale);
+
+    /// <summary>
+    /// Test hook: raises a real left-button press on the picture and reports whether a pan began.
+    /// <para>
+    /// This exists because drag-to-pan was reported broken twice, and the second cause was event ROUTING rather
+    /// than logic: <see cref="ScrollViewer"/> has a class handler for <c>MouseLeftButtonDown</c> that focuses
+    /// itself and marks the event handled, and class handlers run before instance handlers - so a handler attached
+    /// to <c>MouseLeftButtonDown</c> was never called at all. The fix is the tunnelling <c>Preview</c> events, and
+    /// what makes that fix testable is raising the event for real rather than calling the handler directly.
+    /// </para>
+    /// <para>
+    /// Calling the handler would prove only that the arithmetic works, which was never the problem.
+    /// </para>
+    /// </summary>
+    public bool TryStartPanForSmokeTest()
+    {
+        var press = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+        {
+            RoutedEvent = PreviewMouseLeftButtonDownEvent,
+            Source = ImageScroller,
+        };
+
+        ImageScroller.RaiseEvent(press);
+
+        var started = _panFrom is not null;
+
+        // Left as it was found: a captured mouse and a live pan would leak into whatever the harness does next.
+        _panFrom = null;
+        ImageScroller.ReleaseMouseCapture();
+
+        return started;
+    }
+
+    /// <summary>Test hook: whether the picture currently overflows its pane, which is what makes a drag do anything.</summary>
+    public bool PreviewCanPanForSmokeTest => CanPan;
 
     /// <summary>
     /// Test hook: whether the selected row resolved a tooltip thumbnail.

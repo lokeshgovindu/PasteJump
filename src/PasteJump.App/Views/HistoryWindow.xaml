@@ -200,14 +200,6 @@
                                         SortMemberPath="Kind"
                                         ElementStyle="{StaticResource CellText}" />
 
-                    <!-- Empty for a history entry, which cannot be pinned. Kept in both views rather than
-                         swapped in and out, so the column layout does not shift when the view changes. -->
-                    <DataGridTextColumn Header=""
-                                        Binding="{Binding PinnedText}"
-                                        Width="64"
-                                        SortMemberPath="Pinned"
-                                        ElementStyle="{StaticResource MutedCellText}" />
-
                     <DataGridTextColumn Header="When"
                                         Binding="{Binding LocalTimeText}"
                                         Width="116"
@@ -232,6 +224,23 @@
 
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                        <!--
+                            Pinned rows are tinted rather than given a column. The column that used to carry
+                            "PINNED" was empty in every History row and in every unpinned clip - which is almost
+                            all of them - so it spent its width saying nothing, and was reported as such.
+
+                            ModifiedRowBrush rather than a new palette key: it is the same idea the Advanced tab
+                            uses for a row that differs from its default, a soft accent band that survives both
+                            themes. Selection and hover paint over it, which is correct - the pin is the least
+                            important thing about a row you are acting on. The tooltip says PINNED in words, so the
+                            state is never carried by colour alone.
+                        -->
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource ModifiedRowBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+
                         <!--
                             Per-row tooltip: the full untruncated preview, and for an image row a medium thumbnail
                             above it, so hovering the list is enough to find a picture without selecting each one.
@@ -356,9 +365,9 @@
                                           HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Auto"
                                           PreviewMouseWheel="OnImageMouseWheel"
-                                          MouseLeftButtonDown="OnImagePanStart"
-                                          MouseMove="OnImagePanMove"
-                                          MouseLeftButtonUp="OnImagePanEnd"
+                                          PreviewMouseLeftButtonDown="OnImagePanStart"
+                                          PreviewMouseMove="OnImagePanMove"
+                                          PreviewMouseLeftButtonUp="OnImagePanEnd"
                                           MouseDoubleClick="OnImageDoubleClick"
                                           KeyDown="OnImageKeyDown"
                                           SizeChanged="OnImageViewportChanged">

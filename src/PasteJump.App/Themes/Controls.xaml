@@ -609,9 +609,9 @@
                                 <Rectangle Grid.Column="1"
                                            Width="1"
                                            HorizontalAlignment="Right"
-                                           Margin="0,6,-10,6"
+                                           Margin="0,4,-10,4"
                                            Fill="{DynamicResource BorderBrush}"
-                                           Opacity="0.45"
+                                           Opacity="0.6"
                                            SnapsToDevicePixels="True" />
                             </Grid>
                         </Border>
@@ -685,25 +685,32 @@
                                 the content: Margin's right value is the negative of the cell's own right padding,
                                 which puts it on the cell boundary rather than 10px inside it.
                             -->
+                            <!--
+                                Full height, no inset. Inset top and bottom by 5px it was - and it looked broken,
+                                reported as such: a 1px line with a 10px gap at every row boundary is a dotted
+                                line, not a rule. The row hairline can afford an inset because it runs across the
+                                row it belongs to; a column rule has to join up with the one above and below it.
+                            -->
                             <Rectangle x:Name="ColumnRule"
                                        Width="1"
                                        HorizontalAlignment="Right"
-                                       Margin="0,5,-10,5"
+                                       Margin="0,0,-10,0"
                                        Fill="{DynamicResource BorderBrush}"
-                                       Opacity="0.45"
+                                       Opacity="0.6"
                                        SnapsToDevicePixels="True" />
                         </Grid>
                     </Border>
 
                     <ControlTemplate.Triggers>
                         <!--
-                            Gone on the selected row. Not on hover, unlike the row hairline: hover moves with the
-                            pointer, and rules blinking out of one row at a time as it travels down the list is
-                            more distracting than the rules themselves. Selection is where the contrast problem is
-                            real, since the accent fill is what the line would cut across.
+                            RECOLOURED on the selected row, not hidden. Hiding it was the other half of why the
+                            rules looked broken: the selected row punched a gap through every line at once. The
+                            selection fill is the accent, so the rule switches to the colour the selected row's own
+                            text uses, at a low opacity - visible against the fill without ruling it.
                         -->
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="ColumnRule" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="ColumnRule" Property="Fill" Value="{DynamicResource SelectionTextBrush}" />
+                            <Setter TargetName="ColumnRule" Property="Opacity" Value="0.28" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

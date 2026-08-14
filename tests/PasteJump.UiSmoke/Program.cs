@@ -154,6 +154,28 @@ internal static class Program
                             Console.WriteLine("  FAIL  an image clip in the Clips view shows no picture in the preview pane");
                         }
 
+                        // Drag-to-pan, which was reported broken twice - once for the wrong gate and once because
+                        // ScrollViewer's class handler ate the bubbling MouseLeftButtonDown before our handler
+                        // could see it. Zoom well past the pane, then raise a real press: calling the handler
+                        // directly would prove the arithmetic and miss the routing, which was the actual defect.
+                        history.ZoomPreviewForSmokeTest(4);
+                        Drain();
+
+                        if (!history.PreviewCanPanForSmokeTest)
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  a picture at 400% does not overflow its pane, so panning cannot be tested");
+                        }
+                        else if (history.TryStartPanForSmokeTest())
+                        {
+                            Console.WriteLine("  preview: a left-button press starts a pan at 400%");
+                        }
+                        else
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  a left-button press on a zoomed picture does not start a pan");
+                        }
+
                         // The tooltip's own path. It draws in a popup this harness cannot capture, so what is
                         // asserted is the thumbnail resolving at all - the half that fails silently.
                         if (history.SelectedRowHasThumbnailForSmokeTest)
