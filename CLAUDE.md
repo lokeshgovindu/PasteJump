@@ -981,6 +981,13 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   header the decoder needs. Measured on the reported clip — DIB 202,812 plus five further formats (`49161`,
   `49171`, `49349`, `50025`, `50026`) totalling 7,076 — so the footer now reads
   `198.1 KB picture · 205 KB in 6 formats`, and the format count is what explains the gap.
+  - **The preview footer is gone (2026-08-14) and the resolution lives in the header.** Showing `895 × 462` on the
+    left and a byte count on the right, one row under a header that already carried a byte count, was reported as
+    a duplicate - and it was: the two differed only by the clip's other clipboard formats. The header now reads
+    `#18 · Image · 895 × 462 · 1.6 MB · 2026-08-13 21:19`, resolution next to the kind because it says what sort
+    of thing this is rather than how much of it there is. The format breakdown survives as that line's **tooltip**,
+    and only when there is more than one format - detail kept, space not spent. That also gave the picture the
+    footer's 28px.
   - **`LayoutTransform`, never `RenderTransform`, for the zoom.** Only a layout transform changes the size the
     `ScrollViewer` measures; with a render transform the picture would grow while the scroller still believed the
     old size, leaving most of a zoomed image unreachable.

@@ -290,10 +290,15 @@
                     BorderThickness="1"
                     CornerRadius="3">
                 <Grid>
+                    <!--
+                        Two rows: the header and the content. There used to be a third for a footer carrying the
+                        resolution and a byte count, and the byte count all but repeated the header's own - which
+                        was reported. The resolution moved up into the header, beside the kind it describes, and the
+                        footer went with the duplication.
+                    -->
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0"
@@ -429,33 +434,6 @@
                         </Grid>
                     </Grid>
 
-                    <!--
-                        Dimensions on the left, bytes on the right - the two facts you want about an image and
-                        cannot get from the picture itself. Collapsed for anything that is not an image, rather
-                        than showing empty fields.
-                    -->
-                    <Border x:Name="PreviewFooter"
-                            Grid.Row="2"
-                            Background="{DynamicResource SurfaceBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="0,1,0,0"
-                            CornerRadius="0,0,3,3"
-                            Padding="10,0"
-                            MinHeight="28"
-                            Visibility="Collapsed">
-                        <Grid>
-                            <TextBlock x:Name="PreviewDimensions"
-                                       HorizontalAlignment="Left"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource MutedTextBrush}"
-                                       FontSize="11" />
-                            <TextBlock x:Name="PreviewBytes"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource MutedTextBrush}"
-                                       FontSize="11" />
-                        </Grid>
-                    </Border>
                 </Grid>
             </Border>
         </Grid>

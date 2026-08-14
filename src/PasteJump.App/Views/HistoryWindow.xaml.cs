@@ -755,13 +755,12 @@ public partial class HistoryWindow : Window
         if (row is null)
         {
             PreviewHeader.Text = "Preview";
+            PreviewHeader.ToolTip = null;
             PreviewBox.Text = string.Empty;
             PreviewBox.Visibility = Visibility.Visible;
-            ShowImage(null, null, null, 0, 0);
+            ShowImage(null, null);
             return;
         }
-
-        PreviewHeader.Text = $"#{row.Number}  ·  {row.KindText}  ·  {row.SizeText}  ·  {row.LocalTimeText}";
 
         if (row.Kind == ClipKind.Image && TryReadImageBytes(row) is { } picture)
         {
@@ -772,7 +771,8 @@ public partial class HistoryWindow : Window
                 // Whole pane: the picture is the content, and there is no path to show above it. A stored image
                 // is decoded in full, so its own dimensions are the true ones here.
                 PreviewScroller.Visibility = Visibility.Collapsed;
-                ShowImage(bitmap, null, DescribeImageBytes(row, picture), bitmap.PixelWidth, bitmap.PixelHeight);
+                SetPreviewHeader(row, $"{bitmap.PixelWidth} × {bitmap.PixelHeight}", DescribeImageBytes(row, picture));
+                ShowImage(bitmap, null);
                 return;
             }
         }
@@ -781,14 +781,46 @@ public partial class HistoryWindow : Window
         PreviewBox.Text = row.Preview;
 
         // A copied image FILE: the path stays visible and the picture goes underneath it, which is the one
-        // case where both halves of the pane are wanted at once.
+        // case where both halves of the pane are wanted at once. Its resolution is the FILE's, passed through
+        // rather than read off the bitmap - that one has been resized to a thumbnail.
         if (row.Kind == ClipKind.Files && TryLoadFirstImageFile(row.Preview) is { } file)
         {
-            ShowImage(file.Bitmap, file.Path, FormatBytes(file.FileBytes), file.PixelWidth, file.PixelHeight);
+            SetPreviewHeader(row, $"{file.PixelWidth} × {file.PixelHeight}", null);
+            ShowImage(file.Bitmap, file.Path);
             return;
         }
 
-        ShowImage(null, null, null, 0, 0);
+        SetPreviewHeader(row, null, null);
+        ShowImage(null, null);
+    }
+
+    /// <summary>
+    /// The line above the preview: <c>#18 · Image · 895 × 462 · 1.6 MB · 2026-08-13 21:19</c>.
+    /// <para>
+    /// The resolution sits next to the kind, because it says what <em>sort</em> of thing this is rather than how
+    /// much of it there is - and it is the fact a picture cannot tell you about itself. It used to live in a footer
+    /// alongside a second byte count, which was reported as a near-duplicate of the size already in this line: the
+    /// two differed only by the clip's other clipboard formats.
+    /// </para>
+    /// <para>
+    /// That distinction is not lost, only demoted. When a clip stores more than one format the breakdown becomes
+    /// this line's tooltip, where it is available on demand and costs no space to anyone who never wondered.
+    /// </para>
+    /// </summary>
+    private void SetPreviewHeader(HistoryRow row, string? resolution, string? byteBreakdown)
+    {
+        var facts = new List<string> { $"#{row.Number}", row.KindText };
+
+        if (resolution is { Length: > 0 })
+        {
+            facts.Add(resolution);
+        }
+
+        facts.Add(row.SizeText);
+        facts.Add(row.LocalTimeText);
+
+        PreviewHeader.Text = string.Join("  ·  ", facts);
+        PreviewHeader.ToolTip = byteBreakdown;
     }
 
     /// <summary>
@@ -1156,22 +1188,24 @@ public partial class HistoryWindow : Window
     /// reproduce the copy exactly. Both numbers were right; neither said what it was.
     /// </para>
     /// <para>
-    /// So the footer now names both and their relationship, and the format count is the part that explains the
-    /// gap. A history entry keeps one flattened record, so it gets the plain size it always had.
+    /// So this names both and their relationship, and the format count is the part that explains the gap. It is
+    /// the preview header's TOOLTIP now rather than a line of its own: showing two byte counts side by side was
+    /// reported as a duplicate, and the honest fix is to keep the detail without spending space on it. Returns
+    /// null when there is nothing to explain - one format, so one number, so no tooltip.
     /// </para>
     /// </summary>
-    private static string DescribeImageBytes(HistoryRow row, PreviewPicture picture) =>
+    private static string? DescribeImageBytes(HistoryRow row, PreviewPicture picture) =>
         picture.FormatCount > 1
-            ? $"{FormatBytes(picture.PictureBytes)} picture  ·  {row.SizeText} in {picture.FormatCount} formats"
-            : FormatBytes(picture.PictureBytes);
+            ? $"{FormatBytes(picture.PictureBytes)} of picture data, in a clip of {row.SizeText} "
+                + $"across {picture.FormatCount} clipboard formats"
+            : null;
 
-    private void ShowImage(BitmapSource? bitmap, string? path, string? bytesCaption, int pixelWidth, int pixelHeight)
+    private void ShowImage(BitmapSource? bitmap, string? path)
     {
         if (bitmap is null)
         {
             PreviewImage.Source = null;
             PreviewImageHost.Visibility = Visibility.Collapsed;
-            PreviewFooter.Visibility = Visibility.Collapsed;
             PreviewTextRow.Height = new GridLength(1, GridUnitType.Star);
             PreviewImageRow.Height = new GridLength(0);
             return;
@@ -1190,11 +1224,6 @@ public partial class HistoryWindow : Window
         PreviewTextRow.Height = path is null ? new GridLength(0) : GridLength.Auto;
         PreviewImageRow.Height = new GridLength(1, GridUnitType.Star);
 
-        // The file's dimensions, passed in rather than read off the bitmap: a thumbnail has been resized, so
-        // its own PixelWidth is the size we asked for and not the image's.
-        PreviewDimensions.Text = $"{pixelWidth} × {pixelHeight}";
-        PreviewBytes.Text = bytesCaption ?? string.Empty;
-        PreviewFooter.Visibility = Visibility.Visible;
     }
 
     /// <summary>
