@@ -8,6 +8,7 @@
 
 <!-- First because it is the only badge that reports something: the rest state facts that do not change. -->
 [![build](https://github.com/lokeshgovindu/PasteJump/actions/workflows/build.yml/badge.svg)](https://github.com/lokeshgovindu/PasteJump/actions/workflows/build.yml)
+[![downloads](https://img.shields.io/github/downloads/lokeshgovindu/PasteJump/total?label=downloads)](https://github.com/lokeshgovindu/PasteJump/releases)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#getting-started)
 [![Deployment](https://img.shields.io/badge/deployment-self--contained%20portable-success)](#run-it)
@@ -149,6 +150,17 @@ powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
 
 Sources are in `docs/help`; the result is `artifacts/help/PasteJump.chm` (~540 KB, nine topics, twenty
 screenshots). It needs `hhc.exe` from Microsoft's HTML Help Workshop.
+
+### Download counts
+
+The badge above is the running total across every release, straight from GitHub. GitHub keeps **no history** for
+it - the API reports a cumulative count and never says when those downloads happened - so
+`.github/workflows/download-stats.yml` writes the numbers to `docs/download-stats.csv` once a day, and commits only
+when something moved. That file is the trend; the badge is the total.
+
+Read either as traffic rather than as people: anything that fetches a file counts, including CI, mirrors and
+crawlers. The first two counts this repository ever recorded were a verification download made while publishing a
+release.
 
 `build-help.ps1` also refreshes `docs/manual` — the GitHub-readable copy — by running
 `tools/generate-markdown-help.py`. That script is the only thing that writes those files, and CI runs it with

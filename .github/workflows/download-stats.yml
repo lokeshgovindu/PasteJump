@@ -1,0 +1,68 @@
+# Records release download counts once a day, so there is a history rather than only a running total.
+#
+# GitHub reports a cumulative count per asset and keeps no history: the API can say a file has been downloaded 41
+# times, never when. This writes the number down daily to docs/download-stats.csv, which is the only way a trend
+# can exist. The README badge shows the total; this shows the shape.
+#
+# Read the numbers as traffic, not as people: anything that fetches a file counts, including CI, mirrors and
+# crawlers. The first two counts this repository recorded were a verification download made while publishing.
+name: download stats
+
+on:
+  schedule:
+    # 03:17 UTC, an odd minute on purpose - the top of the hour is when everyone else's cron runs and GitHub
+    # queues scheduled jobs under load.
+    - cron: "17 3 * * *"
+
+  # So the first run does not have to wait for tomorrow, and so a missed day can be filled in by hand.
+  workflow_dispatch:
+
+# Least privilege: this reads the public release list and writes one file.
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the counts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/${{ github.repository }}/releases" --paginate > releases.json
+
+      - name: Record them
+        id: record
+        run: |
+          python tools/record-download-stats.py releases.json "$(date -u +%F)" | tee record.log
+          rm releases.json
+
+      - name: Commit, but only if something moved
+        run: |
+          # The script writes nothing when every count matches the last recorded set, so an unchanged day leaves
+          # the tree clean and this step does nothing. A daily "same as yesterday" commit would bury the history
+          # it is meant to build.
+          if git diff --quiet -- docs/download-stats.csv; then
+            echo "Nothing changed, so nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/download-stats.csv
+          git commit -m "Record download counts for $(date -u +%F)"
+          git push
+
+      - name: Put the numbers in the run summary
+        if: always()
+        run: |
+          {
+            echo "## Release downloads"
+            echo
+            echo '```'
+            cat record.log 2>/dev/null || echo "(the record step produced no output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

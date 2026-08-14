@@ -1297,6 +1297,13 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   because a live exe is held open and a stale exe beside new DLLs fails at load with nothing useful in the
   message; and it **checks the published version against MSBuild's**, which catches a publish made before the
   last commit — easy to do by accident now that the revision is the commit count.
+- **Download counts: GitHub keeps a TOTAL, never a history.** The API reports a cumulative count per asset and
+  never says when those downloads happened, so a trend can only exist if something writes the number down.
+  `.github/workflows/download-stats.yml` does that daily into `docs/download-stats.csv` and commits only when a
+  count moved - a daily "same as yesterday" commit would bury the history it is meant to build. The README badge
+  (shields.io) shows the total. Treat both as **traffic, not users**: anything that fetches a file counts, and the
+  first two counts this repository recorded were my own verification download while publishing `2026.1-pre2`.
+  Repository views and clones are a different API with a fourteen-day window, and are not collected.
 - **SourceForge is a mirror, not a second build, and `mirror-to-sourceforge.yml` forwards the bytes GitHub
   already published.** It triggers on a release being **published**, downloads that release's own assets and
   rsyncs them to `/home/frs/project/pastejump/<tag>/` — a folder per tag, matching how AltTab's file area is
