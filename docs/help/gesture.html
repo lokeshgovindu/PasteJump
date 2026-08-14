@@ -208,10 +208,11 @@ commit, so you can type a query at your own pace.</p>
 <tr><th>Key</th><th>Action</th></tr>
 <tr><td class="key">Delete</td><td>Delete the clip being shown, straight away, and carry on browsing. Nothing
 is pasted and the overlay stays up, so a run of presses walks forward through the stack clearing as it
-goes.<br><br>Afterwards <b>releasing <code>Ctrl</code> pastes nothing</b> &mdash; the banner says
-<b>CANCEL</b> &mdash; because deleting a clip is not a request to paste the one that moved up into its place.
-Step to another clip and releasing pastes again, so &quot;delete this one, paste that one&quot; still works in
-one gesture.</td></tr>
+goes.<br><br>The overlay says <b>DELETED</b> for about a second, and afterwards <b>releasing <code>Ctrl</code>
+pastes nothing</b> &mdash; deleting a clip is not a request to paste the one that moved up into its place. Step to
+another clip and releasing pastes again, so &quot;delete this one, paste that one&quot; still works in one gesture.
+How long that chip stays, or whether it appears at all, is <code>overlayDeletedFlashMs</code> in
+<code>PasteJump.json</code>: milliseconds, and <code>0</code> never shows it.</td></tr>
 <tr><td class="key">X</td><td>Cycle what releasing <code>Ctrl</code> will do: Cancel, then Delete this
 clip, then Delete All. A coloured banner shows the current mode. Pressing <code>X</code> repeatedly
 cycles those three and never returns to pasting.</td></tr>

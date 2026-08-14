@@ -47,5 +47,12 @@ public static class SettingsBounds
 
     public static SettingBound OverlayPreviewMaxWidth { get; } = new(120, 1_400);
 
+    /// <summary>
+    /// How long DELETED stays on the overlay. Zero is legal and means "never show it", so the floor is 0 rather
+    /// than a minimum that would be visible - and the ceiling is five seconds, past which a chip meant to reassure
+    /// has become a chip that lingers into the next gesture.
+    /// </summary>
+    public static SettingBound OverlayDeletedFlashMs { get; } = new(0, 5_000);
+
     public static SettingBound OverlayPreviewMaxHeight { get; } = new(80, 900);
 }

@@ -1005,13 +1005,25 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   go got its neighbour inserted into their document. The old rule was "Delete acts now, X only arms", on the
   reasoning that a Delete which rearmed the commit mode "would take a second clip when Ctrl came up"; that had it
   backwards, because leaving the mode alone is what took a clip.
-  - **`PasteCommitMode.Cancel`, not a new private state**, because Cancel already means restore-and-paste-nothing
-    *and* the overlay already draws a banner for it - so the change in what release will do is visible rather than
-    a surprise.
-  - **`_cancelArmedByDelete` distinguishes an automatic Cancel from one the user chose with `X`.** Moving the cursor
-    (`ChoosingAgain`: step, jump, digit, search, kind filter) undoes the automatic one so "delete this, paste that"
-    still works in one gesture; a Cancel the user asked for survives everything. Pressing `X` clears the flag - the
-    mode is theirs from then on. Without that distinction one of the two cases has to be wrong.
+  - **What it says took three iterations, and the third is a transient chip.** First version: set
+    `PasteCommitMode.Cancel`, which drew the existing banner - reported as meaningless, rightly, since *"CANCEL -
+    release Ctrl to cancel (X cycles)"* speaks to someone who was not thinking about cancelling. Second: say
+    nothing. Third, asked for: a **`DELETED` chip that fades after `OverlayDeletedFlashMs`** (default 1200,
+    `0` never shows it). Past tense plus transient is what a *banner* could not be - a banner describes what a
+    release **will** do, and the X cycle's own **DELETE** mode already means "delete the clip on release", so a
+    permanent DELETED would sit one letter from a pending action. `DangerBrush`, in the chip row, not the banner row.
+  - **The controller owns no timer and takes no view on the duration**: it calls `IPasteModeHost.NoteClipDeleted()`
+    and the host runs the clock. A generation counter guards the timer, so a second Delete a moment later cannot
+    have its chip taken down early by the first one's timer.
+  - **`OverlayDeletedFlashMs` is Advanced-only, by request - which means `TryBuild` must CARRY it.** That method
+    starts from `new PasteJumpSettings()` and writes each field from its control, so a setting with no control
+    anywhere silently reverts to its default on every OK. `VerifyEverySettingHasAControl` is what catches that (it
+    round-trips every property: 53 checked, 0 lost). Any future tab-less setting needs the same one-line copy.
+  - **So `_pasteSuppressedByDelete` is independent of `CommitMode`**, which keeps `X` entirely the user's: the mode
+    only ever shows what they chose. Moving the cursor (`ChoosingAgain`: step, jump, digit, search, kind filter)
+    lifts the suppression, so "delete this, paste that" still works in one gesture.
+  - **Checked after the marks branch, not before the switch.** Marking clips is an explicit "paste these", and
+    deleting some other clip is not a reason to discard it - `Marked_clips_still_paste_after_a_delete` pins that.
   - Four tests, and the old one was **rewritten rather than deleted**: `Delete_then_releasing_Ctrl_pastes_nothing`
     carries the history of the reversal so nobody restores the old behaviour thinking it was an oversight.
 - **The preview footer is gone (2026-08-14) and the resolution lives in the header.** Showing `895 × 462` on the

@@ -140,4 +140,13 @@ internal sealed class RecordingPasteModeHost : IPasteModeHost
     }
 
     public void ShowTransientMessage(string message) => Calls.Add($"message:{message}");
+
+    /// <summary>How many times the controller reported a deletion, so the overlay could say so.</summary>
+    public int DeletedNoteCount { get; private set; }
+
+    public void NoteClipDeleted()
+    {
+        DeletedNoteCount++;
+        Calls.Add("deleted");
+    }
 }

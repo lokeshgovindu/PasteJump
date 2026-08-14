@@ -302,6 +302,46 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     public void ShowTransientMessage(string message)
         => _dispatcher.BeginInvoke(() => TransientMessage?.Invoke(message));
 
+    /// <summary>How long DELETED stays up, from settings. Zero never shows it.</summary>
+    private int _deletedFlashMs = 1200;
+
+    public void SetDeletedFlash(int milliseconds) => _deletedFlashMs = Math.Max(0, milliseconds);
+
+    /// <summary>
+    /// Generation counter for the flash, so an earlier deletion's timer cannot hide a later one's chip.
+    /// <para>
+    /// Two Delete presses a moment apart is the ordinary way to clear several clips, and without this the first
+    /// timer would fire mid-second-chip and take it down early - a flicker that would look like a bug in the
+    /// feature meant to reassure.
+    /// </para>
+    /// </summary>
+    private int _deletedFlashGeneration;
+
+    public void NoteClipDeleted()
+    {
+        if (_deletedFlashMs <= 0)
+        {
+            return;
+        }
+
+        var generation = ++_deletedFlashGeneration;
+
+        // BeginInvoke because this arrives from the keyboard hook: the overlay may only be touched on the UI
+        // thread, and the hook must return before Windows delivers the next key.
+        _dispatcher.BeginInvoke(() =>
+        {
+            _overlay?.ShowDeleted(true);
+
+            DelayThen(TimeSpan.FromMilliseconds(_deletedFlashMs), () =>
+            {
+                if (generation == _deletedFlashGeneration)
+                {
+                    _overlay?.ShowDeleted(false);
+                }
+            });
+        });
+    }
+
     // ------------------------------------------------------------- internals
 
     /// <summary>

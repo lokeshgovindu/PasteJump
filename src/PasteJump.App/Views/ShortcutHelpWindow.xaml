@@ -219,7 +219,7 @@
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KeyStyle}" Text="Delete" />
                 <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource DescStyle}"
-                           Text="Delete this clip straight away and carry on browsing. Releasing Ctrl then pastes NOTHING - the banner says CANCEL - because deleting a clip is not a request to paste its neighbour. Step to another clip and releasing pastes again." />
+                           Text="Delete this clip straight away and carry on browsing. DELETED appears for a moment, and releasing Ctrl then pastes nothing - deleting a clip is not a request to paste the one that moved up into its place. Step to another clip and releasing pastes again." />
 
                 <TextBlock x:Name="KeyCommit" Grid.Row="1" Grid.Column="0" Style="{StaticResource KeyStyle}" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource DescStyle}"

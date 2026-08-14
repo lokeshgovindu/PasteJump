@@ -2024,6 +2024,10 @@ public partial class SettingsWindow : Window
         // History, not Appearance: it governs the history window's own list, which is also where its second
         // control lives. Moved 2026-08-14.
         [nameof(PasteJumpSettings.GridDensity)] = "History",
+
+        // Advanced is where it is listed and the only place it appears - there is no control for it on any tab,
+        // by request. The value is edited in PasteJump.json.
+        [nameof(PasteJumpSettings.OverlayDeletedFlashMs)] = "Advanced",
         [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
@@ -2243,6 +2247,12 @@ public partial class SettingsWindow : Window
     {
         settings = new PasteJumpSettings();
         error = string.Empty;
+
+        // CARRIED, not collected. TryBuild starts from a fresh defaults object and writes each field from its
+        // control, so a setting with no control anywhere would silently revert to its default on every OK - which
+        // is what VerifyEverySettingHasAControl exists to catch. OverlayDeletedFlashMs is deliberately Advanced-only
+        // (it appears in the inventory, and is edited in PasteJump.json), so it is copied through by hand.
+        settings.OverlayDeletedFlashMs = _baseline.OverlayDeletedFlashMs;
 
         if (!int.TryParse(MaxClipsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var maxClips)
             || maxClips < 1)

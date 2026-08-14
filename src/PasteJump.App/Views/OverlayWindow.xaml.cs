@@ -184,6 +184,17 @@ public partial class OverlayWindow : Window
         chip.Inlines.Add(new System.Windows.Documents.Run(")") { Foreground = muted });
     }
 
+    /// <summary>
+    /// Shows or hides the transient <c>DELETED</c> chip.
+    /// <para>
+    /// Set by the host on a timer rather than carried on the frame, because it expires without a keystroke - and a
+    /// frame is only produced when something the user did changes what the overlay says. Left visible across
+    /// renders in between, which is why <c>Render</c> does not touch it.
+    /// </para>
+    /// </summary>
+    public void ShowDeleted(bool show)
+        => DeletedChip.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
     /// <summary>Applies a frame and positions the window at the anchor, clamped to the work area.</summary>
     public void Render(PasteOverlayModel model, int anchorX, int anchorY)
     {

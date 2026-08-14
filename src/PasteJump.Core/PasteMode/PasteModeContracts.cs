@@ -273,6 +273,16 @@ public interface IPasteModeHost
     void RequestDeleteAllConfirmation(int unpinnedCount, Action confirmed);
 
     void ShowTransientMessage(string message);
+
+    /// <summary>
+    /// A clip was just deleted with the <c>Delete</c> key, so the overlay may say <c>DELETED</c> for a moment.
+    /// <para>
+    /// The controller reports the event and takes no view on how long anything is shown for: it owns no timers by
+    /// design, and a duration is a setting. See <c>PasteJumpSettings.OverlayDeletedFlashMs</c>, where zero means
+    /// nothing is shown at all - which is why this is called unconditionally rather than gated here.
+    /// </para>
+    /// </summary>
+    void NoteClipDeleted();
 }
 
 /// <summary>Everything the overlay needs to render one frame. Immutable by design.</summary>

@@ -345,6 +345,12 @@ check when behaviour is surprising.</p>
 tells you where to. The filter box matches on name, value <i>or</i> tab &mdash; so typing
 <code>appearance</code> lists everything that tab owns.</p>
 
+<p>A setting whose <b>Where</b> says <b>Advanced</b> has no control on any tab and is edited in
+<code>PasteJump.json</code>. One does today: <code>overlayDeletedFlashMs</code>, how many milliseconds the overlay
+shows <b>DELETED</b> after the <code>Delete</code> key, where <code>0</code> never shows it. It is here rather than
+on a tab because it is a matter of taste about a chip that lasts a second, and the tabs are for settings that change
+what the program does.</p>
+
 <p><b>Settings that hold several values are broken out.</b> Three of them do: the paste-mode key bindings, the
 per-application paste delays, and the excluded programs. Each appears as its parent row followed by one indented row
 per part &mdash; so every key binding is listed with the letter in force and the letter it ships with, an action you

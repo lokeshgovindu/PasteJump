@@ -259,6 +259,7 @@ public partial class App : Application
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetJoinSeparator(_settings.ClipJoinSeparator);
         _pasteHost.SetOverlayParts(_settings.OverlayParts);
+        _pasteHost.SetDeletedFlash(_settings.OverlayDeletedFlashMs);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
         _pasteHost.SetKeyHint(
             _settings.ShowOverlayKeyHint,
@@ -1284,6 +1285,7 @@ public partial class App : Application
         _pasteHost.SetPreviewSize(_settings.OverlayPreviewMaxWidth, _settings.OverlayPreviewMaxHeight);
         _pasteHost.SetJoinSeparator(_settings.ClipJoinSeparator);
         _pasteHost.SetOverlayParts(_settings.OverlayParts);
+        _pasteHost.SetDeletedFlash(_settings.OverlayDeletedFlashMs);
         _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
         _pasteHost.SetKeyHint(
             _settings.ShowOverlayKeyHint,

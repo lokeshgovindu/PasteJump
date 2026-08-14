@@ -110,4 +110,8 @@ internal sealed class StubHost : IPasteModeHost
     public void ShowTransientMessage(string message)
     {
     }
+
+    public void NoteClipDeleted()
+    {
+    }
 }

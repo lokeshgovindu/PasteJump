@@ -127,6 +127,19 @@
                                    Foreground="{DynamicResource AccentBrush}"
                                    Margin="0,0,8,0"
                                    Visibility="Collapsed" />
+                        <!--
+                            DELETED, in the past tense and only for a moment - the host hides it again after
+                            OverlayDeletedFlashMs. DangerBrush, because it reports something destructive that has
+                            already happened; the X cycle's pending DELETE banner is a different colour and a
+                            different place, which is what keeps the two from being read as each other.
+                        -->
+                        <TextBlock x:Name="DeletedChip"
+                                   Style="{StaticResource ChipText}"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,8,0"
+                                   Text="DELETED"
+                                   Visibility="Collapsed" />
                         <TextBlock x:Name="PopChip"
                                    Style="{StaticResource ChipText}"
                                    Foreground="{DynamicResource DangerBrush}"

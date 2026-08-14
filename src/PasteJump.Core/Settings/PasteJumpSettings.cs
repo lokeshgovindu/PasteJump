@@ -267,6 +267,29 @@ public sealed class PasteJumpSettings
     /// </summary>
     public bool ShowOverlayKeyHint { get; set; } = true;
 
+    /// <summary>
+    /// How long the overlay shows <c>DELETED</c> after the <c>Delete</c> key, in milliseconds. <c>0</c> never shows
+    /// it.
+    /// <para>
+    /// A transient chip rather than a banner, and the difference is the whole point. Deleting a clip suppresses the
+    /// paste that releasing Ctrl would otherwise do, and the first attempt at saying so set the commit mode to
+    /// Cancel - which drew a persistent banner reading "CANCEL - release Ctrl to cancel (X cycles)" at someone who
+    /// had just pressed Delete and was not thinking about cancelling anything. Reported as meaningless, and it was:
+    /// a banner describes what a release <em>will</em> do, while what happened here is in the past.
+    /// </para>
+    /// <para>
+    /// A past-tense chip that fades out says the true thing instead, and note the deliberate distance from the X
+    /// cycle's own <c>DELETE</c> mode, which means "delete the clip on release" - a permanent DELETED would sit one
+    /// letter from a pending action.
+    /// </para>
+    /// <para>
+    /// <b>No control on any tab, by request</b> - it appears in Advanced with everything else, and is edited in
+    /// <c>PasteJump.json</c>. <c>0</c> is a supported value rather than a disabled state: whether the chip is worth
+    /// the flicker is a matter of taste, and this is the number that settles it either way.
+    /// </para>
+    /// </summary>
+    public int OverlayDeletedFlashMs { get; set; } = 1200;
+
     // ---- what else the overlay says about a clip
     //
     // All on by default, so nothing changes for anyone who never opens these. They exist because the overlay
@@ -489,6 +512,7 @@ public sealed class PasteJumpSettings
         // the document underneath it.
         OverlayPreviewMaxWidth = Math.Clamp(OverlayPreviewMaxWidth, SettingsBounds.OverlayPreviewMaxWidth.Min, SettingsBounds.OverlayPreviewMaxWidth.Max);
         OverlayPreviewMaxHeight = Math.Clamp(OverlayPreviewMaxHeight, SettingsBounds.OverlayPreviewMaxHeight.Min, SettingsBounds.OverlayPreviewMaxHeight.Max);
+        OverlayDeletedFlashMs = Math.Clamp(OverlayDeletedFlashMs, SettingsBounds.OverlayDeletedFlashMs.Min, SettingsBounds.OverlayDeletedFlashMs.Max);
 
         // Only emptiness is corrected. An unrecognised NAME is deliberately left alone: it may be a theme file that
         // is missing right now - an unplugged drive, a file mid-edit - and rewriting the setting would throw the

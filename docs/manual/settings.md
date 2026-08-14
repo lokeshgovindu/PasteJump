@@ -169,6 +169,8 @@ Every setting PasteJump has, with its current value and the value a fresh instal
 
 **Where** names the tab that holds the control for each setting, so the page that cannot change a value still tells you where to. The filter box matches on name, value *or* tab — so typing `appearance` lists everything that tab owns.
 
+A setting whose **Where** says **Advanced** has no control on any tab and is edited in `PasteJump.json`. One does today: `overlayDeletedFlashMs`, how many milliseconds the overlay shows **DELETED** after the `Delete` key, where `0` never shows it. It is here rather than on a tab because it is a matter of taste about a chip that lasts a second, and the tabs are for settings that change what the program does.
+
 **Settings that hold several values are broken out.** Three of them do: the paste-mode key bindings, the per-application paste delays, and the excluded programs. Each appears as its parent row followed by one indented row per part — so every key binding is listed with the letter in force and the letter it ships with, an action you have switched off reads `(off)`, and each excluded program gets a line of its own. Those indented rows are detail rather than settings: they carry no Reset button, because putting one binding back would mean rewriting part of a stored string, and the tab that owns it already does that properly. The count at the bottom keeps them separate for the same reason.
 
 Values are read-only here, deliberately: one place to edit each setting is what stops two editors disagreeing about what is valid. Change them on the tab named in **Where**, or in `PasteJump.json` while PasteJump is closed. Two things can be done from this page:

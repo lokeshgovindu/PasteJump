@@ -76,14 +76,26 @@ public sealed class PasteModeController
     public bool ShiftHeld { get; set; }
 
     /// <summary>
-    /// True when <c>Delete</c> put this session into Cancel, so that letting go of Ctrl pastes nothing.
+    /// True when <c>Delete</c> has been pressed and nothing has been chosen since, so letting go of Ctrl pastes
+    /// nothing.
     /// <para>
-    /// Distinguishing this from a Cancel the user chose with <c>X</c> is the whole reason it exists: moving the
-    /// cursor afterwards means "I want this one after all" and puts the mode back, while a Cancel the user asked
-    /// for must survive everything they do next. Without the flag one of those two has to be got wrong.
+    /// <b>Deliberately invisible, and deliberately NOT <see cref="PasteCommitMode"/>.</b> The first attempt set the
+    /// mode to Cancel, which had the merit of showing a banner - and the banner was reported as meaningless and
+    /// confusing, rightly: it read "CANCEL - release Ctrl to cancel (X cycles)" to someone who had just pressed
+    /// Delete and was not thinking about cancelling anything. Worse, the X cycle's own DELETE mode means "delete
+    /// the clip on release", so a banner saying DELETED would sit one letter from a pending action.
+    /// </para>
+    /// <para>
+    /// So this suppresses the paste and says nothing. The overlay has already changed - one fewer clip, and a
+    /// different one under the cursor - and the outcome of saying nothing is that nothing is inserted into the
+    /// user's document, which is the safe direction for a surprise to point.
+    /// </para>
+    /// <para>
+    /// Being separate from the mode also keeps <c>X</c> entirely the user's: it only ever shows and changes what
+    /// they chose, and this flag is consulted for the ordinary Paste path alone.
     /// </para>
     /// </summary>
-    private bool _cancelArmedByDelete;
+    private bool _pasteSuppressedByDelete;
 
     public string SearchQuery { get; private set; } = string.Empty;
 
@@ -186,8 +198,6 @@ public sealed class PasteModeController
                     _ => PasteCommitMode.Cancel,
                 };
 
-                // The user now owns the mode, whatever a Delete set it to, so nothing may put it back.
-                _cancelArmedByDelete = false;
                 Render();
                 break;
 
@@ -397,6 +407,13 @@ public sealed class PasteModeController
                 return PasteCommitKind.Pasted;
             }
 
+            // Checked here rather than before the switch, so a set of marks still wins: marking clips is an
+            // explicit "paste these", and deleting a different clip is not a reason to discard it.
+            case PasteCommitMode.Paste when _pasteSuppressedByDelete:
+                _host.RestoreExistingClipboard();
+                EndSession();
+                return PasteCommitKind.Cancelled;
+
             case PasteCommitMode.Paste when current is not null:
             {
                 var pop = ShiftHeld;
@@ -564,23 +581,13 @@ public sealed class PasteModeController
     }
 
     /// <summary>
-    /// The user has moved to another clip, so a Cancel that <c>Delete</c> armed is undone.
+    /// The user has moved to another clip, so a paste suppressed by <c>Delete</c> is allowed again.
     /// <para>
     /// "Delete this one, then paste that one" has to keep working, and moving the cursor is the only signal for it
-    /// that cannot be misread. A Cancel the user chose with <c>X</c> is untouched - see
-    /// <see cref="_cancelArmedByDelete"/>.
+    /// that cannot be misread - see <see cref="_pasteSuppressedByDelete"/>.
     /// </para>
     /// </summary>
-    private void ChoosingAgain()
-    {
-        if (!_cancelArmedByDelete)
-        {
-            return;
-        }
-
-        _cancelArmedByDelete = false;
-        CommitMode = PasteCommitMode.Paste;
-    }
+    private void ChoosingAgain() => _pasteSuppressedByDelete = false;
 
     /// <summary>
     /// The Delete key: remove this clip now and keep browsing.
@@ -607,21 +614,15 @@ public sealed class PasteModeController
         // happen.
         _marked.Remove(current.Id);
 
-        // RELEASING CTRL AFTER A DELETE NOW PASTES NOTHING, and this is a reversal - the previous behaviour was
-        // deliberate and wrong. Deleting leaves the cursor on the clip that moved up, so a release pasted THAT
-        // one: a user who pressed Ctrl+V, deleted the clip they did not want, and let go got the next clip
-        // inserted into their document. Reported as a bug, and it is one - the destructive key is not a request
-        // to paste something else.
+        // RELEASING CTRL AFTER A DELETE PASTES NOTHING. Deleting leaves the cursor on the clip that moved up, so a
+        // release used to paste THAT one: a user who pressed Ctrl+V, deleted the clip they did not want, and let go
+        // got the next clip inserted into their document. Reported as a bug, and it is one - the destructive key is
+        // not a request to paste something else.
         //
-        // Cancel rather than a private "do nothing" state, because Cancel is already exactly this - restore the
-        // clipboard, paste nothing - and because the overlay already draws a banner for it, so the change in what
-        // release will do is visible rather than a surprise. A mode the user chose with X is left alone; only the
-        // default Paste is overridden.
-        if (CommitMode == PasteCommitMode.Paste)
-        {
-            CommitMode = PasteCommitMode.Cancel;
-            _cancelArmedByDelete = true;
-        }
+        // Silently as far as the commit mode goes - see the note on the field. What the overlay says about it is
+        // the host's business and lasts a configurable moment: DELETED, in the past tense, then gone.
+        _pasteSuppressedByDelete = true;
+        _host.NoteClipDeleted();
 
         RefreshWindow();
 
@@ -731,7 +732,7 @@ public sealed class PasteModeController
         _preservedClipId = _options.PreserveClipPosition ? Current?.Id : null;
         State = PasteSessionState.Idle;
         CommitMode = PasteCommitMode.Paste;
-        _cancelArmedByDelete = false;
+        _pasteSuppressedByDelete = false;
         SearchQuery = string.Empty;
         ShiftHeld = false;
         _window = [];

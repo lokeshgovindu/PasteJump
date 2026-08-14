@@ -392,6 +392,11 @@ internal static class Program
                     KindFilterFrame(),
                     OverlayParts.All with { KeyHint = false }));
 
+                // The moment after Delete. Worth a shot of its own: it is the one thing the overlay says that no
+                // keystroke produces - a timer hides it - and it was added because a persistent CANCEL banner in
+                // its place was reported as meaningless.
+                Check("OverlayWindow-Deleted", () => RenderOverlay(TextFactsFrame(), deleted: true));
+
                 Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
 
                 // A copied TEXT FILE, whose contents are read off disk. Written as a real file because that is
@@ -503,7 +508,8 @@ internal static class Program
         PasteOverlayModel frame,
         OverlayParts? parts = null,
         byte[]? imageBytes = null,
-        (int Width, int Height)? previewSize = null)
+        (int Width, int Height)? previewSize = null,
+        bool deleted = false)
     {
         var overlay = new OverlayWindow();
 
@@ -513,6 +519,10 @@ internal static class Program
 
             overlay.ApplyParts(chosen);
             overlay.SetImagePayload(imageBytes);
+
+            // The transient DELETED chip. Set directly, because in the application a timer takes it down again -
+            // a shot of it has to freeze the moment rather than race the timer.
+            overlay.ShowDeleted(deleted);
 
             if (previewSize is { } size)
             {

@@ -209,10 +209,12 @@ public class PasteModeNavigationKeyTests
         controller.Begin();
         controller.Handle(PasteAction.DeleteCurrentClip);
 
-        // Cancel, not a private state of its own: it is already "restore the clipboard and paste nothing", and the
-        // overlay draws a banner for it - so what releasing Ctrl will now do is visible on screen.
-        Assert.Equal(PasteCommitMode.Cancel, controller.CommitMode);
-        Assert.Equal(PasteCommitMode.Cancel, host.LastFrame!.CommitMode);
+        // NO BANNER, and that is the point of the second iteration of this fix. Setting the commit mode to Cancel
+        // showed one, and it was reported as meaningless: "CANCEL - release Ctrl to cancel (X cycles)" to someone
+        // who had just pressed Delete and was not thinking about cancelling. The mode stays exactly what the user
+        // left it, so X still only ever shows their own choice.
+        Assert.Equal(PasteCommitMode.Paste, controller.CommitMode);
+        Assert.Equal(PasteCommitMode.Paste, host.LastFrame!.CommitMode);
 
         var remaining = catalog.Snapshot().Count;
         var kind = controller.ModifierReleased();
@@ -274,24 +276,74 @@ public class PasteModeNavigationKeyTests
     }
 
     /// <summary>
-    /// And <c>X</c> after a Delete hands the mode back to the user: the next thing they press must not put it
-    /// back to Paste behind them.
+    /// The overlay is told, so it can say DELETED for a moment. The controller reports the event and takes no view
+    /// on how long anything is shown for - it owns no timers, and the duration is a setting.
     /// </summary>
     [Fact]
-    public void Cycling_the_commit_mode_after_a_delete_takes_ownership_of_it()
+    public void Delete_tells_the_host_so_the_overlay_can_say_so()
     {
         var (controller, _, host) = Build(clipCount: 3);
 
         controller.Begin();
-        controller.Handle(PasteAction.DeleteCurrentClip);    // arms Cancel
-        controller.Handle(PasteAction.CycleCommitMode);      // Cancel -> Delete, chosen deliberately
-        controller.Handle(PasteAction.Advance);
 
-        Assert.Equal(PasteCommitMode.Delete, controller.CommitMode);
+        Assert.Equal(0, host.DeletedNoteCount);
 
+        controller.Handle(PasteAction.DeleteCurrentClip);
+        controller.Handle(PasteAction.DeleteCurrentClip);
+
+        Assert.Equal(2, host.DeletedNoteCount);
+
+        // Not reported when there was nothing to delete: the third press finds an empty window and returns early,
+        // so a chip that said DELETED would be describing something that did not happen.
+        controller.Handle(PasteAction.DeleteCurrentClip);
+        controller.Handle(PasteAction.DeleteCurrentClip);
+
+        Assert.Equal(3, host.DeletedNoteCount);
+    }
+
+    /// <summary>
+    /// A Delete leaves the commit mode alone, so <c>X</c> afterwards cycles from Paste as it always would. The
+    /// suppression is a separate thing that the user never sees and never has to reason about.
+    /// </summary>
+    [Fact]
+    public void A_delete_does_not_move_the_commit_mode_cycle_along()
+    {
+        var (controller, catalog, host) = Build(clipCount: 3);
+
+        controller.Begin();
+        controller.Handle(PasteAction.DeleteCurrentClip);
+        controller.Handle(PasteAction.CycleCommitMode);      // Paste -> Cancel, the first stop as ever
+
+        Assert.Equal(PasteCommitMode.Cancel, controller.CommitMode);
+
+        var remaining = catalog.Snapshot().Count;
         controller.ModifierReleased();
 
         Assert.Empty(host.PastedClips);
+        Assert.Equal(remaining, catalog.Snapshot().Count);
+    }
+
+    /// <summary>
+    /// Marked clips survive a Delete: marking is an explicit "paste these", and deleting some other clip is not a
+    /// reason to throw that instruction away. This is why the suppression is checked after the marks branch and not
+    /// before the whole switch.
+    /// </summary>
+    [Fact]
+    public void Marked_clips_still_paste_after_a_delete()
+    {
+        var (controller, _, host) = Build(clipCount: 4);
+
+        controller.Begin();
+        controller.Handle(PasteAction.ToggleJoinMark);       // mark the newest
+        controller.Handle(PasteAction.Advance);
+        controller.Handle(PasteAction.ToggleJoinMark);       // and one more
+        controller.Handle(PasteAction.Advance);
+        controller.Handle(PasteAction.DeleteCurrentClip);    // a third clip, not one of the marked ones
+
+        controller.ModifierReleased();
+
+        Assert.Single(host.JoinedClips);
+        Assert.Equal(2, host.JoinedClips[0].Count);
     }
 
     [Fact]
