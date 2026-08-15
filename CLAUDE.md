@@ -1463,6 +1463,17 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   Every route into a state has to call `ApplyTrayIcon`: the tray toggles *and* `OnSettingsApplied`, since
   "Watch the clipboard" is editable in the Settings dialog too. Pause originally updated only the tooltip,
   which is precisely why Pause and Disable were reported as being the same command.
+- **An off state's toggle is bold in the tray menu (2026-08-15), and the menu is the one place that must not use
+  the disabled-beats-paused precedence.** Asked for, and the reason it is needed is that the menu is opened by
+  right-clicking the very icon whose hue carries the state, so opening it covers up the indicator: `Resume Capture`
+  and `Enable PasteJump` are `Emphasised`, since the row that undoes an off state is both the state indicator and
+  the way out of it. **Both are bold when both apply** — a paused-then-disabled PasteJump genuinely has two things
+  to switch back on, and picking one would hide the other, unlike `ApplyTrayIcon` and `BuildTrayTooltip` which have
+  to choose a single answer. Note the signal is now shared with About, which is `Emphasised` by request; if a third
+  claimant ever appears, bold has stopped meaning anything and the answer is a disabled status row at the top of
+  the menu instead. `VerifyOffStateIsEmphasised` in the UI smoke harness is the only thing that would notice the
+  emphasis being tidied away — it finds each toggle **by its `Invoke` delegate, not by its label**, so renaming an
+  item cannot fail it and a swapped pair cannot pass it. Verified by removing one: 2 failures.
 - **The artwork is full-bleed on purpose — do not add padding back.** The tile was inset 3.5% with a 23.5%
   corner radius, which at 16 px cost a pixel on every side and rounded most of each corner away; the tray icon
   was reported as looking small next to neighbours whose artwork runs edge to edge. Windows pads tray icons

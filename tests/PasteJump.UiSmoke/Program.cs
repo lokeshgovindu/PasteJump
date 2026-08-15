@@ -1060,6 +1060,52 @@ internal static class Program
             }
         }
 
+        VerifyOffStateIsEmphasised();
+    }
+
+    /// <summary>
+    /// An off state's toggle is bold, so the row that puts PasteJump back to normal is the one the eye lands on.
+    /// <para>
+    /// This is the only thing that would notice the emphasis being tidied away. Until it existed the sole sign of
+    /// being paused or disabled was the tray icon's hue - and the menu is opened by right-clicking that very icon,
+    /// so the menu covers up the indicator while it is up.
+    /// </para>
+    /// <para>
+    /// Items are located by their <c>Invoke</c> delegate rather than by their label, so renaming a menu item cannot
+    /// fail this check and a swapped pair of toggles cannot pass it.
+    /// </para>
+    /// </summary>
+    private static void VerifyOffStateIsEmphasised()
+    {
+        foreach (var (paused, disabled) in new[] { (false, false), (true, false), (false, true), (true, true) })
+        {
+            var items = TrayMenu.Items(NoOpTrayCommands, paused, disabled);
+
+            Check("pause", NoOpTrayCommands.PauseToggle, paused);
+            Check("disable", NoOpTrayCommands.DisableToggle, disabled);
+
+            void Check(string what, Action command, bool isOff)
+            {
+                var item = items.SingleOrDefault(i => ReferenceEquals(i.Invoke, command));
+
+                if (item is null)
+                {
+                    _failures++;
+                    Console.WriteLine($"  FAIL  no tray {what} toggle when paused={paused} disabled={disabled}");
+                    return;
+                }
+
+                if (item.Emphasised == isOff)
+                {
+                    return;
+                }
+
+                _failures++;
+                Console.WriteLine(
+                    $"  FAIL  tray {what} toggle when paused={paused} disabled={disabled} is "
+                        + $"{(item.Emphasised ? "bold and should not be" : "not bold and should be")}: {item.Text}");
+            }
+        }
     }
 
     private static int _trayMenuThemesFollowed;

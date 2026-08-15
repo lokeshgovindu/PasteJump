@@ -40,7 +40,7 @@ internal static class TrayGlyph
 /// <param name="Gesture">Shortcut text, shown right-aligned and muted. None of today's items has one.</param>
 /// <param name="IsChecked">Draws a tick in place of the glyph. State beats decoration.</param>
 /// <param name="IsEnabled">A greyed, unclickable row.</param>
-/// <param name="Emphasised">Semi-bold. Used once, for About.</param>
+/// <param name="Emphasised">Semi-bold. About, plus whichever toggle offers to undo an off state.</param>
 /// <param name="Submenu">Nested items. A header with a submenu is not itself clickable.</param>
 internal sealed record TrayMenuItem(
     string Text,
@@ -106,8 +106,13 @@ internal static class TrayMenu
             // Disable below, and "Pause monitoring" beside "Disable PasteJump" was reported as two names for one
             // thing. Title case for the command, sentence case inside the parentheses: "(Keep Pasting)" reads as a
             // second command rather than as the explanation it is.
+            //
+            // Bold while paused, and the same for Disable below. Until this the only sign of an off state was the
+            // tray icon's hue - and the menu is opened by right-clicking that icon, so opening the menu covers up
+            // the one thing that said so. Bold marks the row that puts the application back to normal, which is
+            // both the state indicator and the way out of it, so it is the row worth finding fastest.
             isPaused
-                ? new TrayMenuItem("_Resume Capture", commands.PauseToggle, TrayGlyph.Resume)
+                ? new TrayMenuItem("_Resume Capture", commands.PauseToggle, TrayGlyph.Resume, Emphasised: true)
                 : new TrayMenuItem("_Pause Capture (keep pasting)", commands.PauseToggle, TrayGlyph.Pause),
 
             new("_Settings…", commands.Settings, TrayGlyph.Settings),
@@ -143,8 +148,13 @@ internal static class TrayMenu
             // One glyph for both directions: the prohibition sign marks the subject - interception - while the
             // label carries the direction. Pause/Resume above earns two glyphs because play and pause are a
             // universally understood pair; there is no such pair for this.
+            //
+            // Bold while disabled, for the reason given on the pause toggle above. Note that both can be bold at
+            // once - disabling also stops capture, so a paused-then-disabled PasteJump genuinely has two things to
+            // switch back on and the menu should not hide one of them behind a precedence rule. That is the one
+            // place this departs from ApplyTrayIcon and BuildTrayTooltip, which must pick a single answer.
             isDisabled
-                ? new TrayMenuItem("_Enable PasteJump", commands.DisableToggle, TrayGlyph.Disable)
+                ? new TrayMenuItem("_Enable PasteJump", commands.DisableToggle, TrayGlyph.Disable, Emphasised: true)
                 : new TrayMenuItem("_Disable PasteJump (Ctrl+V passes through)", commands.DisableToggle, TrayGlyph.Disable),
 
             // Restart sits immediately above Exit. Both are the same kind of end-of-session action, and grouping
