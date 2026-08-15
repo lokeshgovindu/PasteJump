@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 893 in Debug (`dotnet test`) - 841 in Core.Tests, 52 in Interop.Tests; **891 in Release**, see below |
+| Tests | 904 in Debug (`dotnet test`) - 852 in Core.Tests, 52 in Interop.Tests; **902 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1085,6 +1085,39 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     entered **0 times**. Lesson worth keeping: when a test of routing passes, count the handler entries before
     believing it. The check now asks the extracted `ShouldStartPan` predicate about the real `ScrollBar` in the
     visual tree, and about `PreviewImage` for the other direction. Verified it fails with the guard neutered.
+- **The history table filters by kind and its rows have a menu (2026-08-15), and both are built out of things that
+  already existed.** Asked for against a real store of 5,718 mixed entries, where finding one picture was a scroll.
+  The filter is the gesture's own `PasteKindFilter` from `Core` - the same four states in the same order as the `K`
+  key - so the window and the gesture cannot come to disagree about what "images" means. Decisions worth keeping:
+  - **It is not persisted and is not a setting.** Same rule as during the gesture, for the same reason: a window
+    that opened with most of its rows hidden reads as a history that has lost them. That also keeps it out of
+    `TryBuild`, `ShowValues` and the Advanced tab, none of which it needs.
+  - **The kind is filtered in memory, not in the query.** `SearchHistory`'s cap is a backstop on how much is read,
+    so narrowing in SQL would make "the newest 50,000 images" a scan of the whole archive - and would quietly change
+    what the status line's numbers mean. The status line **names the filter** whenever one is on, because a short
+    list with no explanation is the failure this window has already had twice.
+  - **The menu is on the `DataGrid`, not in the `RowStyle`.** A `Style` setter shares one `ContextMenu` instance
+    across every row regardless, so the row-scoped version buys nothing - and `x:Name` inside a setter value yields
+    no field, which is exactly what `ContextMenuOpening` needs in order to set the items to match the selection.
+  - **Right-click selects what it landed on, unless that row is already selected.** A `DataGrid` does not do this
+    itself: the menu opens over one row while acting on whatever was selected before, so Delete would remove
+    something the user was not pointing at. The exception is the load-bearing half - right-clicking inside a
+    selection of five to copy them joined must not collapse it to one.
+  - **Pin is absent in the History view, not disabled**, exactly as the toolbar button is: a greyed row would imply
+    history had pins that could not be reached. And **`Show Only …` is hidden for a mixed selection** - it named the
+    first row's kind, which promises something the selection does not say - and for `ClipKind.Other`, which has no
+    filter of its own, so the item would hide the very clip it was invoked on.
+  - **Nothing is reachable only by right-clicking.** Every item is also a button or the combo. A menu that is the
+    sole route to an action is one that people who never right-click never find.
+  - **`UpdateRowMenu` is split from the handler because `ContextMenuEventArgs` cannot be constructed**, and the menu
+    draws in its own popup HWND that no render reaches - so asserting the shape of the menu is the only test there
+    can be. the `HistoryWindow-Filtered` case's three states (one row, several, the Clips view) are what caught the mixed-kind
+    label. Note the check's own first version was faulty rather than the code: it selected "three rows" with the
+    images filter on, and the seed holds one image, so it failed for want of rows to select.
+  - **`MenuGlyph` now owns the icon recipe** - font, 16px, `Ideal`, `Grayscale` - because the row menu is the second
+    menu to need it and each of those four was got wrong once already. `TrayGlyph` and `RowGlyph` keep only their
+    codepoints, since choosing a glyph is a decision about a particular menu. The new ones were rendered four
+    candidates at a time and looked at, as `TrayGlyph`'s were.
 - **A `ScrollViewer` eats `MouseLeftButtonDown`, so pan handlers must use the `Preview` events.** Its class
     handler focuses the control and marks the event handled, and **class handlers run before instance handlers** -
     so a handler attached to `MouseLeftButtonDown` is never called. This is what kept drag-to-pan broken after the
@@ -1494,8 +1527,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 893 tests (Debug)
-dotnet test -c Release                              # 891 - what CI runs, and it is not the same set
+dotnet test                                         # 904 tests (Debug)
+dotnet test -c Release                              # 902 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

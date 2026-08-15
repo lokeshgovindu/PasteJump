@@ -15,6 +15,7 @@ using PasteJump.Core.Formatting;
 using PasteJump.Core.Imaging;
 using PasteJump.Core.Model;
 using PasteJump.Core.Paste;
+using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
 using PasteJump.Interop;
@@ -202,6 +203,18 @@ public partial class HistoryWindow : Window
     /// </summary>
     private string _joinSeparator;
 
+    /// <summary>
+    /// The Kind combo's four states, in the order the gesture's K key cycles them, so the two feel like one
+    /// feature. The labels are the filter's own <c>Describe()</c> where it has one, capitalised for a combo.
+    /// </summary>
+    private static readonly (string Label, PasteKindFilter Filter)[] KindChoices =
+    [
+        ("All kinds", PasteKindFilter.All),
+        ("Text", PasteKindFilter.Text),
+        ("Images", PasteKindFilter.Images),
+        ("Files", PasteKindFilter.Files),
+    ];
+
     public HistoryWindow(
         ClipStore store,
         IClipboardAccess clipboard,
@@ -228,6 +241,21 @@ public partial class HistoryWindow : Window
         {
             DensityCombo.Items.Add(choice.Label);
         }
+
+        foreach (var choice in KindChoices)
+        {
+            KindCombo.Items.Add(choice.Label);
+        }
+
+        KindCombo.SelectedIndex = 0;
+
+        // Icons on the row menu, matching the tray menu's. Set here rather than in XAML so the one recipe in
+        // MenuGlyph is the only place a font, a size and two rendering modes are stated. Pin's changes with its
+        // direction, so it is set per opening instead.
+        RowCopyItem.Icon = MenuGlyph.Create(RowGlyph.Copy);
+        RowDeleteItem.Icon = MenuGlyph.Create(RowGlyph.Delete);
+        RowFilterKindItem.Icon = MenuGlyph.Create(RowGlyph.Filter);
+        RowClearFilterItem.Icon = MenuGlyph.Create(RowGlyph.ClearFilter);
 
         ApplyDensity(density);
 
@@ -541,6 +569,33 @@ public partial class HistoryWindow : Window
     /// </summary>
     public void JoinSelectionForSmokeTest() => CopySelectionJoined();
 
+    /// <summary>Moves the Kind combo, exactly as choosing it does. UI smoke harness only.</summary>
+    public void SetKindFilterForSmokeTest(PasteKindFilter filter) => SelectKindFilter(filter);
+
+    /// <summary>The kinds currently in the grid. UI smoke harness only.</summary>
+    public IReadOnlyList<ClipKind> VisibleKindsForSmokeTest() => _rows.Select(r => r.Kind).Distinct().ToList();
+
+    /// <summary>The status line, which is the only place a filter hiding rows is admitted. UI smoke harness only.</summary>
+    public string StatusForSmokeTest() => StatusText.Text;
+
+    /// <summary>
+    /// The row menu as it would open against the current selection: the headers of its visible items, in order,
+    /// or an empty list when it would not open. UI smoke harness only.
+    /// </summary>
+    public IReadOnlyList<string> RowMenuForSmokeTest()
+    {
+        if (!UpdateRowMenu())
+        {
+            return [];
+        }
+
+        return RowMenu.Items
+            .OfType<MenuItem>()
+            .Where(i => i.Visibility == Visibility.Visible)
+            .Select(i => i.Header as string ?? string.Empty)
+            .ToList();
+    }
+
     /// <summary>Asks for a reload, coalescing rapid successive calls.</summary>
     public void QueueRefresh()
     {
@@ -572,6 +627,11 @@ public partial class HistoryWindow : Window
 
         foreach (var clip in _store.GetOrdered())
         {
+            if (!_kindFilter.Admits(clip.Kind))
+            {
+                continue;
+            }
+
             if (!string.IsNullOrEmpty(term)
                 && !clip.Preview.Contains(term, StringComparison.OrdinalIgnoreCase)
                 && !clip.Tags.Any(t => t.Contains(term, StringComparison.OrdinalIgnoreCase)))
@@ -595,9 +655,9 @@ public partial class HistoryWindow : Window
 
         var total = _store.Count;
 
-        StatusText.Text = string.IsNullOrWhiteSpace(term)
+        StatusText.Text = string.IsNullOrWhiteSpace(term) && _kindFilter == PasteKindFilter.All
             ? $"{_rows.Count} clip{(_rows.Count == 1 ? string.Empty : "s")} the Ctrl+V gesture can reach"
-            : $"{_rows.Count} of {total} clips match";
+            : $"{_rows.Count} of {total} clips match{DescribeKindFilter()}";
     }
 
     private void LoadHistory()
@@ -606,6 +666,14 @@ public partial class HistoryWindow : Window
 
         foreach (var entry in _store.SearchHistory(SearchBox.Text, _historyLoadLimit))
         {
+            // The kind is filtered here rather than in the query: the cap SearchHistory applies is a backstop on
+            // how much is read, and narrowing it in SQL would mean "the newest 50,000 images" costing a scan of
+            // the whole archive. Filtering what came back keeps the cap meaning what the status line says it does.
+            if (!_kindFilter.Admits(entry.Kind))
+            {
+                continue;
+            }
+
             _rows.Add(new HistoryRow
             {
                 Id = entry.Id,
@@ -621,16 +689,162 @@ public partial class HistoryWindow : Window
 
         var total = _store.HistoryCount;
 
-        StatusText.Text = string.IsNullOrWhiteSpace(SearchBox.Text)
+        StatusText.Text = string.IsNullOrWhiteSpace(SearchBox.Text) && _kindFilter == PasteKindFilter.All
             ? $"{_rows.Count} of {total} history entries"
-            : $"{_rows.Count} matches of {total} history entries";
+            : $"{_rows.Count} of {total} history entries match{DescribeKindFilter()}";
 
         // Said outright when the query hit its cap, rather than leaving the two numbers to be compared. A
         // window silently showing a fraction of the store is indistinguishable from an import that failed -
         // which is exactly how an 11,000-entry import was first reported.
-        if (_rows.Count < total && string.IsNullOrWhiteSpace(SearchBox.Text))
+        if (_rows.Count < total && string.IsNullOrWhiteSpace(SearchBox.Text) && _kindFilter == PasteKindFilter.All)
         {
             StatusText.Text += $" — showing the newest {_rows.Count}; search to reach the rest";
+        }
+    }
+
+    /// <summary>
+    /// Which kind of clip the grid is showing. Not persisted, and not a setting: the gesture's own filter resets
+    /// per session for the same reason, which is that a window opening with most of its rows hidden reads as a
+    /// history that has lost them rather than as a filter still being on.
+    /// </summary>
+    private PasteKindFilter _kindFilter = PasteKindFilter.All;
+
+    /// <summary>" (images only)"-shaped tail for the status line, empty when nothing is filtered.</summary>
+    private string DescribeKindFilter()
+        => _kindFilter.Describe() is { } what ? $" ({what})" : string.Empty;
+
+    private void OnKindFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Fires while the combo is being populated, before the grid exists - as OnViewChanged notes.
+        if (EntriesGrid is null || KindCombo.SelectedIndex < 0)
+        {
+            return;
+        }
+
+        _kindFilter = KindChoices[KindCombo.SelectedIndex].Filter;
+        Refresh();
+    }
+
+    /// <summary>
+    /// Right-click selects the row it landed on, unless that row is already part of the selection.
+    /// </summary>
+    /// <remarks>
+    /// A <see cref="DataGrid"/> does not do this itself: the menu would open over one row and act on whatever was
+    /// selected before, which for Delete means deleting something the user was not pointing at. Leaving an existing
+    /// multi-row selection alone is the other half - right-clicking inside a selection of five to copy them joined
+    /// must not collapse it to one.
+    /// </remarks>
+    private void OnRowRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var row = FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+
+        if (row is null)
+        {
+            // Over the header or the empty space below the rows. Nothing to act on, so no menu.
+            e.Handled = true;
+            return;
+        }
+
+        if (!row.IsSelected)
+        {
+            EntriesGrid.SelectedItem = row.Item;
+        }
+    }
+
+    private void OnRowMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        // Suppressed rather than shown empty when there is nothing selected - an all-disabled menu says less than
+        // no menu, and the grid can be empty (a filter matching nothing is a legal state here as it is during the
+        // gesture).
+        if (!UpdateRowMenu())
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Sets the menu to match the selection, since one menu instance serves every row. Separate from the handler
+    /// because <see cref="ContextMenuEventArgs"/> cannot be constructed, so this is the only shape the UI smoke
+    /// harness can drive - and the menu is in its own popup HWND, which no window render reaches.
+    /// </summary>
+    /// <returns>False when there is nothing to act on, so the menu should not open at all.</returns>
+    private bool UpdateRowMenu()
+    {
+        var selected = EntriesGrid.SelectedItems.OfType<HistoryRow>().ToList();
+
+        if (selected.Count == 0)
+        {
+            return false;
+        }
+
+        // Mirrors the toolbar button, including the relabel that is the only sign joining exists.
+        RowCopyItem.Header = selected.Count > 1 ? "_Copy Joined" : "_Copy";
+
+        // Pinning is a property of a clip, so the item is not merely disabled in the History view - it is absent,
+        // as the toolbar button is. A disabled row would imply the store had pins that could not be reached.
+        RowPinItem.Visibility = ShowingClips ? Visibility.Visible : Visibility.Collapsed;
+        var unpinning = selected.All(r => r.Pinned);
+        RowPinItem.Header = unpinning ? "Un_pin" : "_Pin";
+        RowPinItem.Icon = MenuGlyph.Create(unpinning ? RowGlyph.Unpin : RowGlyph.Pin);
+
+        RowDeleteItem.Header = selected.Count > 1 ? $"_Delete {selected.Count} Entries" : "_Delete";
+
+        // Named rather than "this kind", so the item says what it will do before it is chosen - and taken from the
+        // whole selection, not from its first row: three mixed rows offered "Show Only Files" because a file clip
+        // happened to be first, which promises something the selection does not say. A mixed selection has no one
+        // kind, so the item is hidden.
+        var kinds = selected.Select(r => r.Kind).Distinct().ToList();
+        var filter = kinds.Count == 1 ? FilterFor(kinds[0]) : PasteKindFilter.All;
+
+        RowFilterKindItem.Visibility = filter == PasteKindFilter.All || _kindFilter == filter
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        RowFilterKindItem.Header = $"Show Only _{KindChoices.First(c => c.Filter == filter).Label}";
+
+        RowClearFilterItem.Visibility = _kindFilter == PasteKindFilter.All ? Visibility.Collapsed : Visibility.Visible;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Which filter shows a given kind on its own. <see cref="ClipKind.Other"/> has none, exactly as during the
+    /// gesture - it appears only under All - so the menu item is hidden for such a row rather than offering a
+    /// filter that would hide the very clip it was invoked on.
+    /// </summary>
+    private static PasteKindFilter FilterFor(ClipKind kind) => kind switch
+    {
+        ClipKind.Text => PasteKindFilter.Text,
+        ClipKind.Image => PasteKindFilter.Images,
+        ClipKind.Files => PasteKindFilter.Files,
+        _ => PasteKindFilter.All,
+    };
+
+    private void OnFilterToRowKindClicked(object sender, RoutedEventArgs e)
+    {
+        if (EntriesGrid.SelectedItem is not HistoryRow row)
+        {
+            return;
+        }
+
+        SelectKindFilter(FilterFor(row.Kind));
+    }
+
+    private void OnClearKindFilterClicked(object sender, RoutedEventArgs e) => SelectKindFilter(PasteKindFilter.All);
+
+    /// <summary>
+    /// Moves the combo, which raises <see cref="OnKindFilterChanged"/> and reloads. Driving the control rather
+    /// than the field is deliberate: setting <c>_kindFilter</c> directly would filter the grid while the combo
+    /// went on saying "All kinds", and there would then be no way to clear it.
+    /// </summary>
+    private void SelectKindFilter(PasteKindFilter filter)
+    {
+        for (var i = 0; i < KindChoices.Length; i++)
+        {
+            if (KindChoices[i].Filter == filter)
+            {
+                KindCombo.SelectedIndex = i;
+                return;
+            }
         }
     }
 
@@ -1226,6 +1440,19 @@ public partial class HistoryWindow : Window
     /// </summary>
     private static bool ShouldStartPan(DependencyObject? origin)
         => origin is null || !HasAncestor<ScrollBar>(origin);
+
+    private static T? FindAncestor<T>(DependencyObject? from) where T : DependencyObject
+    {
+        for (var node = from; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is T hit)
+            {
+                return hit;
+            }
+        }
+
+        return null;
+    }
 
     private static bool HasAncestor<T>(DependencyObject from) where T : DependencyObject
     {

@@ -41,6 +41,30 @@ Afterwards the status line accounts for every row you selected, including any it
 
 The same thing works during the gesture, without opening this window: press `J` to mark clips and release `Ctrl`. See [the gesture](gesture.md).
 
+## Showing one kind of clip
+
+The second control in the toolbar narrows the list to one kind: **All kinds**, **Text**, **Images** or **Files**. It is the same filter the `K` key applies during the paste gesture, so both places mean the same thing by "images".
+
+It combines with the search box — **Images** plus a search term finds pictures copied from a page whose name you remember — and the status line names the filter while one is on, so a short list is never left looking like a history that has lost entries.
+
+The list narrowed to **Images**. The status line names the filter while one is on.
+
+## The row menu
+
+Right-clicking a row opens a menu of the things that apply to it:
+
+| Item | What it does |
+| --- | --- |
+| **Copy** | The same as the Copy button — and it reads **Copy Joined** when several rows are selected. |
+| **Pin** | Pins or unpins, in the Clips view. History entries cannot be pinned, so the item is not there at all in that view. |
+| **Delete** | Removes the selected rows, saying how many when there are several. |
+| **Show Only…** | Sets the Kind filter to the kind of the selected row. |
+| **Show All Kinds** | Clears the filter. Only there while one is on. |
+
+Right-clicking a row that is not part of the selection selects it first, so the menu always acts on what you pointed at. Right-clicking *inside* a selection of several rows leaves that selection alone.
+
+Everything in the menu is also a button or a control in the toolbar. Nothing is reachable only by right-clicking.
+
 ## Searching
 
 The box on the right filters the list as you type, with a ✕ at its end to clear it. `Ctrl`+`K`, `Ctrl`+`E` or `Ctrl`+`F` jumps to it; `Esc` clears it. History search is full-text and matches on word prefixes, so `conn` finds `connection`.

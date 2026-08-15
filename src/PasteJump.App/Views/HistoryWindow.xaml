@@ -74,6 +74,20 @@
                     <ComboBoxItem Content="History" IsSelected="True" />
                 </ComboBox>
 
+                <!--
+                    Kind, beside the store switch rather than out with Density: both answer "what am I looking at",
+                    while Density answers "how does it look". The gesture has the same filter on its K key and the
+                    same four states, from the same PasteKindFilter in Core - one definition, so the window and the
+                    gesture cannot disagree about what "images" means.
+                -->
+                <ComboBox x:Name="KindCombo"
+                          MinHeight="32"
+                          Width="104"
+                          Margin="0,0,10,0"
+                          VerticalAlignment="Center"
+                          SelectionChanged="OnKindFilterChanged"
+                          ToolTip="Show only one kind of clip. The same filter is on the K key during the gesture. It is not remembered between openings, deliberately: a window that opened with most of its rows hidden would read as data lost." />
+
                 <Button x:Name="PinButton"
                         Click="OnPinClicked"
                         Content="_Pin"
@@ -178,6 +192,8 @@
                       VirtualizingPanel.IsVirtualizing="True"
                       VirtualizingPanel.VirtualizationMode="Recycling"
                       SelectionChanged="OnSelectionChanged"
+                      PreviewMouseRightButtonDown="OnRowRightButtonDown"
+                      ContextMenuOpening="OnRowMenuOpening"
                       MouseDoubleClick="OnRowDoubleClick">
                 <DataGrid.Columns>
                     <!-- Position in history, newest first. Deliberately NOT recomputed when a column
@@ -225,6 +241,27 @@
                         </DataGridTextColumn.HeaderStyle>
                     </DataGridTextColumn>
                 </DataGrid.Columns>
+
+                <!--
+                    The row menu. Every item does exactly what a toolbar button or the Kind combo does - nothing is
+                    reachable only from here - because a menu that is the sole route to an action is one that people
+                    who never right-click never find. On the grid rather than in the RowStyle: a Style setter shares
+                    one instance across every row regardless, and this way the items have names, which is what lets
+                    ContextMenuOpening set them to match the selection.
+
+                    Themed for free: the ContextMenu and MenuItem templates the tray menu needed apply to every menu
+                    in the application.
+                -->
+                <DataGrid.ContextMenu>
+                    <ContextMenu x:Name="RowMenu">
+                        <MenuItem x:Name="RowCopyItem" Header="_Copy" InputGestureText="Enter" Click="OnCopyClicked" />
+                        <MenuItem x:Name="RowPinItem" Header="_Pin" Click="OnPinClicked" />
+                        <MenuItem x:Name="RowDeleteItem" Header="_Delete" InputGestureText="Del" Click="OnDeleteClicked" />
+                        <Separator />
+                        <MenuItem x:Name="RowFilterKindItem" Header="Show Only This _Kind" Click="OnFilterToRowKindClicked" />
+                        <MenuItem x:Name="RowClearFilterItem" Header="Show _All Kinds" Click="OnClearKindFilterClicked" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
 
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">

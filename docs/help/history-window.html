@@ -96,6 +96,45 @@ joining cannot be what was meant.</td></tr>
 <p>The same thing works during the gesture, without opening this window: press <code>J</code> to mark clips and
 release <code>Ctrl</code>. See <a href="gesture.html">the gesture</a>.</p>
 
+<h2>Showing one kind of clip</h2>
+
+<p>The second control in the toolbar narrows the list to one kind: <b>All kinds</b>, <b>Text</b>,
+<b>Images</b> or <b>Files</b>. It is the same filter the <code>K</code> key applies during the paste
+gesture, so both places mean the same thing by &quot;images&quot;.</p>
+
+<p>It combines with the search box &mdash; <b>Images</b> plus a search term finds pictures copied from a
+page whose name you remember &mdash; and the status line names the filter while one is on, so a short list
+is never left looking like a history that has lost entries.</p>
+
+<div class="shot">
+<img src="images/history-filtered.png" alt="The history list narrowed to images, with the status line naming the filter">
+<p>The list narrowed to <b>Images</b>. The status line names the filter while one is on.</p>
+</div>
+
+<div class="note"><b>Note</b> The filter is not remembered between openings. A window that opened with most
+of its rows hidden would read as data lost rather than as a filter still being on.</div>
+
+<h2>The row menu</h2>
+
+<p>Right-clicking a row opens a menu of the things that apply to it:</p>
+
+<table>
+<tr><th>Item</th><th>What it does</th></tr>
+<tr><td class="name">Copy</td><td>The same as the Copy button &mdash; and it reads <b>Copy Joined</b>
+when several rows are selected.</td></tr>
+<tr><td class="name">Pin</td><td>Pins or unpins, in the Clips view. History entries cannot be pinned, so
+the item is not there at all in that view.</td></tr>
+<tr><td class="name">Delete</td><td>Removes the selected rows, saying how many when there are several.</td></tr>
+<tr><td class="name">Show Only&hellip;</td><td>Sets the Kind filter to the kind of the selected row.</td></tr>
+<tr><td class="name">Show All Kinds</td><td>Clears the filter. Only there while one is on.</td></tr>
+</table>
+
+<p>Right-clicking a row that is not part of the selection selects it first, so the menu always acts on
+what you pointed at. Right-clicking <i>inside</i> a selection of several rows leaves that selection alone.</p>
+
+<p>Everything in the menu is also a button or a control in the toolbar. Nothing is reachable only by
+right-clicking.</p>
+
 <h2>Searching</h2>
 
 <p>The box on the right filters the list as you type, with a &#x2715; at its end to clear it. <code>Ctrl</code>+<code>K</code>,

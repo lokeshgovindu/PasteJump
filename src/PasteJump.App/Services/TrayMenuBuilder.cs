@@ -30,9 +30,6 @@ namespace PasteJump.App.Services;
 /// </summary>
 internal static class TrayMenuBuilder
 {
-    /// <summary>The icon font. Fluent first, MDL2 as the Windows 10 fallback - see <see cref="TrayGlyph"/>.</summary>
-    private static readonly FontFamily GlyphFont = new("Segoe Fluent Icons, Segoe MDL2 Assets");
-
     private static ContextMenu? _menu;
 
     /// <summary>
@@ -117,31 +114,7 @@ internal static class TrayMenuBuilder
 
         if (item.Glyph is { Length: > 0 })
         {
-            // No Foreground set on purpose: inheriting the item's means the glyph follows the theme and greys out
-            // with a disabled row, both for free. Setting it here would need a DynamicResource per glyph and would
-            // still miss the disabled case.
-            var icon = new TextBlock
-            {
-                Text = item.Glyph,
-                FontFamily = GlyphFont,
-
-                // 16, not the 15 this shipped with for one day. Reported as poor quality, and the reason is that an
-                // icon font is hinted for the sizes its designers used - 16, 20, 24 - so 15 lands between stems and
-                // the rasteriser has to guess. Compared at 3x magnification across 14/15/16/18/20: 16 is the first
-                // size where the gear's teeth and the keyboard's keys are distinct, and 18 is cleaner still but too
-                // large beside 12px labels in a 26px row.
-                FontSize = 16,
-            };
-
-            // Ideal, against the Display mode the menu sets for its text, and deliberately only here. Display snaps
-            // glyph outlines to the pixel grid the way GDI did, which is what makes small TEXT crisp and what
-            // visibly distorts an icon: the same comparison showed uneven stems and a blobby gear under Display at
-            // every size. Grayscale rather than ClearType because subpixel antialiasing puts colour fringes on a
-            // monochrome glyph, which reads as a rendering fault on the dark palettes.
-            TextOptions.SetTextFormattingMode(icon, TextFormattingMode.Ideal);
-            TextOptions.SetTextRenderingMode(icon, TextRenderingMode.Grayscale);
-
-            element.Icon = icon;
+            element.Icon = MenuGlyph.Create(item.Glyph);
         }
 
         if (item.Submenu is { Count: > 0 })

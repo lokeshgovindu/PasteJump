@@ -210,6 +210,126 @@ internal static class Program
                         }
                     });
 
+                // The Kind filter and the row menu, both asked for after a store of 5,718 mixed entries made
+                // finding one picture a scroll. Two things are checked that a screenshot cannot show: that the
+                // filter really narrows the rows (a grid of text entries with "Images" in the combo looks like a
+                // correctly rendered window), and the SHAPE of the row menu - it lives in its own popup HWND, so
+                // nothing rendered here contains it.
+                Check(
+                    "HistoryWindow-Filtered",
+                    () =>
+                    {
+                        var window = new HistoryWindow(store, new NullClipboard(), new SelfWriteGuard(), formatters);
+
+                        window.Loaded += (_, _) =>
+                        {
+                            window.SetKindFilterForSmokeTest(PasteKindFilter.Images);
+                            window.SelectRowForSmokeTest(0);
+                        };
+
+                        return window;
+                    },
+                    static (window, _) =>
+                    {
+                        var history = (HistoryWindow)window;
+
+                        var kinds = history.VisibleKindsForSmokeTest();
+
+                        if (kinds.Count == 0)
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  the images filter left no rows at all - the seed no longer covers this case");
+                        }
+                        else if (kinds.Any(k => k != ClipKind.Image))
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  the images filter left {string.Join(", ", kinds)} in the grid");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"  history: the images filter leaves {kinds.Count} kind in the grid");
+                        }
+
+                        // The status line is the only place a filter hiding rows is admitted. A window quietly
+                        // showing a fraction of the store is the failure this application has already had twice.
+                        if (history.StatusForSmokeTest().Contains("images only", StringComparison.Ordinal))
+                        {
+                            Console.WriteLine($"  history: status says so - \"{history.StatusForSmokeTest()}\"");
+                        }
+                        else
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  the status line does not name the filter: \"{history.StatusForSmokeTest()}\"");
+                        }
+
+                        // One row selected, History view, a filter on.
+                        var menu = history.RowMenuForSmokeTest();
+
+                        Console.WriteLine($"  row menu (history, 1 row): {string.Join(" | ", menu)}");
+
+                        if (menu.Count == 0)
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  the row menu would not open on a selected row");
+                        }
+
+                        // Pinning is a clip's property, so the item must be absent here rather than disabled - the
+                        // toolbar button is absent for the same reason.
+                        if (menu.Any(h => h.Contains("Pin", StringComparison.Ordinal)))
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  the row menu offers Pin in the History view, where nothing can be pinned");
+                        }
+
+                        // With a filter on, the way back out of it has to be in the menu.
+                        if (!menu.Any(h => h.Contains("All Kinds", StringComparison.Ordinal)))
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  a filtered grid offers no way to clear the filter from the row menu");
+                        }
+
+                        // Several rows: Copy relabels, exactly as the toolbar button does, and Delete says how many.
+                        // The filter comes off first - the seed holds one image, so selecting "three rows" under it
+                        // selected one, and the first version of this check failed for that reason rather than
+                        // finding anything. A multi-row assertion needs multiple rows to be reachable.
+                        history.SetKindFilterForSmokeTest(PasteKindFilter.All);
+                        Drain();
+                        history.SelectFirstRowsForSmokeTest(3);
+                        Drain();
+
+                        var many = history.RowMenuForSmokeTest();
+
+                        Console.WriteLine($"  row menu (history, 3 rows): {string.Join(" | ", many)}");
+
+                        if (!many.Any(h => h.Contains("Joined", StringComparison.Ordinal)))
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  the row menu does not offer Copy Joined with several rows selected");
+                        }
+
+                        // And the Clips view, where Pin must appear.
+                        history.ShowClipsForSmokeTest();
+                        Drain();
+                        history.SelectRowForSmokeTest(0);
+                        Drain();
+
+                        var clips = history.RowMenuForSmokeTest();
+
+                        Console.WriteLine($"  row menu (clips, 1 row): {string.Join(" | ", clips)}");
+
+                        if (!clips.Any(h => h.Contains("Pin", StringComparison.Ordinal)))
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  the row menu offers no Pin in the Clips view");
+                        }
+
+                        if (clips.Any(h => h.Contains("All Kinds", StringComparison.Ordinal)))
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  the row menu offers to clear a filter that is not on");
+                        }
+                    });
+
                 // Several rows selected, then joined. Two shots because they are two different states and each
                 // is only reachable here: the Copy button relabels itself to "Copy Joined" with more than one row
                 // selected, and the status line a join produces is written nowhere else. They cannot be one shot,
