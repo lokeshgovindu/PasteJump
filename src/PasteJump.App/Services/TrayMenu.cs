@@ -17,6 +17,12 @@ namespace PasteJump.App.Services;
 /// <c>E768</c> is a play triangle, so it is Resume rather than Pause, and <c>E733</c> is a clean prohibition sign
 /// where <c>E71A</c> turned out to be a plain rounded square.
 /// </para>
+/// <para>
+/// Help was <c>E897</c>, a bare question mark, and it changed after the menu was rendered beside itself: every other
+/// glyph of its sort here is enclosed - About's <c>i</c>, Disable's prohibition sign, Exit's cross - so the loose
+/// <c>?</c> read as lighter and smaller than its neighbours. <c>E9CE</c> is the same circle as About's, and was
+/// confirmed to exist in <c>Segoe MDL2 Assets</c> as well as Fluent, which is what the Windows 10 floor needs.
+/// </para>
 /// </remarks>
 internal static class TrayGlyph
 {
@@ -25,7 +31,7 @@ internal static class TrayGlyph
     public const string Pause = "";        // two bars
     public const string Resume = "";       // a play triangle - the same item, the other way round
     public const string Settings = "";     // a gear
-    public const string Manual = "";       // a question mark
+    public const string Manual = "";       // a question mark in a circle, matching About's i
     public const string Keys = "";         // a keyboard
     public const string Updates = "";      // Sync: two arrows chasing each other
     public const string Disable = "";      // a prohibition sign
