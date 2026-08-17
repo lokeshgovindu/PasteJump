@@ -1046,7 +1046,9 @@ public sealed class ClipStore : IDisposable
         {
             ClipKind.Image => "[image]",
             ClipKind.Files => "[files]",
-            _ => "[binary]",
+
+            // Named rather than a bare "[binary]": see BinaryPreview for the report that asked for it.
+            _ => BinaryPreview.Describe(snapshot.Payloads),
         };
     }
 

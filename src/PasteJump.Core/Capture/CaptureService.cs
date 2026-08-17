@@ -285,7 +285,9 @@ public sealed class CaptureService
             {
                 ClipKind.Image => "[image]",
                 ClipKind.Files => "[files]",
-                _ => "[binary]",
+
+                // Named rather than a bare "[binary]": see BinaryPreview for the report that asked for it.
+                _ => BinaryPreview.Describe(snapshot.Payloads),
             };
 
         _store.AddHistory(_clock.UtcNow, snapshot.Kind, preview, blob, snapshot.TotalBytes);
