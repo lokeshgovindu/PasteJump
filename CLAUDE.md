@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 910 in Debug (`dotnet test`) - 858 in Core.Tests, 52 in Interop.Tests; **908 in Release**, see below |
+| Tests | 913 in Debug (`dotnet test`) - 861 in Core.Tests, 52 in Interop.Tests; **911 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1085,27 +1085,33 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     entered **0 times**. Lesson worth keeping: when a test of routing passes, count the handler entries before
     believing it. The check now asks the extracted `ShouldStartPan` predicate about the real `ScrollBar` in the
     visual tree, and about `PreviewImage` for the other direction. Verified it fails with the guard neutered.
-- **A clip that is `Other` names its format now, and the report behind that is worth keeping (2026-08-17).** Two
-  ShareX screenshots were taken; one arrived as a 7.2 MB `Image` and the other as `Other`, 708 bytes, previewed as
-  `[binary]`. The store settles what happened, and it is not a PasteJump defect: that clip held
-  `System.Drawing.Bitmap` (484 B), `Ole Private Data` (216 B) and `DataObject` (8 B) - **a .NET object where a
-  bitmap should have been**, with no `CF_DIB` beside it and far too few bytes to be a screenshot. The clip 27
-  seconds later, which worked, has `fmt 8` at 7.5 MB. So the pixels were never on the clipboard in any form Win32
-  can read, and PasteJump stored faithfully what it was offered.
-  - **`CF_BITMAP` was not the missing piece**, though the capture path invites the suspicion, since
-    `NonGlobalFormats` skips it before anything is recorded. Windows synthesises `CF_DIB` and `CF_DIBV5` from a
-    `CF_BITMAP` the owner set, and `EnumClipboardFormats` reports synthesised formats, so a bitmap-only clipboard
-    still shows `fmt 8` and is captured. No `fmt 8` therefore means no bitmap was offered at all. This rests on
-    documented synthesis rather than an experiment - writing a `CF_BITMAP`-only clipboard to prove it would have
-    added a junk clip to a real 5,882-entry history.
-  - **What changed is the preview**, not the capture: `BinaryPreview.Describe` names the largest payload, so the row
-    reads `[binary: System.Drawing.Bitmap]`. The largest wins with no ignore-list, because OLE's bookkeeping is
-    small by nature and size already sorts the subject from the paperwork. It is also what `history_fts` indexes, so
-    these clips became searchable by format name. Old rows keep `[binary]` - the preview is written at capture.
-  - **The salvage nobody has proved is worth it**: reading the clipboard through `OleGetClipboard` or the managed
-    `Clipboard.GetImage()`, which understand .NET's serialized formats, in the case where raw Win32 finds no image.
-    Left undone deliberately. 484 bytes is strong evidence there were no pixels to recover, so it would be a
-    guess - and the named preview means the next occurrence arrives with its format already on the row.
+- **A screenshot stored as `[binary]`, 708 bytes: PasteJump read the clipboard mid-write (2026-08-17).** Two
+  ShareX screenshots; the first became `Other`/708 B and the second a 7.2 MB `Image`. **This was a PasteJump
+  defect, and the first reading of it here was wrong** - the store's format list looked like a writer that never
+  offered pixels, and that conclusion was recorded before the timing had been measured. What settles it: both
+  files are 1912x987, whose pixels are **7,548,576 bytes**, and the clip that worked holds `fmt 8` at 7,548,628 B.
+  The image existed both times.
+  - **The mechanism, measured with a probe, not reasoned about.** A WinForms writer doing
+    `Clipboard.SetDataObject(..., copy: true)` - what ShareX does - publishes in two phases: `OleSetClipboard`
+    announces the object and raises a notification, `OleFlushClipboard` renders afterwards. The probe found the
+    clipboard **locked for the first ~50 ms** and its `CF_DIB` readable **51 ms after** the notification; a reader
+    that wins the lock mid-sequence sees the OLE entries with no pixels at all.
+  - **Why the existing guard missed it.** `BookkeepingFormats.CarriesNoUserContent` already retries exactly this
+    case, but it demands that *every* format be bookkeeping and its list held four names. The clip also carried
+    `System.Drawing.Bitmap` (484 B) - a .NET **type name**, not a rendered format, holding whatever serialisation
+    produced, which since BinaryFormatter's removal is a stub - so "all bookkeeping" was false and a half-written
+    clipboard was stored as a clip. That name is now on the list; the two capture tests fail without it.
+  - **The list's own warning applies to this entry**: a large serialised bitmap from an old framework will now be
+    retried and, failing anything better, dropped. Right trade while it cannot be decoded either way. The sibling
+    type names are deliberately absent - no clip has been seen carrying one, and the list warns against guessing.
+  - **`BinaryPreview` came out of the same report and is still worth having**: an `Other` clip reads
+    `[binary: System.Drawing.Bitmap]` rather than `[binary]`, largest payload wins with no ignore-list, and it is
+    what `history_fts` indexes. It is what would have made this diagnosable from the row instead of the database -
+    and note the first, wrong conclusion was reached *because* the row said so little.
+  - **Not done**: a grace delay before the first open attempt, which would also stop PasteJump stealing the lock
+    from a writer mid-flush. `DefaultBackoffMs` still starts at 0. The retry now covers the symptom; whether
+    PasteJump's own read is what made ShareX's flush fail was not established, and no clip should be dropped on a
+    guess about that.
 - **The history table filters by kind and its rows have a menu (2026-08-15), and both are built out of things that
   already existed.** Asked for against a real store of 5,718 mixed entries, where finding one picture was a scroll.
   The filter is the gesture's own `PasteKindFilter` from `Core` - the same four states in the same order as the `K`
@@ -1548,8 +1554,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 910 tests (Debug)
-dotnet test -c Release                              # 908 - what CI runs, and it is not the same set
+dotnet test                                         # 913 tests (Debug)
+dotnet test -c Release                              # 911 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

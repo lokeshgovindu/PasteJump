@@ -121,6 +121,88 @@ public sealed class CaptureServiceTests : IDisposable
         Assert.Equal(0, capture.BookkeepingOnlySkipCount);
     }
 
+    /// <summary>
+    /// The clip from the report: a ShareX screenshot stored as <c>Other</c>, 708 bytes, while the same
+    /// screenshot saved to disk perfectly and the next one captured as a 7.2 MB image.
+    /// </summary>
+    /// <remarks>
+    /// The payload set is that clip's, byte for byte. It slipped past the bookkeeping rule because
+    /// <c>System.Drawing.Bitmap</c> was not on the list, so "all bookkeeping" was false and a half-written
+    /// clipboard was stored as though the copy were finished. Both screenshots were 1912x987, whose pixels are
+    /// 7,548,576 bytes - 484 cannot be any part of one.
+    /// </remarks>
+    [Fact]
+    public void DoesNotStoreAnOleWriteCaughtBeforeItsPixelsWereRendered()
+    {
+        _clipboard.EnqueueRead(HalfWrittenScreenshotSnapshot());
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        Assert.Equal(0, _store.Count);
+        Assert.Equal(1, capture.BookkeepingOnlySkipCount);
+    }
+
+    /// <summary>
+    /// And the screenshot is not lost: the retry is what stores it, once the writer has flushed its formats.
+    /// Measured at 51 ms behind the notification in a probe of a WinForms <c>SetDataObject(..., copy: true)</c>.
+    /// </summary>
+    [Fact]
+    public void TheRetryStoresTheScreenshotOnceItsPixelsArrive()
+    {
+        _clipboard.EnqueueRead(HalfWrittenScreenshotSnapshot());
+        _clipboard.EnqueueRead(ScreenshotSnapshot());
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        _scheduler.RunPending();
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(ClipKind.Image, _store.GetOrdered()[0].Kind);
+    }
+
+    /// <summary>
+    /// The other side of the same rule: a rendered image is stored even though the same OLE entries are
+    /// beside it. Without this the fix above would suppress every OLE image copy - which is most of them.
+    /// </summary>
+    [Fact]
+    public void StoresARenderedImageThatCarriesTheSameOleEntries()
+    {
+        _clipboard.EnqueueRead(ScreenshotSnapshot());
+
+        var capture = Build();
+        capture.Prime();
+        SignalChange(capture);
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(0, capture.BookkeepingOnlySkipCount);
+    }
+
+    /// <summary>The reported clip's payload set, exactly as the store held it.</summary>
+    private static ClipboardSnapshot HalfWrittenScreenshotSnapshot() => new(
+        [
+            new ClipPayload(50198, "System.Drawing.Bitmap", new byte[484]),
+            new ClipPayload(49171, "Ole Private Data", new byte[216]),
+            new ClipPayload(49161, "DataObject", new byte[8]),
+        ],
+        null,
+        ClipKind.Other,
+        "msedge.exe");
+
+    /// <summary>The same copy after the writer flushed it: CF_DIB present, OLE entries still there.</summary>
+    private static ClipboardSnapshot ScreenshotSnapshot() => new(
+        [
+            new ClipPayload(8, null, new byte[7_548_628]),
+            new ClipPayload(49171, "Ole Private Data", new byte[216]),
+            new ClipPayload(49161, "DataObject", new byte[8]),
+        ],
+        null,
+        ClipKind.Image,
+        "msedge.exe");
+
     /// <summary>The eight-byte marker set observed in a real store, for the tests above.</summary>
     private static ClipboardSnapshot BookkeepingSnapshot() => new(
         [

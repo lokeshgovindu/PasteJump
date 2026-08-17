@@ -46,6 +46,28 @@ public static class BookkeepingFormats
         "Ole Private Data",
         "Object Descriptor",
         "Link Source Descriptor",
+
+        // The .NET object entry, and the reason this list grew after the rule above was written.
+        //
+        // Reported as a ShareX screenshot arriving as "[binary]", 708 bytes, while the screenshot itself
+        // saved perfectly and the next one 27 seconds later captured as a 7.2 MB image. The stored clip was
+        // System.Drawing.Bitmap (484 B) beside DataObject (8 B) and Ole Private Data (216 B) - so the set was
+        // NOT all bookkeeping by the rule above, and a half-written clipboard was stored as though it were a
+        // clip. Both screenshots are 1912x987, whose pixels are 7,548,576 bytes; 484 cannot be any part of that.
+        //
+        // Confirmed with a probe rather than reasoned about: a WinForms writer doing
+        // Clipboard.SetDataObject(..., copy: true) leaves the clipboard locked for the first ~50 ms, and a
+        // reader that wins that lock mid-sequence sees only the OLE entries with no CF_DIB. Its pixels became
+        // readable 51 ms after the notification.
+        //
+        // This is a type name, not a rendered format: what it holds is whatever .NET serialised, which since
+        // BinaryFormatter's removal is a stub of a few hundred bytes. PasteJump can neither show it nor
+        // usefully write it back, so on its own it is not a clip. Note the risk the list's own rule warns
+        // about is real here - a large serialised bitmap from an old framework would now be retried and, if
+        // nothing better follows, dropped. That is the right trade while it cannot be decoded either way, and
+        // the sibling type names (Metafile and the rest) are deliberately NOT listed: no clip has been seen
+        // carrying one, and guessing at this list is what it warns against.
+        "System.Drawing.Bitmap",
     ];
 
     /// <summary>
