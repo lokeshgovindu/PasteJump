@@ -248,6 +248,30 @@ public sealed class PasteJumpSettings
     public int OverlayPreviewMaxHeight { get; set; } = 400;
 
     /// <summary>
+    /// The font the paste overlay draws in. Empty means the built-in look, which is not one font: the labels use
+    /// the system UI font and the clip preview uses <c>Consolas</c>, because a proportional font makes a text
+    /// preview harder to scan.
+    /// <para>
+    /// Set to a family name and it applies to the whole overlay, preview included. That is deliberate: "change
+    /// the overlay's font" should change what you are looking at rather than most of it, and anyone who wants the
+    /// preview to stay monospaced can name a monospaced font. An unknown name is not an error - WPF falls back to
+    /// the default face - but the Settings dialog offers installed families so a typo is not reachable from there.
+    /// </para>
+    /// </summary>
+    public string OverlayFontFamily { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The overlay's text size in device-independent pixels. The whole overlay scales with it, keeping the one
+    /// point of difference it has always had: the detail line is a point smaller than the clip's own text.
+    /// </summary>
+    /// <remarks>
+    /// 12 is the size every part of the overlay was written at, so the default changes nothing. The ceiling is
+    /// what fits: the overlay is anchored at the caret and grows downwards, and beyond ~24 it stops being a strip
+    /// beside your work and starts covering the thing you are pasting into.
+    /// </remarks>
+    public int OverlayFontSize { get; set; } = 12;
+
+    /// <summary>
     /// Characters of a text clip shown in the paste overlay before it is elided.
     /// <para>
     /// Separate from <see cref="PreviewMaxChars"/>, which is about what gets <em>stored</em>. This one is about
@@ -475,6 +499,11 @@ public sealed class PasteJumpSettings
         // Floor is high enough that search still has something to index; the ceiling is where a preview column
         // stops being a preview. Text past it is archived whole regardless, so neither bound loses data.
         PreviewMaxChars = Math.Clamp(PreviewMaxChars, SettingsBounds.PreviewMaxChars.Min, SettingsBounds.PreviewMaxChars.Max);
+        OverlayFontSize = Math.Clamp(OverlayFontSize, SettingsBounds.OverlayFontSize.Min, SettingsBounds.OverlayFontSize.Max);
+
+        // Trimmed rather than validated against installed families: a font that is not on this machine may well be
+        // on the next one the settings file travels to, and dropping the name here would silently lose it.
+        OverlayFontFamily = OverlayFontFamily?.Trim() ?? string.Empty;
 
         // Either both or neither. See OverlayX for why half a fixed position is not a state worth having.
         if (OverlayX is null || OverlayY is null)

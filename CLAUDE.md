@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 913 in Debug (`dotnet test`) - 861 in Core.Tests, 52 in Interop.Tests; **911 in Release**, see below |
+| Tests | 916 in Debug (`dotnet test`) - 864 in Core.Tests, 52 in Interop.Tests; **914 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1085,6 +1085,33 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     entered **0 times**. Lesson worth keeping: when a test of routing passes, count the handler entries before
     believing it. The check now asks the extracted `ShouldStartPan` predicate about the real `ScrollBar` in the
     visual tree, and about `PreviewImage` for the other direction. Verified it fails with the guard neutered.
+- **The overlay's font is a setting; its colours deliberately are not (2026-08-17).** Asked for as "font and
+  colour", then narrowed by the user once it was pointed out that the overlay's colours already come from the
+  theme - which they do, through the same palette brushes every window uses, so a theme file is the colour
+  setting and a second route would have been two ways to answer one question.
+  - **`OverlayFontFamily` empty means the built-in look, and that look is two fonts** - the system UI face for
+    labels, `Consolas` for the clip's own text, because a proportional font makes a text preview harder to scan.
+    Naming a font applies it to **all** of the overlay, preview included: "change the overlay's font" should
+    change what you are looking at rather than most of it, and anyone wanting an aligned preview names a
+    monospaced font. That is why the default is empty rather than `"Segoe UI"` - storing one name would silently
+    make the preview proportional.
+  - **The name is never validated against installed families.** A settings file travels between machines, so a
+    font missing here may be present there; `Normalise` trims and keeps it. The dialog offers installed families
+    only, and a saved name this machine lacks is *added* to the combo rather than reset, or opening Settings
+    would quietly discard it on the next save. Each name is drawn in its own face - the difference between
+    choosing a font and guessing at one from a list of words.
+  - **The overlay's typography is four resource keys** (`OverlayFontFamily`, `OverlayMonoFontFamily`,
+    `OverlayFontSize`, `OverlaySmallFontSize`) with defaults in `OverlayWindow.xaml` and overrides written by
+    `ApplyFont`. **The defaults must stay in the XAML**: the window is also shown with no settings applied at
+    all, which is how the UI smoke harness renders it. The detail line is size **minus one**, not a ratio, so
+    the one step of difference survives at 9px where a proportion would round it away.
+  - **`OverlayWindow-Font` asserts and shoots, and needs both.** The shot shows 18px Cascadia Mono still laying
+    out; the assertions catch what a shot cannot - a resource key misspelled in either place leaves a perfectly
+    normal-looking 12px overlay. `LargestTextSizeForSmokeTest` walks the visual tree rather than reading the
+    resources, which is the point: a `FontSize="12"` left behind in the XAML would keep a row at twelve while
+    every resource said 18. Verified by making `ApplyFont` return early: 3 failures.
+  - Applied through `PasteJumpPasteHost.SetOverlayFont`, which remembers as well as applies - the overlay is
+    built lazily on the first gesture, long after the settings were read, exactly as `SetPreviewSize` handles.
 - **A screenshot stored as `[binary]`, 708 bytes: PasteJump read the clipboard mid-write (2026-08-17).** Two
   ShareX screenshots; the first became `Other`/708 B and the second a 7.2 MB `Image`. **This was a PasteJump
   defect, and the first reading of it here was wrong** - the store's format list looked like a writer that never
@@ -1554,8 +1581,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 913 tests (Debug)
-dotnet test -c Release                              # 911 - what CI runs, and it is not the same set
+dotnet test                                         # 916 tests (Debug)
+dotnet test -c Release                              # 914 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

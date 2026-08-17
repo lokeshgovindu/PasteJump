@@ -230,6 +230,16 @@ the Windows <i>taskbar</i> colour, which is a separate Windows setting.</td></tr
 <tr><td class="name">Edit… / Duplicate… / Reload / Folder</td><td>For working on themes: open this one's file,
 start a new one from the colours on screen, re-read the folder after saving an edit, or open the folder itself.
 Again, <a href="themes.html">Themes</a> has the detail.</td></tr>
+<tr><td class="name">Overlay Font</td><td>The font the paste overlay draws in. <b>(default)</b> is the built-in
+look, which is two fonts: the system UI font for the labels and <code>Consolas</code> for the clip's own text.
+Choosing a font applies it to <b>all</b> of the overlay, the clip text included &mdash; so pick a monospaced font if
+you want text previews to stay aligned. The list shows each font in its own face, and only fonts installed here; a
+name typed straight into the settings file is kept even if this machine lacks it, so a file can travel between
+machines. Colours are not here because they come from the <a href="themes.html">theme</a>.</td></tr>
+<tr><td class="name">Overlay Text Size</td><td>9 to 24. The whole overlay scales with it, keeping the one size
+difference it has always had: the detail line stays a point smaller than the clip's text. 12 is what it was designed
+at. Well above 24 it stops being a strip beside your work and starts covering what you are pasting into, which is
+why that is the ceiling.</td></tr>
 <tr><td class="name">What the Overlay Shows</td><td>Switches for everything the overlay says beyond the clip itself,
 all on to begin with: the position in the stack, the paste format, tags, the application it was copied from, the
 <code>PINNED</code> marker, and the key reminder along the bottom. The row under the preview is chosen <b>per kind of

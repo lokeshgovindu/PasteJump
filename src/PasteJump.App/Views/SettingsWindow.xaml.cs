@@ -344,6 +344,21 @@ public partial class SettingsWindow : Window
             ThemeCombo.Items.Add(theme.Name);
         }
 
+        // The installed families, sorted, with "(default)" first for the built-in two-font look. Read from
+        // Fonts.SystemFontFamilies rather than kept as a list: fonts get installed, and a stale list would be a
+        // dialog that cannot offer the font the user just added. Source is the family's own name where it has one
+        // for the current culture, so a Japanese system shows the names its users would recognise.
+        OverlayFontFamilyCombo.Items.Add(DefaultFontLabel);
+
+        foreach (var name in System.Windows.Media.Fonts.SystemFontFamilies
+                     .Select(NameOf)
+                     .Where(static n => n.Length > 0)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(static n => n, StringComparer.CurrentCultureIgnoreCase))
+        {
+            OverlayFontFamilyCombo.Items.Add(name);
+        }
+
         // The only place a skipped theme file can be reported. The catalogue deliberately does not fail at start-up
         // over one, so without this a file with a typo in it would simply never appear and nothing would say why.
         ShowThemeProblems();
@@ -478,6 +493,12 @@ public partial class SettingsWindow : Window
         PreviewWidthBox.Text = source.OverlayPreviewMaxWidth.ToString(CultureInfo.CurrentCulture);
         PreviewHeightBox.Text = source.OverlayPreviewMaxHeight.ToString(CultureInfo.CurrentCulture);
         OverlayPreviewCharsBox.Text = source.OverlayPreviewChars.ToString(CultureInfo.CurrentCulture);
+
+        OverlayFontSizeBox.Text = source.OverlayFontSize.ToString(CultureInfo.CurrentCulture);
+
+        // A saved font this machine does not have is added to the list rather than silently reset: the settings
+        // file may have come from another machine, and quietly dropping the name would lose it on the next save.
+        OverlayFontFamilyCombo.SelectedItem = SelectableFontName(source.OverlayFontFamily);
 
         // Empty rather than "0" for "not set". Zero is a legal screen coordinate, so using it as the sentinel
         // would make the top-left corner unreachable.
@@ -2031,6 +2052,8 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayFontFamily)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayFontSize)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayX)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayY)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayKeyHint)] = "Appearance",
@@ -2305,6 +2328,13 @@ public partial class SettingsWindow : Window
             return false;
         }
 
+        if (!int.TryParse(OverlayFontSizeBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var overlayFontSize)
+            || !SettingsBounds.OverlayFontSize.Admits(overlayFontSize))
+        {
+            error = SettingsBounds.OverlayFontSize.Refuse("Overlay text size");
+            return false;
+        }
+
         if (!int.TryParse(OverlayPreviewCharsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var overlayChars)
             || !SettingsBounds.OverlayPreviewChars.Admits(overlayChars))
         {
@@ -2440,6 +2470,10 @@ public partial class SettingsWindow : Window
         settings.OverlayPreviewMaxWidth = previewWidth;
         settings.OverlayPreviewMaxHeight = previewHeight;
         settings.OverlayPreviewChars = overlayChars;
+        settings.OverlayFontSize = overlayFontSize;
+        settings.OverlayFontFamily = OverlayFontFamilyCombo.SelectedItem is string font && font != DefaultFontLabel
+            ? font
+            : string.Empty;
         settings.ShowOverlayKeyHint = ShowKeyHintCheck.IsChecked == true;
         settings.ShowOverlayPosition = ShowPositionCheck.IsChecked == true;
         settings.ShowOverlayTextDetails = TextDetailsCheck.IsChecked == true;
@@ -2495,4 +2529,56 @@ public partial class SettingsWindow : Window
         settings.Normalise();
         return true;
     }
+    /// <summary>What the font combo calls "no font chosen". Not a font name, so it cannot collide with one.</summary>
+    private const string DefaultFontLabel = "(default)";
+
+    /// <summary>
+    /// A family's name in the user's own language where it has one, falling back to its invariant name.
+    /// </summary>
+    private static string NameOf(System.Windows.Media.FontFamily family)
+    {
+        var names = family.FamilyNames;
+
+        foreach (var culture in new[] { System.Globalization.CultureInfo.CurrentUICulture, System.Globalization.CultureInfo.InvariantCulture })
+        {
+            var key = System.Windows.Markup.XmlLanguage.GetLanguage(culture.IetfLanguageTag);
+
+            if (names.TryGetValue(key, out var localised) && localised.Length > 0)
+            {
+                return localised;
+            }
+        }
+
+        // Source is the last resort and can carry a URI for a private font, so take the family segment only.
+        var source = family.Source ?? string.Empty;
+        var hash = source.LastIndexOf('#');
+
+        return hash >= 0 ? source[(hash + 1)..] : source;
+    }
+
+    /// <summary>
+    /// The combo item standing for a saved family name, adding it to the list when this machine lacks the font.
+    /// </summary>
+    private string SelectableFontName(string? saved)
+    {
+        if (string.IsNullOrWhiteSpace(saved))
+        {
+            return DefaultFontLabel;
+        }
+
+        var name = saved.Trim();
+
+        foreach (var item in OverlayFontFamilyCombo.Items)
+        {
+            if (item is string existing && string.Equals(existing, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return existing;
+            }
+        }
+
+        OverlayFontFamilyCombo.Items.Add(name);
+
+        return name;
+    }
+
 }

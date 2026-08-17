@@ -538,6 +538,51 @@ internal static class Program
                 // its place was reported as meaningless.
                 Check("OverlayWindow-Deleted", () => RenderOverlay(TextFactsFrame(), deleted: true));
 
+                // The overlay's font, asked for so the gesture can be read in a face and at a size of the user's
+                // choosing. Its colours were left alone deliberately - those come from the theme.
+                //
+                // A shot AND an assertion, because they catch different things: a screenshot shows whether 18px in
+                // Cascadia Mono still lays out, and the assertion catches the failure a screenshot cannot, which is
+                // the setting never arriving. ApplyFont writes resource keys that the XAML also defines defaults
+                // for, so a typo in either name leaves the overlay looking perfectly normal at 12px.
+                Check(
+                    "OverlayWindow-Font",
+                    () => RenderOverlay(TextFrame(), font: ("Cascadia Mono", 18)),
+                    static (window, _) =>
+                    {
+                        var overlay = (OverlayWindow)window;
+
+                        var size = overlay.Resources["OverlayFontSize"] as double?;
+                        var small = overlay.Resources["OverlaySmallFontSize"] as double?;
+                        var family = (overlay.Resources["OverlayFontFamily"] as System.Windows.Media.FontFamily)?.Source;
+                        var mono = (overlay.Resources["OverlayMonoFontFamily"] as System.Windows.Media.FontFamily)?.Source;
+
+                        Console.WriteLine($"  overlay font: {family} {size}px, details {small}px, clip text {mono}");
+
+                        if (size != 18 || small != 17)
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  the overlay's size resources are {size}/{small}, expected 18/17");
+                        }
+
+                        // One font for the whole overlay including the clip's own text, which is the documented
+                        // behaviour: anyone wanting an aligned preview names a monospaced font, as this case does.
+                        if (family != "Cascadia Mono" || mono != "Cascadia Mono")
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  the chosen font did not reach the overlay: labels={family}, clip text={mono}");
+                        }
+
+                        // And the rendered text really is at the new size - the resources could be right while a
+                        // literal left behind in the XAML keeps a row at 12.
+                        if (overlay.LargestTextSizeForSmokeTest() < 18)
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  nothing in the overlay draws at 18px; largest is {overlay.LargestTextSizeForSmokeTest()}");
+                        }
+                    });
+
+
                 Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
 
                 // A copied TEXT FILE, whose contents are read off disk. Written as a real file because that is
@@ -650,7 +695,8 @@ internal static class Program
         OverlayParts? parts = null,
         byte[]? imageBytes = null,
         (int Width, int Height)? previewSize = null,
-        bool deleted = false)
+        bool deleted = false,
+        (string? Family, int Size)? font = null)
     {
         var overlay = new OverlayWindow();
 
@@ -668,6 +714,11 @@ internal static class Program
             if (previewSize is { } size)
             {
                 overlay.ApplyPreviewSize(size.Width, size.Height);
+            }
+
+            if (font is { } chosenFont)
+            {
+                overlay.ApplyFont(chosenFont.Family, chosenFont.Size);
             }
 
             // The hint is one of the parts, so it follows the same value rather than being hard-coded on - otherwise

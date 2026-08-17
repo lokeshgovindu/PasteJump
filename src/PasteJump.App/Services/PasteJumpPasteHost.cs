@@ -95,6 +95,19 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     }
 
     /// <summary>
+    /// Sets the overlay's font, applying it now if the overlay exists and remembering it for when it is next
+    /// created - the same two-part job as <see cref="SetPreviewSize"/>, and for the same reason: the overlay is
+    /// built on the first gesture, long after the settings were read.
+    /// </summary>
+    public void SetOverlayFont(string? family, int size)
+    {
+        _overlayFontFamily = family;
+        _overlayFontSize = size;
+
+        _overlay?.ApplyFont(family, size);
+    }
+
+    /// <summary>
     /// Sets the overlay's image-preview ceiling, applying it now if the overlay already exists and remembering
     /// it for when it is next created. Also the width thumbnails are decoded at, so a larger preview is a
     /// larger decode rather than a smaller one stretched.
@@ -108,6 +121,11 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
         _overlay?.ApplyPreviewSize(maxWidth, maxHeight);
     }
     private IReadOnlyList<ClipPayload>? _savedClipboard;
+    /// <summary>The size an unconfigured overlay uses - the same 12 the XAML defaults to.</summary>
+    private const int DefaultOverlayFontSize = 12;
+
+    private string? _overlayFontFamily;
+    private int _overlayFontSize = DefaultOverlayFontSize;
 
     public PasteJumpPasteHost(
         ClipStore store,
@@ -251,6 +269,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
             // Applied on creation as well as on change, because the overlay is created lazily on the first
             // gesture - which is usually long after the settings were loaded.
+            _overlay.ApplyFont(_overlayFontFamily, _overlayFontSize);
             _overlay.ApplyPreviewSize(_previewMaxWidth, _previewMaxHeight);
             _overlay.ApplyKeyHint(_showKeyHint, _triggerKey, _keyMap);
             _overlay.ApplyParts(_overlayParts);

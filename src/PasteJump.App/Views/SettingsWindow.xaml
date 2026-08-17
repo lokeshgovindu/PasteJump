@@ -791,6 +791,45 @@
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="The most room an image preview may take in the overlay during the gesture. A maximum, not a size — a smaller picture is drawn at its own dimensions and never enlarged. Raise it to judge a screenshot while pasting; lower it to keep the overlay out of the way of the document underneath. Width 120 to 1400, height 80 to 900. Long text previews follow the height too." />
 
+                        <!--
+                            The overlay's font. Here rather than in the Paste Mode tab because this tab is where
+                            everything about how the application LOOKS lives, and the theme it sits under is the
+                            other half of the same question - the overlay's colours come from that theme, so a font
+                            setting beside it is the pair completed.
+                        -->
+                        <Grid Style="{StaticResource SettingRow}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="190" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Overlay Font" />
+                            <!--
+                                Each name drawn in its own face, which is the difference between choosing a font
+                                and guessing at one from a list of words. "(default)" is not a family, so WPF
+                                falls back to the standard face for it - which is exactly what it stands for.
+                            -->
+                            <ComboBox x:Name="OverlayFontFamilyCombo" Grid.Column="1">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" FontFamily="{Binding}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Text="The font the paste overlay draws in. &quot;(default)&quot; is the built-in look, which is two fonts: the system UI font for the labels and Consolas for the clip's own text. Choosing a font applies it to all of the overlay, the clip text included — pick a monospaced font if you want text previews to stay aligned. Only installed fonts are listed, but a name typed into the settings file is kept even if this machine lacks it." />
+
+                        <Grid Style="{StaticResource SettingRow}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="96" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Overlay Text Size" />
+                            <TextBox x:Name="OverlayFontSizeBox" Grid.Column="1" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Text="Text size in the overlay, 9 to 24. Everything scales with it and the detail line stays one point smaller. 12 is the size the overlay was designed at; much above 24 it stops being a strip beside your work and starts covering what you are pasting into." />
+
                         <Grid Style="{StaticResource SettingRow}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

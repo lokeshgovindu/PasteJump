@@ -1,9 +1,11 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PasteJump.App.Services;
 using PasteJump.Core.Model;
+using PasteJump.Core.Settings;
 using PasteJump.Core.PasteMode;
 
 namespace PasteJump.App.Views;
@@ -285,6 +287,43 @@ public partial class OverlayWindow : Window
     /// limits disagreeing.
     /// </para>
     /// </summary>
+    /// <summary>Sets the overlay's font. Applies to a visible overlay as well as the next one.</summary>
+    /// <param name="family">
+    /// A font family name, or empty for the built-in look - the system UI font for labels with the clip's own
+    /// text in Consolas. A name applies to the whole overlay, preview included; see the setting for why.
+    /// </param>
+    /// <param name="size">
+    /// Text size in device-independent pixels, clamped to <see cref="SettingsBounds.OverlayFontSize"/>. The
+    /// detail line stays a point smaller, which is the one size difference the overlay has always had.
+    /// </param>
+    /// <remarks>
+    /// Writes the same four resource keys the XAML defines defaults for, so the bindings there re-resolve. A
+    /// <see cref="FontFamily"/> is constructed from the name rather than validated: an unknown family falls back
+    /// to the default face, which is a better outcome than refusing to draw the overlay at all.
+    /// </remarks>
+    public void ApplyFont(string? family, int size)
+    {
+        var clamped = Math.Clamp(size, SettingsBounds.OverlayFontSize.Min, SettingsBounds.OverlayFontSize.Max);
+
+        Resources["OverlayFontSize"] = (double)clamped;
+
+        // A point smaller, not a ratio: the difference is meant to stay one step at every size, and at 9px a
+        // proportional shrink would round to the same number and lose the distinction entirely.
+        Resources["OverlaySmallFontSize"] = (double)Math.Max(clamped - 1, SettingsBounds.OverlayFontSize.Min);
+
+        if (string.IsNullOrWhiteSpace(family))
+        {
+            Resources["OverlayFontFamily"] = new FontFamily("Segoe UI");
+            Resources["OverlayMonoFontFamily"] = new FontFamily("Consolas");
+            return;
+        }
+
+        var chosen = new FontFamily(family.Trim());
+
+        Resources["OverlayFontFamily"] = chosen;
+        Resources["OverlayMonoFontFamily"] = chosen;
+    }
+
     public void ApplyPreviewSize(int maxWidth, int maxHeight)
     {
         PreviewImage.MaxWidth = maxWidth;
@@ -517,4 +556,33 @@ public partial class OverlayWindow : Window
         Left = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Left, desiredLeft), scale);
         Top = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Top, desiredTop), scale);
     }
+    /// <summary>
+    /// The largest <c>FontSize</c> any text in the overlay actually draws at. UI smoke harness only.
+    /// </summary>
+    /// <remarks>
+    /// Reads the visual tree rather than the resources, which is the point: a resource can hold 18 while a
+    /// <c>FontSize="12"</c> left behind in the XAML keeps a row at twelve, and nothing else would notice.
+    /// </remarks>
+    public double LargestTextSizeForSmokeTest()
+    {
+        var largest = 0d;
+
+        Walk(this);
+
+        return largest;
+
+        void Walk(DependencyObject node)
+        {
+            if (node is TextBlock { Text.Length: > 0 } text && text.IsVisible)
+            {
+                largest = Math.Max(largest, text.FontSize);
+            }
+
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+            {
+                Walk(VisualTreeHelper.GetChild(node, i));
+            }
+        }
+    }
+
 }

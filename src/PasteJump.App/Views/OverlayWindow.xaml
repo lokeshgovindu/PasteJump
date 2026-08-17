@@ -1,10 +1,13 @@
 ﻿<Window x:Class="PasteJump.App.Views.OverlayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:system="clr-namespace:System;assembly=System.Runtime"
         Title="PasteJump Overlay"
         WindowStyle="None"
         ResizeMode="NoResize"
         Background="{DynamicResource SurfaceBrush}"
+        FontFamily="{DynamicResource OverlayFontFamily}"
+        FontSize="{DynamicResource OverlayFontSize}"
         ShowInTaskbar="False"
         ShowActivated="False"
         Focusable="False"
@@ -13,6 +16,20 @@
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType">
+
+    <Window.Resources>
+        <!--
+            The overlay's typography, as resources rather than literals, so one setting can move all of it.
+            These are the defaults and they are today's look exactly: the system UI font for labels, Consolas
+            for a clip's own text, 12 with the detail line a point smaller. OverlayWindow.ApplyFont overwrites
+            these four keys; they must stay here as well, because the window is also shown with no settings
+            applied at all - which is how the UI smoke harness renders it.
+        -->
+        <FontFamily x:Key="OverlayFontFamily">Segoe UI</FontFamily>
+        <FontFamily x:Key="OverlayMonoFontFamily">Consolas</FontFamily>
+        <system:Double x:Key="OverlayFontSize">12</system:Double>
+        <system:Double x:Key="OverlaySmallFontSize">11</system:Double>
+    </Window.Resources>
 
     <!--
         On ShowInTaskbar="False" above. Every window PasteJump shows appears in the taskbar EXCEPT this one
@@ -75,7 +92,7 @@
                     <TextBlock x:Name="PositionText"
                                Grid.Column="0"
                                Foreground="{DynamicResource TextBrush}"
-                               FontSize="12"
+                               FontSize="{DynamicResource OverlayFontSize}"
                                FontWeight="SemiBold"
                                VerticalAlignment="Center"
                                Text="Clip 1 of 1" />
@@ -160,7 +177,7 @@
                     Visibility="Collapsed">
                 <TextBlock x:Name="ModeText"
                            Foreground="White"
-                           FontSize="12"
+                           FontSize="{DynamicResource OverlayFontSize}"
                            FontWeight="SemiBold" />
             </Border>
 
@@ -187,13 +204,13 @@
                     -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource SearchGlyph}"
-                                   FontSize="11"
+                                   FontSize="{DynamicResource OverlaySmallFontSize}"
                                    Foreground="{DynamicResource AccentBrush}"
                                    Margin="0,0,5,0" />
 
                         <TextBlock Text="Search"
                                    Foreground="{DynamicResource AccentBrush}"
-                                   FontSize="11"
+                                   FontSize="{DynamicResource OverlaySmallFontSize}"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center"
                                    Margin="0,0,8,0" />
@@ -202,8 +219,8 @@
                     <TextBlock x:Name="SearchQueryText"
                                Grid.Column="1"
                                Foreground="{DynamicResource TextBrush}"
-                               FontFamily="Consolas"
-                               FontSize="12"
+                               FontFamily="{DynamicResource OverlayMonoFontFamily}"
+                               FontSize="{DynamicResource OverlayFontSize}"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
 
@@ -228,8 +245,8 @@
                 <TextBlock x:Name="PreviewText"
                            Grid.Row="0"
                            Foreground="{DynamicResource TextBrush}"
-                           FontFamily="Consolas"
-                           FontSize="12"
+                           FontFamily="{DynamicResource OverlayMonoFontFamily}"
+                           FontSize="{DynamicResource OverlayFontSize}"
                            TextWrapping="Wrap"
                            MaxHeight="400"
                            LineHeight="16" />
@@ -258,8 +275,8 @@
                 <TextBlock x:Name="PreviewFileText"
                            Grid.Row="1"
                            Foreground="{DynamicResource MutedTextBrush}"
-                           FontFamily="Consolas"
-                           FontSize="12"
+                           FontFamily="{DynamicResource OverlayMonoFontFamily}"
+                           FontSize="{DynamicResource OverlayFontSize}"
                            TextWrapping="NoWrap"
                            MaxHeight="260"
                            LineHeight="16"
@@ -279,7 +296,7 @@
                 <TextBlock x:Name="EmptyText"
                            Grid.Row="0"
                            Foreground="{DynamicResource MutedTextBrush}"
-                           FontSize="12"
+                           FontSize="{DynamicResource OverlayFontSize}"
                            FontStyle="Italic"
                            Visibility="Collapsed"
                            Text="No clips" />
@@ -297,7 +314,7 @@
                        Margin="10,0,10,8"
                        Foreground="{DynamicResource TextBrush}"
                        TextWrapping="Wrap"
-                       FontSize="12" />
+                       FontSize="{DynamicResource OverlayFontSize}" />
 
         </StackPanel>
     </Border>

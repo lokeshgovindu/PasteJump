@@ -43,6 +43,12 @@ public static class SettingsBounds
 
     public static SettingBound HistoryPreviewMaxWidth { get; } = new(120, 4_096);
 
+    /// <summary>
+    /// Nine is the smallest size the overlay's two-line rows stay legible at; twenty-four is where it stops being
+    /// a strip beside your work. Both ends were looked at rather than picked.
+    /// </summary>
+    public static SettingBound OverlayFontSize { get; } = new(9, 24);
+
     public static SettingBound OverlayPreviewChars { get; } = new(40, 4_000);
 
     public static SettingBound OverlayPreviewMaxWidth { get; } = new(120, 1_400);

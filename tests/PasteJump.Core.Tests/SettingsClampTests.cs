@@ -184,4 +184,46 @@ public sealed class SettingsClampTests
 
         Assert.Equal("short", host.LastFrame!.PreviewText);
     }
+    /// <summary>
+    /// The overlay's font, asked for so the gesture can be read at a size and in a face of the user's choosing -
+    /// its colours already come from the theme, which is why only the font became a setting.
+    /// </summary>
+    [Fact]
+    public void Overlay_font_size_is_clamped_both_ways()
+    {
+        var low = new PasteJumpSettings { OverlayFontSize = 1 };
+        var high = new PasteJumpSettings { OverlayFontSize = 400 };
+
+        low.Normalise();
+        high.Normalise();
+
+        Assert.Equal(9, low.OverlayFontSize);
+        Assert.Equal(24, high.OverlayFontSize);
+    }
+
+    [Fact]
+    public void The_default_overlay_font_is_the_built_in_look()
+    {
+        var settings = new PasteJumpSettings();
+
+        settings.Normalise();
+
+        // Empty, not "Segoe UI": the built-in look is two fonts, the UI face for labels and Consolas for a clip's
+        // own text, and naming one of them here would silently make the preview proportional.
+        Assert.Equal(string.Empty, settings.OverlayFontFamily);
+        Assert.Equal(12, settings.OverlayFontSize);
+    }
+
+    [Fact]
+    public void An_overlay_font_name_is_trimmed_but_never_dropped()
+    {
+        // Not validated against installed families on purpose: a settings file travels between machines, and a
+        // font missing here may well be present there. Dropping the name would lose it on the next save.
+        var settings = new PasteJumpSettings { OverlayFontFamily = "  Cascadia Mono  " };
+
+        settings.Normalise();
+
+        Assert.Equal("Cascadia Mono", settings.OverlayFontFamily);
+    }
+
 }
