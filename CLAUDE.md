@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 921 in Debug (`dotnet test`) - 869 in Core.Tests, 52 in Interop.Tests; **919 in Release**, see below |
+| Tests | 925 in Debug (`dotnet test`) - 873 in Core.Tests, 52 in Interop.Tests; **923 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1112,6 +1112,33 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     every resource said 18. Verified by making `ApplyFont` return early: 3 failures.
   - Applied through `PasteJumpPasteHost.SetOverlayFont`, which remembers as well as applies - the overlay is
     built lazily on the first gesture, long after the settings were read, exactly as `SetPreviewSize` handles.
+- **Some applications publish one copy TWICE, ~200 ms apart, the second time with more formats (2026-08-17).** This
+  is the real cause of the "Same as the last copy" notice on a copy made once, and it took **three attempts and an
+  instrument** to find, because the first two fixes were guesses. The capture log settled it in one reproduction -
+  five identical cycles, each: `read: 4 formats, 40 bytes -> STORED`, then **190 ms later** `read: 6 formats, 216
+  bytes` with the **same dedup key** -> `SUPPRESSED as a repeat`. Windows Terminal alone was fine; Terminal running a
+  busy console application (the Claude CLI) reproduced it every time, which is the load-dependent gap.
+  - **Two separate mechanisms, and the difference matters.** An OLE *publish* raises two notifications a few
+    milliseconds apart with the same content - that is what `ClipboardSettleMs` coalescing handles. A *second
+    publish* is a different thing entirely: hundreds of milliseconds later, after the first read has already stored a
+    clip, carrying **more formats than the first**. No settle window can cover that without making capture feel slow,
+    which is why the first two attempts failed.
+  - **So the second publish enriches the clip instead of being announced.** Within `ClipboardRepublishMs` (default
+    1,000) an identical-keyed read carrying **strictly more bytes** replaces the stored clip's payloads in place -
+    same id, same position, no new list entry, nothing new in history, and **no notice**, since the copy was already
+    acknowledged when it was stored.
+  - **The "more bytes" condition is load-bearing, not belt-and-braces.** Time alone cannot separate "the application
+    published again" from "the user pressed Ctrl+C twice quickly", and three existing tests assert that a genuine
+    repeat IS announced. A second publish always carries more - that is why it happens - so an identical repeat falls
+    through to the old behaviour untouched.
+  - **It also fixes a silent data loss nobody had reported**: keeping the 40-byte plain-text version and discarding
+    the 216-byte one lost the HTML and RTF for good, so pasting into Word arrived plain from a copy that carried rich
+    text. `ClipStore.ReplacePayloads` moves the content hash and byte count with the payloads, or the clip stops
+    being findable by hash and the list reports a size it does not have.
+  - **`logs\capture.log` is why this was findable at all** - see `CaptureTraceLog`. Metadata only: kinds, byte and
+    format counts, source process, and for text a length plus a short hash, never the text. Verified live: the
+    two-stage publish reproduced through a probe logged `ENRICHED clip 3451 491ms after storing it: 8 formats, 441
+    bytes replace the poorer set`.
 - **One copy is not one notification, and reading on each of them was two bugs (2026-08-17).** Reported as "I have
   taken two screenshots from different applications but it still shows the same as the last copy", then narrowed by
   the user to "in some applications, getting two clips" and "I double clicked one word, first time it is copied, and
@@ -1612,8 +1639,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 921 tests (Debug)
-dotnet test -c Release                              # 919 - what CI runs, and it is not the same set
+dotnet test                                         # 925 tests (Debug)
+dotnet test -c Release                              # 923 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

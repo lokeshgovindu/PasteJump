@@ -72,6 +72,25 @@ public sealed class PasteJumpSettings
     public int ClipboardSettleMs { get; set; } = 120;
 
     /// <summary>
+    /// How long after storing a clip a second publish of the same content counts as the same copy, in
+    /// milliseconds.
+    /// <para>
+    /// Some applications publish a copy <b>twice</b>: the plain text at once and the formatted versions a fraction
+    /// of a second later. Windows Terminal running a busy console application was measured at <b>4 formats, 40
+    /// bytes</b> and then, <b>190 ms later</b>, the same text as <b>6 formats, 216 bytes</b> with HTML and RTF
+    /// added. That is beyond any sane settle window, so it arrives as a separate read - and it used to be reported
+    /// as "Same as the last copy" on a copy the user had made exactly once.
+    /// </para>
+    /// <para>
+    /// Within this window such a read is treated as the same copy: nothing is added, nothing is said, and if it
+    /// carries <b>more</b> than what was stored the clip is enriched in place, so pasting keeps the formatting the
+    /// application actually offered. Beyond the window an identical copy is a genuine repeat and is reported as
+    /// before. Zero switches the whole behaviour off.
+    /// </para>
+    /// </summary>
+    public int ClipboardRepublishMs { get; set; } = 1_000;
+
+    /// <summary>
     /// Record an identical copy as a new clip rather than promoting the existing one.
     /// Original: <c>is_duplicate_copied</c>.
     /// </summary>
@@ -524,6 +543,7 @@ public sealed class PasteJumpSettings
         PreviewMaxChars = Math.Clamp(PreviewMaxChars, SettingsBounds.PreviewMaxChars.Min, SettingsBounds.PreviewMaxChars.Max);
         OverlayFontSize = Math.Clamp(OverlayFontSize, SettingsBounds.OverlayFontSize.Min, SettingsBounds.OverlayFontSize.Max);
         ClipboardSettleMs = Math.Clamp(ClipboardSettleMs, SettingsBounds.ClipboardSettleMs.Min, SettingsBounds.ClipboardSettleMs.Max);
+        ClipboardRepublishMs = Math.Clamp(ClipboardRepublishMs, SettingsBounds.ClipboardRepublishMs.Min, SettingsBounds.ClipboardRepublishMs.Max);
 
         // Trimmed rather than validated against installed families: a font that is not on this machine may well be
         // on the next one the settings file travels to, and dropping the name here would silently lose it.

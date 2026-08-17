@@ -2050,6 +2050,7 @@ public partial class SettingsWindow : Window
         // by request. The value is edited in PasteJump.json.
         [nameof(PasteJumpSettings.OverlayDeletedFlashMs)] = "Advanced",
         [nameof(PasteJumpSettings.ClipboardSettleMs)] = "Advanced",
+        [nameof(PasteJumpSettings.ClipboardRepublishMs)] = "Advanced",
         [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
@@ -2282,6 +2283,7 @@ public partial class SettingsWindow : Window
         // writes. It has a measured default that wants leaving alone, and the honest way to say "only change this
         // if you know why" is the Advanced inventory rather than a box on a tab.
         settings.ClipboardSettleMs = _baseline.ClipboardSettleMs;
+        settings.ClipboardRepublishMs = _baseline.ClipboardRepublishMs;
 
         if (!int.TryParse(MaxClipsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var maxClips)
             || maxClips < 1)

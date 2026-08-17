@@ -662,4 +662,146 @@ public sealed class CaptureServiceTests : IDisposable
         Assert.True(_clipboard.ReadCallCount >= 1, "the read must happen even while notifications keep arriving");
     }
 
+    /// <summary>
+    /// The same copy published twice - plain text first, the formatted versions a fraction of a second later - is
+    /// one clip, is not announced as a repeat, and keeps the RICHER payloads.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The numbers are from a real capture log, where Windows Terminal running a busy console application published
+    /// every selection twice: <c>4 formats, 40 bytes</c> and then, 190 ms later, the same text as
+    /// <c>6 formats, 216 bytes</c> with HTML and RTF added. The second read was suppressed as a repeat, which put
+    /// "Same as the last copy, so not added again" on screen for a copy made exactly once - reported as "I double
+    /// clicked one word, first time it is copied, and immediately that warning came".
+    /// </para>
+    /// <para>
+    /// The formatting mattered too: keeping the 40-byte version and discarding the 216-byte one loses the rich text
+    /// for good, so a paste into Word arrives plain from a copy that carried RTF.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_same_copy_published_again_with_more_formats_enriches_the_clip_silently()
+    {
+        const string word = "selection";
+
+        _clipboard
+            .EnqueueRead(PublishedSnapshot(word, rich: false))
+            .EnqueueRead(PublishedSnapshot(word, rich: true));
+
+        var capture = Build();
+        capture.Prime();
+
+        var duplicateNotices = 0;
+        capture.CaptureObserved += () => duplicateNotices++;
+
+        // Two separate bursts: the second publish is far outside any settle window, which is exactly why the
+        // window alone could not fix this.
+        SignalChange(capture);
+        SignalChange(capture);
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(0, duplicateNotices);
+        Assert.Equal(1, capture.RepublishCount);
+        Assert.Equal(1, capture.EnrichedCount);
+        Assert.Equal(0, capture.ConsecutiveDuplicateSkipCount);
+
+        // The richer set is what survived - all of it, not just a larger byte count.
+        var clip = _store.GetOrdered()[0];
+        var formats = _store.GetPayloads(clip.Id);
+
+        Assert.Equal(3, formats.Count);
+        Assert.Contains(formats, f => f.FormatName == "HTML Format");
+        Assert.Contains(formats, f => f.FormatName == "Rich Text Format");
+    }
+
+    /// <summary>
+    /// And the enrichment is not a second history entry: it was not a second copy.
+    /// </summary>
+    [Fact]
+    public void An_enriched_republish_does_not_log_history_twice()
+    {
+        _clipboard
+            .EnqueueRead(PublishedSnapshot("once", rich: false))
+            .EnqueueRead(PublishedSnapshot("once", rich: true));
+
+        var capture = Build();
+        capture.Prime();
+
+        SignalChange(capture);
+        SignalChange(capture);
+
+        Assert.Equal(1, _store.HistoryCount);
+    }
+
+    /// <summary>
+    /// The limit of the rule: a republish carrying nothing extra is still reported as a repeat, because that is
+    /// what a user pressing Ctrl+C twice looks like and the acknowledgement is wanted there.
+    /// </summary>
+    [Fact]
+    public void A_repeat_carrying_nothing_extra_is_still_announced()
+    {
+        _clipboard
+            .EnqueueRead(PublishedSnapshot("same", rich: false))
+            .EnqueueRead(PublishedSnapshot("same", rich: false));
+
+        var capture = Build();
+        capture.Prime();
+
+        var duplicateNotices = 0;
+        capture.CaptureObserved += () => duplicateNotices++;
+
+        SignalChange(capture);
+        SignalChange(capture);
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(1, duplicateNotices);
+        Assert.Equal(1, capture.ConsecutiveDuplicateSkipCount);
+        Assert.Equal(0, capture.EnrichedCount);
+    }
+
+    /// <summary>
+    /// Zero switches the behaviour off, which is also how a reader can see what the setting does.
+    /// </summary>
+    [Fact]
+    public void A_republish_window_of_zero_restores_the_repeat_notice()
+    {
+        _settings.ClipboardRepublishMs = 0;
+
+        _clipboard
+            .EnqueueRead(PublishedSnapshot("word", rich: false))
+            .EnqueueRead(PublishedSnapshot("word", rich: true));
+
+        var capture = Build();
+        capture.Prime();
+
+        var duplicateNotices = 0;
+        capture.CaptureObserved += () => duplicateNotices++;
+
+        SignalChange(capture);
+        SignalChange(capture);
+
+        Assert.Equal(1, duplicateNotices);
+        Assert.Equal(0, capture.EnrichedCount);
+    }
+
+    /// <summary>
+    /// One publish of a text selection: the plain formats alone, or those plus the formatted versions an
+    /// application adds on its second pass. Modelled on a real log - see the enrichment test above.
+    /// </summary>
+    private static ClipboardSnapshot PublishedSnapshot(string text, bool rich)
+    {
+        var payloads = new List<ClipPayload>
+        {
+            new(13, null, System.Text.Encoding.Unicode.GetBytes(text)),
+        };
+
+        if (rich)
+        {
+            payloads.Add(new ClipPayload(49_381, "HTML Format", System.Text.Encoding.UTF8.GetBytes($"<span>{text}</span>")));
+            payloads.Add(new ClipPayload(49_382, "Rich Text Format", System.Text.Encoding.UTF8.GetBytes($"{{\rtf1 {text}}}")));
+        }
+
+        return new ClipboardSnapshot(payloads, text, ClipKind.Text, "WindowsTerminal.exe");
+    }
+
 }

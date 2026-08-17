@@ -162,6 +162,75 @@ public sealed class ClipStore : IDisposable
     }
 
     /// <summary>
+    /// Replaces a clip's payloads with a richer set of the same content, keeping its identity.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// For the second half of a two-stage publish. An application can put a copy on the clipboard <b>twice</b>: the
+    /// plain text first and the formatted versions a fraction of a second later. Windows Terminal running a busy
+    /// console application was measured doing exactly that - <b>4 formats, 40 bytes</b>, then <b>190 ms later</b> the
+    /// same text as <b>6 formats, 216 bytes</b> with HTML and RTF added.
+    /// </para>
+    /// <para>
+    /// Keeping the first version and discarding the second loses the formatting for good: paste into Word and it
+    /// arrives as plain text, from a copy that carried rich text. So the richer set replaces the poorer one in
+    /// place - same clip id, same position in the stack, no second entry in the list and nothing new in history,
+    /// because it is not a new copy.
+    /// </para>
+    /// <para>
+    /// The content hash and byte count move with the payloads, or the clip would no longer be findable by hash and
+    /// the list would report a size it does not have.
+    /// </para>
+    /// </summary>
+    /// <returns>False when the clip is gone, which is possible if it was deleted between the two publishes.</returns>
+    public bool ReplacePayloads(long clipId, ClipboardSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        lock (_gate)
+        {
+            if (GetByIdCore(clipId) is null)
+            {
+                return false;
+            }
+
+            using var tx = _connection.BeginTransaction();
+
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "DELETE FROM clip_format WHERE clip_id = $id;";
+                cmd.Parameters.AddWithValue("$id", clipId);
+                cmd.ExecuteNonQuery();
+            }
+
+            foreach (var payload in snapshot.Payloads)
+            {
+                InsertPayload(tx, clipId, payload);
+            }
+
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = """
+                    UPDATE clip
+                       SET total_bytes = $bytes, content_hash = $hash, kind = $kind
+                     WHERE id = $id;
+                    """;
+                cmd.Parameters.AddWithValue("$bytes", snapshot.TotalBytes);
+                cmd.Parameters.AddWithValue("$hash", snapshot.ContentHash);
+                cmd.Parameters.AddWithValue("$kind", (int)snapshot.Kind);
+                cmd.Parameters.AddWithValue("$id", clipId);
+                cmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+
+            return true;
+        }
+    }
+
+    /// <summary>
     /// Id of the most recently added clip, ignoring pinning, or null when the stack is empty.
     /// <para>
     /// Used by consecutive-duplicate suppression to check that the clip it is suppressing against is

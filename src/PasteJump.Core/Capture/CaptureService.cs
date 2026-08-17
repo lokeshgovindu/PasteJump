@@ -55,6 +55,8 @@ public sealed class CaptureService
 
     private uint _lastSequenceNumber;
     private bool _settleScheduled;
+    private DateTimeOffset? _lastCapturedUtc;
+    private long _lastTotalBytes;
     private bool _settleExtended;
     private string? _lastDedupKey;
     private long? _lastClipId;
@@ -131,6 +133,12 @@ public sealed class CaptureService
     /// multi-step publish. This is the number that says the coalescing is doing anything.
     /// </summary>
     public int CoalescedNotificationCount { get; private set; }
+
+    /// <summary>Reads recognised as the same copy published a second time. Diagnostics only.</summary>
+    public int RepublishCount { get; private set; }
+
+    /// <summary>Republishes that carried more than what was stored, so the clip was replaced. Diagnostics only.</summary>
+    public int EnrichedCount { get; private set; }
 
     /// <summary>Times the settle window restarted because another notification arrived. Diagnostics only.</summary>
     public int SettleExtensionCount { get; private set; }
@@ -312,6 +320,41 @@ public sealed class CaptureService
 
         if (!settings.AllowDuplicateClips && IsConsecutiveDuplicate(snapshot))
         {
+            // The same copy, published a second time - not a repeat the user made. See the setting for the
+            // measurements: plain text first, the formatted versions ~190ms later, which is far outside any settle
+            // window and used to be announced as "Same as the last copy" on a copy made exactly once.
+            // Two conditions, and the second one is what keeps a genuine repeat distinguishable. Time alone cannot
+            // tell "the application published the same copy again" from "the user pressed Ctrl+C twice quickly", but
+            // a second publish carries MORE than the first - that is the whole reason it happens, the formatted
+            // versions arriving after the plain text. An identical repeat carries exactly the same bytes, so it
+            // falls through to the notice below, as before.
+            if (snapshot.TotalBytes > _lastTotalBytes
+                && _lastClipId is { } enrichId
+                && IsSameCopyPublishedAgain(settings, out var since))
+            {
+                RepublishCount++;
+
+                if (_store.ReplacePayloads(enrichId, snapshot))
+                {
+                    EnrichedCount++;
+                    _lastTotalBytes = snapshot.TotalBytes;
+
+                    _trace?.Invoke($"ENRICHED clip {enrichId} {since.TotalMilliseconds:F0}ms after storing it: "
+                        + $"{snapshot.Payloads.Count} formats, {snapshot.TotalBytes} bytes replace the poorer set. "
+                        + "Same copy published twice - no new clip, no notice.");
+                }
+                else
+                {
+                    // The clip went away between the two publishes, so there is nothing to enrich. Still not a
+                    // repeat the user made, so still nothing to announce.
+                    _trace?.Invoke($"republish arrived {since.TotalMilliseconds:F0}ms later but clip {enrichId} is gone");
+                }
+
+                // Deliberately no CaptureObserved: the copy was acknowledged when it was stored, and saying
+                // anything here is the bug that was reported.
+                return;
+            }
+
             ConsecutiveDuplicateSkipCount++;
             _trace?.Invoke($"SUPPRESSED as a repeat of the previous clip (key={Describe(snapshot.DedupKey)}, "
                 + $"clip {_lastClipId}) - this is what shows the \"Same as the last copy\" notice");
@@ -329,6 +372,8 @@ public sealed class CaptureService
 
         _lastDedupKey = snapshot.DedupKey;
         _lastClipId = clip.Id;
+        _lastCapturedUtc = _clock.UtcNow;
+        _lastTotalBytes = snapshot.TotalBytes;
 
         if (!wasNewCapture)
         {
@@ -362,6 +407,24 @@ public sealed class CaptureService
     /// that no longer exists.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// True when an identical read arrived soon enough after the clip was stored to be the same copy being
+    /// published again rather than the user copying the same thing twice.
+    /// </summary>
+    private bool IsSameCopyPublishedAgain(PasteJumpSettings settings, out TimeSpan since)
+    {
+        since = TimeSpan.Zero;
+
+        if (settings.ClipboardRepublishMs <= 0 || _lastCapturedUtc is not { } stored)
+        {
+            return false;
+        }
+
+        since = _clock.UtcNow - stored;
+
+        return since >= TimeSpan.Zero && since.TotalMilliseconds <= settings.ClipboardRepublishMs;
+    }
+
     /// <summary>
     /// A dedup key shortened for the trace. Text keys ARE the text, so only a length and a short hash go to the
     /// log - a diagnostics file must never become a copy of everything the user has copied.

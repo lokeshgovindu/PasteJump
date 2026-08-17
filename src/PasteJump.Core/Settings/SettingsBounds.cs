@@ -53,6 +53,12 @@ public static class SettingsBounds
     /// </summary>
     public static SettingBound ClipboardSettleMs { get; } = new(0, 1_000);
 
+    /// <summary>
+    /// Zero switches off the same-copy-published-twice handling. Five seconds is the ceiling: past that, an
+    /// identical copy really is the user copying the same thing again.
+    /// </summary>
+    public static SettingBound ClipboardRepublishMs { get; } = new(0, 5_000);
+
     public static SettingBound OverlayFontSize { get; } = new(9, 24);
 
     public static SettingBound OverlayPreviewChars { get; } = new(40, 4_000);
