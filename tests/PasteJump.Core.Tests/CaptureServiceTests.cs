@@ -51,11 +51,22 @@ public sealed class CaptureServiceTests : IDisposable
         schedule: _scheduler.Schedule,
         retryDelay: TimeSpan.FromMilliseconds(10));
 
-    /// <summary>Advances the sequence number, as a real clipboard change would.</summary>
+    /// <summary>
+    /// Advances the sequence number and lets the settle window elapse, as a real clipboard change does.
+    /// </summary>
+    /// <remarks>
+    /// The read is scheduled rather than immediate since coalescing arrived - one copy raises more than one
+    /// notification, so PasteJump waits for the clipboard to stop changing before reading it. Draining the
+    /// scheduler here rather than setting <c>ClipboardSettleMs</c> to zero in these tests is deliberate: it keeps
+    /// every test in this file exercising the path the application actually takes.
+    /// </remarks>
     private void SignalChange(CaptureService capture)
     {
         _clipboard.SequenceNumber++;
         capture.OnClipboardChanged();
+
+        // The scheduled read. Nothing else is queued at this point, so this cannot swallow a retry.
+        _scheduler.RunPending();
     }
 
     /// <summary>
@@ -327,7 +338,10 @@ public sealed class CaptureServiceTests : IDisposable
         // First read lost the race against whoever held the clipboard.
         Assert.Equal(0, _store.Count);
         Assert.Equal(1, capture.ReadFailureCount);
-        Assert.Equal(1, _scheduler.ScheduledCount);
+
+        // Two schedules, not one: the settle window SignalChange has already drained, and the retry that failed
+        // read then queued. Counting them separately is what would have hidden the retry going missing.
+        Assert.Equal(2, _scheduler.ScheduledCount);
 
         _scheduler.RunAll();
 
@@ -361,7 +375,8 @@ public sealed class CaptureServiceTests : IDisposable
         capture.Prime();
         SignalChange(capture);
 
-        Assert.Equal(1, _scheduler.ScheduledCount);
+        // The settle read, plus the retry it queued after failing.
+        Assert.Equal(2, _scheduler.ScheduledCount);
 
         // A newer change arrives before the retry fires. That change has its own notification, so
         // this retry must not store what is now stale content.
@@ -486,4 +501,165 @@ public sealed class CaptureServiceTests : IDisposable
 
         Assert.Equal(1, capture.DroppedCaptureCount);
     }
+    /// <summary>
+    /// One copy, two notifications, one clip. This is the reported bug, and it is the whole reason notifications
+    /// are coalesced.
+    /// </summary>
+    /// <remarks>
+    /// An OLE writer publishes in two steps - the data object is announced, then its formats are rendered - and
+    /// each raises <c>WM_CLIPBOARDUPDATE</c> with its own sequence number. PasteJump read on both and stored two
+    /// clips per screenshot. Worse, the two reads did not always return identical bytes, so the duplicate check
+    /// could not collapse them: a real store held 665,745 bytes twice, with different hashes, one second apart,
+    /// from a single capture. That is what "I take one screenshot and see the same thing twice" was.
+    ///
+    /// Note the two snapshots here differ deliberately, exactly as the two reads did. Making them identical would
+    /// let the duplicate check pass this test even with no coalescing at all.
+    /// </remarks>
+    [Fact]
+    public void One_copy_publishing_in_two_steps_is_stored_once()
+    {
+        // The clipboard as it ENDS UP, not a queue of reads: the point is that only one read happens, and that it
+        // happens after the writer has finished. A queue would have modelled the old behaviour instead.
+        _clipboard.Standing = FakeClipboardAccess.TextSnapshot("the finished clipboard");
+
+        var capture = Build();
+        capture.Prime();
+
+        // Both notifications arrive before the settle window elapses, which is what ~45ms apart means.
+        _clipboard.SequenceNumber++;
+        capture.OnClipboardChanged();
+        _clipboard.SequenceNumber++;
+        capture.OnClipboardChanged();
+
+        _scheduler.RunAll();
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal("the finished clipboard", _store.GetOrdered()[0].Preview);
+        Assert.Equal(2, capture.NotificationCount);
+        Assert.Equal(1, capture.CoalescedNotificationCount);
+
+        // The load-bearing assertion. One clip alone would pass without any coalescing at all, since two identical
+        // reads collapse in the duplicate check anyway - what proves the fix is that the clipboard was read ONCE.
+        Assert.Equal(1, _clipboard.ReadCallCount);
+    }
+
+    /// <summary>
+    /// The other half: two genuinely separate copies are still two clips. Without this, coalescing could "fix" the
+    /// duplicate by swallowing real copies, which is the worse failure of the two.
+    /// </summary>
+    [Fact]
+    public void Two_separate_copies_are_still_two_clips()
+    {
+        _clipboard
+            .EnqueueRead(FakeClipboardAccess.TextSnapshot("first copy"))
+            .EnqueueRead(FakeClipboardAccess.TextSnapshot("second copy"));
+
+        var capture = Build();
+        capture.Prime();
+
+        // SignalChange drains the settle window each time, so these are two separate bursts.
+        SignalChange(capture);
+        SignalChange(capture);
+
+        Assert.Equal(2, _store.Count);
+        Assert.Equal(0, capture.CoalescedNotificationCount);
+    }
+
+    /// <summary>
+    /// Zero restores the old behaviour, for anyone who would rather have the duplicates than the delay - and it is
+    /// also how a reader can tell this setting does what it says.
+    /// </summary>
+    [Fact]
+    public void A_settle_of_zero_reads_on_every_notification()
+    {
+        _settings.ClipboardSettleMs = 0;
+
+        _clipboard
+            .EnqueueRead(FakeClipboardAccess.TextSnapshot("step one"))
+            .EnqueueRead(FakeClipboardAccess.TextSnapshot("step two"));
+
+        var capture = Build();
+        capture.Prime();
+
+        _clipboard.SequenceNumber++;
+        capture.OnClipboardChanged();
+        _clipboard.SequenceNumber++;
+        capture.OnClipboardChanged();
+
+        // Both read inline, so both stored - the behaviour the report was about.
+        Assert.Equal(2, _store.Count);
+        Assert.Equal(0, capture.CoalescedNotificationCount);
+    }
+
+    /// <summary>
+    /// A second publishing step that lands just AFTER the window still yields one clip, because the window
+    /// restarts on every notification.
+    /// </summary>
+    /// <remarks>
+    /// This is the case the first version of the fix missed. With a fixed window measured from the first
+    /// notification, a step arriving late began a fresh read, that read saw what the first had already stored, and
+    /// the user got "Same as the last copy" on a copy that was nothing of the sort - reported as "I double clicked
+    /// one word, first time it is copied, and immediately that warning came".
+    /// </remarks>
+    [Fact]
+    public void A_late_second_step_still_produces_one_clip_and_no_duplicate_notice()
+    {
+        _clipboard.Standing = FakeClipboardAccess.TextSnapshot("the selected word");
+
+        var capture = Build();
+        capture.Prime();
+
+        var duplicateNotices = 0;
+        capture.CaptureObserved += () => duplicateNotices++;
+
+        // Step one.
+        _clipboard.SequenceNumber++;
+        capture.OnClipboardChanged();
+
+        // Step two, arriving while the scheduled read is still pending, so it extends the window.
+        _clipboard.SequenceNumber++;
+        capture.OnClipboardChanged();
+
+        // The timer fires, sees the extension, and re-queues rather than reading.
+        _scheduler.RunPending();
+        Assert.Equal(1, capture.SettleExtensionCount);
+        Assert.Equal(0, _clipboard.ReadCallCount);
+
+        // The re-queued read is the only one that runs.
+        _scheduler.RunAll();
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(1, _clipboard.ReadCallCount);
+
+        // And the point of the whole exercise: no "Same as the last copy" for a single copy.
+        Assert.Equal(0, duplicateNotices);
+    }
+
+    /// <summary>
+    /// The bound: an application rewriting the clipboard in a loop must not defer the read for ever. After
+    /// <see cref="CaptureService.MaxSettleExtensions"/> restarts the read happens regardless.
+    /// </summary>
+    [Fact]
+    public void The_settle_window_cannot_be_extended_indefinitely()
+    {
+        _clipboard.Standing = FakeClipboardAccess.TextSnapshot("something that keeps changing");
+
+        var capture = Build();
+        capture.Prime();
+
+        _clipboard.SequenceNumber++;
+        capture.OnClipboardChanged();
+
+        // One more notification per round, for more rounds than the ceiling allows.
+        for (var round = 0; round < CaptureService.MaxSettleExtensions + 3; round++)
+        {
+            _clipboard.SequenceNumber++;
+            capture.OnClipboardChanged();
+            _scheduler.RunPending();
+        }
+
+        Assert.Equal(CaptureService.MaxSettleExtensions, capture.SettleExtensionCount);
+        Assert.True(_clipboard.ReadCallCount >= 1, "the read must happen even while notifications keep arriving");
+    }
+
 }

@@ -57,10 +57,22 @@ public sealed class ImagePathTests : IDisposable
         clock: null,
         schedule: _scheduler.Schedule);
 
+    /// <summary>
+    /// Advances the sequence number and lets the settle window elapse, as a real clipboard change does.
+    /// </summary>
+    /// <remarks>
+    /// The read is scheduled rather than immediate since coalescing arrived - one copy raises more than one
+    /// notification, so PasteJump waits for the clipboard to stop changing before reading it. Draining the
+    /// scheduler here rather than setting <c>ClipboardSettleMs</c> to zero in these tests is deliberate: it keeps
+    /// every test in this file exercising the path the application actually takes.
+    /// </remarks>
     private void SignalChange(CaptureService capture)
     {
         _clipboard.SequenceNumber++;
         capture.OnClipboardChanged();
+
+        // The scheduled read. Nothing else is queued at this point, so this cannot swallow a retry.
+        _scheduler.RunPending();
     }
 
     /// <summary>

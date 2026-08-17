@@ -24,6 +24,13 @@ public sealed class CaptureService
     /// <summary>How many deferred re-reads to attempt after a failed read.</summary>
     public const int MaxDeferredRetries = 2;
 
+    /// <summary>
+    /// How many times the settle window may restart before the read happens anyway. Five windows at the default
+    /// 120 ms is 600 ms, which is far longer than any publish measured and still short enough that an application
+    /// rewriting the clipboard in a loop cannot silence capture altogether.
+    /// </summary>
+    public const int MaxSettleExtensions = 4;
+
     private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromMilliseconds(350);
 
     private readonly IClipboardAccess _clipboard;
@@ -36,6 +43,8 @@ public sealed class CaptureService
     private readonly TimeSpan _retryDelay;
 
     private uint _lastSequenceNumber;
+    private bool _settleScheduled;
+    private bool _settleExtended;
     private string? _lastDedupKey;
     private long? _lastClipId;
 
@@ -101,11 +110,94 @@ public sealed class CaptureService
     /// </summary>
     public int ConsecutiveDuplicateSkipCount { get; private set; }
 
+    /// <summary>Clipboard notifications seen, before coalescing. Diagnostics only.</summary>
+    public int NotificationCount { get; private set; }
+
+    /// <summary>
+    /// Notifications absorbed into a read that was already scheduled - so, second and later steps of a
+    /// multi-step publish. This is the number that says the coalescing is doing anything.
+    /// </summary>
+    public int CoalescedNotificationCount { get; private set; }
+
+    /// <summary>Times the settle window restarted because another notification arrived. Diagnostics only.</summary>
+    public int SettleExtensionCount { get; private set; }
+
     /// <summary>Call once at start-up so the first real change is not mistaken for a new one.</summary>
     public void Prime() => _lastSequenceNumber = _clipboard.SequenceNumber;
 
     /// <summary>Handles a clipboard-change notification.</summary>
-    public void OnClipboardChanged() => Capture(attempt: 0);
+    /// <remarks>
+    /// <para>
+    /// Coalescing, not reading. One copy raises more than one notification: an OLE writer announces its data
+    /// object and then renders it, each step with its own sequence number, so reading on both stored two clips for
+    /// one screenshot - and since the two reads do not always return identical bytes, the duplicate check could not
+    /// collapse them. Reading during the first step is also how a clipboard with no pixels in it yet got stored.
+    /// </para>
+    /// <para>
+    /// So the first notification schedules a read <see cref="PasteJumpSettings.ClipboardSettleMs"/> ahead and the
+    /// ones that arrive while it is pending are absorbed - the read that eventually runs sees the finished
+    /// clipboard, whatever number of steps the writer took to publish it. The sequence-number check inside
+    /// <see cref="Capture"/> then skips the absorbed notifications for free, since by then the number it recorded is
+    /// the final one.
+    /// </para>
+    /// <para>
+    /// Falls back to reading inline when there is no scheduler (which is how the tests that predate this drive it)
+    /// or when the setting is zero.
+    /// </para>
+    /// </remarks>
+    public void OnClipboardChanged()
+    {
+        var settleMs = _settings().ClipboardSettleMs;
+
+        if (settleMs <= 0 || _schedule is null)
+        {
+            Capture(attempt: 0);
+            return;
+        }
+
+        NotificationCount++;
+
+        // Absorbed - and the window starts again from here. A fixed window measured from the FIRST notification
+        // was the first version of this, and it only helps when both steps of a publish land inside it: the second
+        // step arriving just after it would begin a fresh read, be recognised as a repeat of what the first read
+        // stored, and produce the "Same as the last copy" toast on a copy that was nothing of the sort. Restarting
+        // means the read happens once the clipboard has actually stopped changing, whatever the gap.
+        if (_settleScheduled)
+        {
+            CoalescedNotificationCount++;
+            _settleExtended = true;
+            return;
+        }
+
+        ScheduleSettledRead(settleMs, MaxSettleExtensions);
+    }
+
+    /// <summary>
+    /// Queues the one read, re-queueing it while notifications keep arriving.
+    /// </summary>
+    /// <remarks>
+    /// Bounded on purpose. An application that rewrites the clipboard on a timer would otherwise push the read
+    /// back for ever and capture nothing at all - so after <see cref="MaxSettleExtensions"/> extensions the read
+    /// happens regardless, and the worst case becomes the old behaviour rather than silence.
+    /// </remarks>
+    private void ScheduleSettledRead(int settleMs, int extensionsLeft)
+    {
+        _settleScheduled = true;
+        _settleExtended = false;
+
+        _schedule!(TimeSpan.FromMilliseconds(settleMs), () =>
+        {
+            if (_settleExtended && extensionsLeft > 0)
+            {
+                SettleExtensionCount++;
+                ScheduleSettledRead(settleMs, extensionsLeft - 1);
+                return;
+            }
+
+            _settleScheduled = false;
+            Capture(attempt: 0);
+        });
+    }
 
     private void Capture(int attempt)
     {

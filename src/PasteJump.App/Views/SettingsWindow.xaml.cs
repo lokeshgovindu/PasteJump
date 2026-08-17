@@ -2049,6 +2049,7 @@ public partial class SettingsWindow : Window
         // Advanced is where it is listed and the only place it appears - there is no control for it on any tab,
         // by request. The value is edited in PasteJump.json.
         [nameof(PasteJumpSettings.OverlayDeletedFlashMs)] = "Advanced",
+        [nameof(PasteJumpSettings.ClipboardSettleMs)] = "Advanced",
         [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
@@ -2276,6 +2277,11 @@ public partial class SettingsWindow : Window
         // is what VerifyEverySettingHasAControl exists to catch. OverlayDeletedFlashMs is deliberately Advanced-only
         // (it appears in the inventory, and is edited in PasteJump.json), so it is copied through by hand.
         settings.OverlayDeletedFlashMs = _baseline.OverlayDeletedFlashMs;
+
+        // Same treatment, and for a stronger reason: this one is timing against other applications' clipboard
+        // writes. It has a measured default that wants leaving alone, and the honest way to say "only change this
+        // if you know why" is the Advanced inventory rather than a box on a tab.
+        settings.ClipboardSettleMs = _baseline.ClipboardSettleMs;
 
         if (!int.TryParse(MaxClipsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var maxClips)
             || maxClips < 1)

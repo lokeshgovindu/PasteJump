@@ -49,6 +49,29 @@ public sealed class PasteJumpSettings
     public bool MonitorClipboard { get; set; } = true;
 
     /// <summary>
+    /// How long to let the clipboard settle after a change notification before reading it, in milliseconds.
+    /// <para>
+    /// <b>One copy is not one notification.</b> An OLE writer publishes in two steps - <c>OleSetClipboard</c>
+    /// announces the data object, <c>OleFlushClipboard</c> renders the formats - and each step raises its own
+    /// <c>WM_CLIPBOARDUPDATE</c> with its own sequence number. Reading on both stored <b>two clips for one
+    /// screenshot</b>, and because the two reads do not always yield identical bytes the duplicate check could not
+    /// collapse them: measured at 665,745 bytes twice with different hashes, one second apart, from one capture.
+    /// Reading during the first step is also what caught a half-written clipboard with no pixels in it at all.
+    /// </para>
+    /// <para>
+    /// So notifications are coalesced: the first schedules a read this far ahead, and any that arrive while it is
+    /// pending are absorbed. 120 ms was measured, not guessed - a WinForms writer held the clipboard locked for the
+    /// first ~50 ms and its pixels became readable at 51 ms, with the second notification at ~45 ms. Nothing
+    /// notices the delay: it is time between Ctrl+C and a clip appearing in a list, not in any paste path.
+    /// </para>
+    /// <para>
+    /// Zero restores the old behaviour of reading on every notification, which is kept for anyone who would rather
+    /// have the duplicates than the delay.
+    /// </para>
+    /// </summary>
+    public int ClipboardSettleMs { get; set; } = 120;
+
+    /// <summary>
     /// Record an identical copy as a new clip rather than promoting the existing one.
     /// Original: <c>is_duplicate_copied</c>.
     /// </summary>
@@ -500,6 +523,7 @@ public sealed class PasteJumpSettings
         // stops being a preview. Text past it is archived whole regardless, so neither bound loses data.
         PreviewMaxChars = Math.Clamp(PreviewMaxChars, SettingsBounds.PreviewMaxChars.Min, SettingsBounds.PreviewMaxChars.Max);
         OverlayFontSize = Math.Clamp(OverlayFontSize, SettingsBounds.OverlayFontSize.Min, SettingsBounds.OverlayFontSize.Max);
+        ClipboardSettleMs = Math.Clamp(ClipboardSettleMs, SettingsBounds.ClipboardSettleMs.Min, SettingsBounds.ClipboardSettleMs.Max);
 
         // Trimmed rather than validated against installed families: a font that is not on this machine may well be
         // on the next one the settings file travels to, and dropping the name here would silently lose it.

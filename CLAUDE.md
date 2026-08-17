@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 916 in Debug (`dotnet test`) - 864 in Core.Tests, 52 in Interop.Tests; **914 in Release**, see below |
+| Tests | 921 in Debug (`dotnet test`) - 869 in Core.Tests, 52 in Interop.Tests; **919 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1112,6 +1112,37 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     every resource said 18. Verified by making `ApplyFont` return early: 3 failures.
   - Applied through `PasteJumpPasteHost.SetOverlayFont`, which remembers as well as applies - the overlay is
     built lazily on the first gesture, long after the settings were read, exactly as `SetPreviewSize` handles.
+- **One copy is not one notification, and reading on each of them was two bugs (2026-08-17).** Reported as "I have
+  taken two screenshots from different applications but it still shows the same as the last copy", then narrowed by
+  the user to "in some applications, getting two clips" and "I double clicked one word, first time it is copied, and
+  immediately that warning came". Both symptoms are one cause: an OLE writer publishes in two steps -
+  `OleSetClipboard` announces the data object, `OleFlushClipboard` renders the formats - and **each step raises its
+  own `WM_CLIPBOARDUPDATE` with its own sequence number**, so PasteJump read twice for one copy.
+  - **What the two reads produced.** Sometimes two clips: a real store held `665,745` bytes twice, one second apart,
+    **with different content hashes**, from a single screenshot - so the duplicate check could not collapse them,
+    because the two reads genuinely returned different bytes. Sometimes one clip plus the toast **"Same as the last
+    copy, so not added again"**, when the second read did match: a *new* copy announcing itself as a repeat, which
+    is what "showing the same as the last copy" actually was. The store was never wrong and no image was ever stale
+    - which is why hunting for a display or cache fault found nothing, and reading the store settled it in minutes.
+  - **The fix is a restarting settle window** (`ClipboardSettleMs`, default 120, Advanced-only): the first
+    notification schedules the read, later ones are absorbed **and push it back**, so the read happens once the
+    clipboard has stopped changing. A *fixed* window from the first notification was the first attempt and it is not
+    enough - a step landing just after it starts a fresh read and produces exactly the spurious duplicate toast. The
+    restart is bounded (`MaxSettleExtensions = 4`, so ~600 ms at the default) because an application rewriting the
+    clipboard on a timer would otherwise defer the read for ever; the worst case has to be the old behaviour, not
+    silence.
+  - **120 ms was measured, not chosen.** A probe watching a WinForms `SetImage` found the clipboard **locked for the
+    first ~50 ms**, its `CF_DIB` readable at **51 ms**, and the second notification at **~45 ms**. Nothing notices
+    the delay: it sits between Ctrl+C and a clip appearing in a list, never in a paste path.
+  - **Zero restores the old read-on-every-notification behaviour**, and the tests cover that too - which is also how
+    a reader can see what the setting does.
+  - **The three existing test files drive it through `SignalChange`, which now drains the scheduler** rather than
+    setting the window to zero, so every capture test keeps exercising the path the application really takes. Two
+    retry tests had to change: `ScheduledCount` is now 2, the settle read plus the retry. Verified by disabling the
+    restart: 2 failures; by defaulting the window to 0: 2 failures.
+  - **This also supersedes the `System.Drawing.Bitmap` entry's usefulness** in `BookkeepingFormats` for the common
+    case, since a half-published clipboard is no longer read at all. It stays as the backstop for a publish slower
+    than the bound.
 - **A screenshot stored as `[binary]`, 708 bytes: PasteJump read the clipboard mid-write (2026-08-17).** Two
   ShareX screenshots; the first became `Other`/708 B and the second a 7.2 MB `Image`. **This was a PasteJump
   defect, and the first reading of it here was wrong** - the store's format list looked like a writer that never
@@ -1581,8 +1612,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 916 tests (Debug)
-dotnet test -c Release                              # 914 - what CI runs, and it is not the same set
+dotnet test                                         # 921 tests (Debug)
+dotnet test -c Release                              # 919 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

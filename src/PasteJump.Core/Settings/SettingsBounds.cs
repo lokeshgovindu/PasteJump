@@ -47,6 +47,12 @@ public static class SettingsBounds
     /// Nine is the smallest size the overlay's two-line rows stay legible at; twenty-four is where it stops being
     /// a strip beside your work. Both ends were looked at rather than picked.
     /// </summary>
+    /// <summary>
+    /// Zero means read on every notification, which is what PasteJump did before an OLE write was found to raise
+    /// two of them per copy. One second is the ceiling: beyond that a copy is slow to appear in an open list.
+    /// </summary>
+    public static SettingBound ClipboardSettleMs { get; } = new(0, 1_000);
+
     public static SettingBound OverlayFontSize { get; } = new(9, 24);
 
     public static SettingBound OverlayPreviewChars { get; } = new(40, 4_000);
