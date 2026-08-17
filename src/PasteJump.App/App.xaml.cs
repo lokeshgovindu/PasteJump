@@ -78,6 +78,7 @@ public partial class App : Application
     private PasteGestureRecognizer _recognizer = null!;
     private PasteJumpPasteHost _pasteHost = null!;
     private CaptureService _capture = null!;
+    private CaptureTraceLog _captureTrace = null!;
 
     private ThemeManager _theme = null!;
 
@@ -275,6 +276,10 @@ public partial class App : Application
 
         _recognizer = new PasteGestureRecognizer(_controller);
 
+        // Beside the database, so it follows a custom data folder rather than living wherever the exe is.
+        _captureTrace = new CaptureTraceLog(_paths.ClipsDirectory);
+        _captureTrace.Write($"---- PasteJump {AppVersion.Current} started, settle={_settings.ClipboardSettleMs}ms ----");
+
         _capture = new CaptureService(
             _clipboard,
             _store,
@@ -296,7 +301,11 @@ public partial class App : Application
                 };
 
                 timer.Start();
-            });
+            },
+
+            // Every decision, one line each, into logs\capture.log beside the database. On by default and
+            // metadata only - see CaptureTraceLog for why it exists and what it deliberately does not record.
+            trace: _captureTrace.Write);
 
         _capture.ClipCaptured += OnClipCaptured;
         _capture.CaptureObserved += OnDuplicateCaptureObserved;

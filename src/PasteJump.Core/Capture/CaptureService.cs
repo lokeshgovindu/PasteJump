@@ -42,6 +42,17 @@ public sealed class CaptureService
     private readonly Action<TimeSpan, Action>? _schedule;
     private readonly TimeSpan _retryDelay;
 
+    /// <summary>
+    /// Where a one-line account of each decision goes, or null for none.
+    /// </summary>
+    /// <remarks>
+    /// Added because two attempts at the "one copy, two clips" report were fixed blind: the timing between an
+    /// application's publishing steps is what decides the behaviour, it differs per application - 45 ms for one
+    /// writer, 345 ms for another, sometimes under the same sequence number - and none of it was visible after the
+    /// fact. Metadata only: kinds, byte counts and hash prefixes, never a clip's content.
+    /// </remarks>
+    private readonly Action<string>? _trace;
+
     private uint _lastSequenceNumber;
     private bool _settleScheduled;
     private bool _settleExtended;
@@ -56,7 +67,8 @@ public sealed class CaptureService
         Func<PasteJumpSettings> settings,
         IClock? clock = null,
         Action<TimeSpan, Action>? schedule = null,
-        TimeSpan? retryDelay = null)
+        TimeSpan? retryDelay = null,
+        Action<string>? trace = null)
     {
         _clipboard = clipboard;
         _store = store;
@@ -66,6 +78,7 @@ public sealed class CaptureService
         _clock = clock ?? SystemClock.Instance;
         _schedule = schedule;
         _retryDelay = retryDelay ?? DefaultRetryDelay;
+        _trace = trace;
     }
 
     /// <summary>Raised after a clip is captured, so open windows can refresh.</summary>
@@ -166,9 +179,11 @@ public sealed class CaptureService
         {
             CoalescedNotificationCount++;
             _settleExtended = true;
+            _trace?.Invoke($"notify seq={_clipboard.SequenceNumber} coalesced, window restarted");
             return;
         }
 
+        _trace?.Invoke($"notify seq={_clipboard.SequenceNumber} read scheduled in {settleMs}ms");
         ScheduleSettledRead(settleMs, MaxSettleExtensions);
     }
 
@@ -217,6 +232,7 @@ public sealed class CaptureService
             // to open the clipboard.
             if (sequence == _lastSequenceNumber)
             {
+                _trace?.Invoke($"read skipped: sequence {sequence} unchanged since the last capture");
                 return;
             }
 
@@ -224,6 +240,7 @@ public sealed class CaptureService
         }
         else if (sequence != _lastSequenceNumber)
         {
+            _trace?.Invoke($"retry {attempt} abandoned: sequence moved {_lastSequenceNumber} -> {sequence}");
             // The clipboard moved on while we were waiting to retry. That newer change has its own
             // notification, so retrying this one would store stale content.
             return;
@@ -236,10 +253,16 @@ public sealed class CaptureService
         if (settings.IsProcessIgnored(foregroundProcess))
         {
             IgnoredProcessSkipCount++;
+            _trace?.Invoke($"skipped: {foregroundProcess} is an excluded application");
             return;
         }
 
         var snapshot = _clipboard.TryRead();
+
+        _trace?.Invoke(snapshot is null
+            ? $"read seq={sequence} attempt={attempt}: FAILED to open the clipboard"
+            : $"read seq={sequence} attempt={attempt}: kind={snapshot.Kind} bytes={snapshot.TotalBytes} "
+              + $"formats={snapshot.Payloads.Count} key={Describe(snapshot.DedupKey)} from={foregroundProcess}");
 
         // An OLE source announces its data object before rendering any of it, so a read that lands between
         // the two sees only bookkeeping. Treated exactly like a failed read - retried on a delay rather than
@@ -278,6 +301,7 @@ public sealed class CaptureService
         if (_selfWrites.IsOwnWrite(snapshot.ContentHash))
         {
             SelfWriteSkipCount++;
+            _trace?.Invoke("skipped: this is our own write, put there in order to paste");
             return;
         }
 
@@ -289,6 +313,8 @@ public sealed class CaptureService
         if (!settings.AllowDuplicateClips && IsConsecutiveDuplicate(snapshot))
         {
             ConsecutiveDuplicateSkipCount++;
+            _trace?.Invoke($"SUPPRESSED as a repeat of the previous clip (key={Describe(snapshot.DedupKey)}, "
+                + $"clip {_lastClipId}) - this is what shows the \"Same as the last copy\" notice");
 
             // Reported even though nothing was stored. The user pressed Ctrl+C and is entitled to
             // feedback that it registered; staying silent here made a repeat copy indistinguishable
@@ -298,6 +324,8 @@ public sealed class CaptureService
         }
 
         var clip = _store.Add(snapshot, settings.AllowDuplicateClips, out var wasNewCapture);
+
+        _trace?.Invoke($"STORED clip {clip.Id} (new={wasNewCapture}) kind={snapshot.Kind} bytes={snapshot.TotalBytes}");
 
         _lastDedupKey = snapshot.DedupKey;
         _lastClipId = clip.Id;
@@ -334,6 +362,22 @@ public sealed class CaptureService
     /// that no longer exists.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// A dedup key shortened for the trace. Text keys ARE the text, so only a length and a short hash go to the
+    /// log - a diagnostics file must never become a copy of everything the user has copied.
+    /// </summary>
+    private static string Describe(string dedupKey)
+    {
+        if (dedupKey.StartsWith("h:", StringComparison.Ordinal))
+        {
+            return dedupKey.Length > 14 ? dedupKey[..14] : dedupKey;
+        }
+
+        var hash = (uint)dedupKey.GetHashCode(StringComparison.Ordinal);
+
+        return $"text[{dedupKey.Length}ch #{hash:x8}]";
+    }
+
     private bool IsConsecutiveDuplicate(ClipboardSnapshot snapshot)
     {
         if (_lastDedupKey is null
