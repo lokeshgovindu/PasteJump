@@ -4,7 +4,7 @@
 
 # Themes
 
-**Seventeen colour schemes ship alongside Light and Dark, and a theme is just a small text file — so you can change one, or write your own, without waiting for anybody.**
+**Eighteen colour schemes ship alongside Light and Dark, and a theme is just a small text file — so you can change one, or write your own, without waiting for anybody.**
 
 ## Choosing one
 
@@ -13,7 +13,7 @@
 - **Same as Windows** — The default. Follows the Windows *app* colour mode and keeps following it if you change it later.
 - **Light, Dark** — The two base palettes. Every other theme is built on one of them.
 - **Light-based** — Sepia, Solarized Light, Catppuccin Latte, GitHub Light.
-- **Dark-based** — Midnight, Solarized Dark, Catppuccin Mocha, Tokyo Night, One Dark, Monokai, Nord, Dracula, Rose Pine, Everforest Dark, Kanagawa, Gruvbox Dark, Zenburn.
+- **Dark-based** — Midnight, Solarized Dark, Catppuccin Mocha, Tokyo Night, One Dark, Monokai, Nord, Dracula, Rose Pine, Everforest Dark, Kanagawa, Gruvbox Dark, Zenburn, GitHub Dark.
 
 **The theme applies as you move through the list**, including with the arrow keys, so you can see it rather than imagine it. Nothing is saved until you press OK or Apply — Cancel, `Esc` and the close button all put the previous theme back.
 
@@ -32,7 +32,7 @@ Themes live in a `themes` folder beside your settings, one `.json` file each. Th
 
 A name, which palette it is built on, and as many colours as you care to set:
 
-- **name** — What the settings list shows, and how the theme is remembered. Up to 40 characters. It may not be `Light`, `Dark` or `System`, since those already mean something. A theme sharing a name with one of the seventeen shipped ones **replaces** it, which is how you tweak Monokai without inventing a name for it.
+- **name** — What the settings list shows, and how the theme is remembered. Up to 40 characters. It may not be `Light`, `Dark` or `System`, since those already mean something. A theme sharing a name with one of the eighteen shipped ones **replaces** it, which is how you tweak Monokai without inventing a name for it.
 - **basedOn** — `light` or `dark`, and it does two jobs. It supplies every colour you leave out, and it tells Windows whether to draw dark title bars and window borders — those are drawn by Windows, not by PasteJump, so a dark theme claiming to be light gets a white title bar around dark content. Omitted means `light`.
 - **colors** — Any of the keys listed below. **Set as few as you like**: anything absent comes from the theme named in `basedOn`, so a three-line file that changes only the accent is perfectly valid.
 

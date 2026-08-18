@@ -574,6 +574,48 @@ public static class BuiltInThemes
         """;
 
     /// <summary>
+    /// GitHub Dark, the counterpart of GitHub Light and for the same reason: the least mannered dark theme here.
+    /// </summary>
+    /// <remarks>
+    /// Added after someone asked why the light one had no pair -- there was no reason, only that this list grew a
+    /// light default and never a dark one. Values are GitHub's own dark defaults from Primer: canvas #0D1117,
+    /// the subtle surface above it #161B22, foreground #E6EDF3, accent #58A6FF.
+    /// </remarks>
+    private const string GitHubDark = """
+        {
+            "name": "GitHub Dark",
+            "basedOn": "dark",
+            "colors": {
+                "SurfaceBrush": "#0D1117",
+                "SurfaceRaisedBrush": "#161B22",
+                "BorderBrush": "#30363D",
+                "TextBrush": "#E6EDF3",
+                "MutedTextBrush": "#848D97",
+                "AccentBrush": "#58A6FF",
+                "AccentHoverBrush": "#79B8FF",
+                "AccentPressedBrush": "#A5D6FF",
+                "AccentTextBrush": "#0D1117",
+                "WarnBrush": "#D29922",
+                "DangerBrush": "#F85149",
+                "ControlBackgroundBrush": "#161B22",
+                "ControlBorderBrush": "#30363D",
+                "ControlHoverBrush": "#1F242C",
+                "ControlPressedBrush": "#262C36",
+                "ControlDisabledTextBrush": "#6E7681",
+                "SelectionBrush": ["#1C3A5E", "#132B45"],
+                "SelectionBorderBrush": "#388BFD",
+                "SelectionTextBrush": "#E6EDF3",
+                "HoverBorderBrush": "#1F242C",
+                "ModifiedRowBrush": "#33270A",
+                "ScrollThumbBrush": "#30363D",
+                "ScrollThumbHoverBrush": "#484F58",
+                "SplitterLineBrush": "#30363D",
+                "ShadowColor": "#FF010409"
+            }
+        }
+        """;
+
+    /// <summary>
     /// GitHub Light. Not a mood but a default - the cleanest light theme here, and the one that looks least like a
     /// theme at all.
     /// </summary>
@@ -638,6 +680,7 @@ public static class BuiltInThemes
         GruvboxDark,
         Zenburn,
         GitHubLight,
+        GitHubDark,
     ];
 
     /// <summary>

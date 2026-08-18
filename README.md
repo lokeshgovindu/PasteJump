@@ -28,7 +28,7 @@ Two things beyond the jog wheel are worth knowing about up front:
   they paste as *one* clip rather than one after another, with a separator of your choosing; images are left out and
   counted. There is a key for doing the same during the gesture, **switched off by default** because most people
   paste twice rather than mark twice: give it a letter under *Settings → Keys*.
-- **Seventeen themes beyond Light and Dark, and you can write your own.** A theme is a small `.json` file of named colours that inherits
+- **Eighteen themes beyond Light and Dark, and you can write your own.** A theme is a small `.json` file of named colours that inherits
   everything it does not set, so a three-line file is a valid theme. Solarized, Catppuccin, Nord, Dracula, Tokyo
   Night, Monokai, Gruvbox, Kanagawa and more are built in, and the theme applies as you step through the list.
 
