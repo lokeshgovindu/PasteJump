@@ -34,6 +34,38 @@ public static class WindowGeometry
         double minHeight)
         => (Fit(width, workWidth, minWidth), Fit(height, workHeight, minHeight));
 
+    /// <summary>
+    /// The width to give the list pane: the remembered one, kept wide enough to be a list and narrow enough to
+    /// leave the preview its own minimum.
+    /// </summary>
+    /// <param name="wanted">The remembered list width.</param>
+    /// <param name="totalWidth">Width available to both panes and the splitter between them.</param>
+    /// <param name="minList">The list's own minimum.</param>
+    /// <param name="minPreview">The preview's minimum, which is what stops the list eating the window.</param>
+    /// <param name="splitterWidth">The grab area between them, which belongs to neither.</param>
+    /// <remarks>
+    /// Needed because the list width is remembered independently of the window width: a split left at 900px on a
+    /// maximised window would, restored on a 1000px window, leave the preview a sliver - and the user would find a
+    /// pane they cannot see with no obvious way to know why. The list's minimum wins if even that will not fit,
+    /// for the same reason it does in <see cref="FitTo"/>.
+    /// </remarks>
+    public static double FitPane(
+        double wanted,
+        double totalWidth,
+        double minList,
+        double minPreview,
+        double splitterWidth)
+    {
+        if (totalWidth <= 0)
+        {
+            return Math.Max(wanted, minList);
+        }
+
+        var widest = totalWidth - splitterWidth - minPreview;
+
+        return Math.Max(Math.Min(wanted, widest), minList);
+    }
+
     private static double Fit(double wanted, double available, double minimum)
     {
         // An unusable work area - which is what a disconnected monitor reports - leaves the wanted size alone

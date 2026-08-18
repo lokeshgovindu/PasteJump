@@ -2201,4 +2201,36 @@ public partial class HistoryWindow : Window
         return (origin.X, origin.Y, ImageScale.ScaleX);
     }
 
+    /// <summary>
+    /// Sets how wide the list pane is, fitted so the preview keeps its own minimum.
+    /// </summary>
+    /// <remarks>
+    /// Applied after the window has a width to fit into, which is why the caller does it on Loaded rather than
+    /// before the first show: ActualWidth is zero until then, and fitting against zero would collapse the list to
+    /// its minimum on every opening.
+    /// </remarks>
+    public void ApplyListWidth(int width)
+    {
+        var available = ActualWidth > 0 ? ActualWidth - SplitPadding : Width - SplitPadding;
+
+        ListColumn.Width = new GridLength(WindowGeometry.FitPane(
+            width,
+            available,
+            ListColumn.MinWidth,
+            PreviewMinWidth,
+            SplitterWidth));
+    }
+
+    /// <summary>The list pane's width as it stands, for remembering where the splitter was left.</summary>
+    public int CurrentListWidth => (int)Math.Round(ListColumn.ActualWidth);
+
+    /// <summary>The preview's own MinWidth, from the XAML. Stated here because a column definition cannot be named twice.</summary>
+    private const double PreviewMinWidth = 240;
+
+    /// <summary>The splitter's grab area, which belongs to neither pane.</summary>
+    private const double SplitterWidth = 6;
+
+    /// <summary>The window chrome and margins the split grid does not get: 12 either side.</summary>
+    private const double SplitPadding = 24;
+
 }

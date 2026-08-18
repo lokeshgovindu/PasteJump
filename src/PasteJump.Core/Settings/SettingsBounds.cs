@@ -69,6 +69,9 @@ public static class SettingsBounds
     /// <inheritdoc cref="HistoryWindowWidth"/>
     public static SettingBound HistoryWindowHeight { get; } = new(400, 20_000);
 
+    /// <summary>The list pane's remembered width. The floor is its own MinWidth.</summary>
+    public static SettingBound HistoryListWidth { get; } = new(300, 20_000);
+
     public static SettingBound OverlayFontSize { get; } = new(9, 24);
 
     public static SettingBound OverlayPreviewChars { get; } = new(40, 4_000);

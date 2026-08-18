@@ -173,11 +173,18 @@
 
         <!-- Split: list on the left, preview on the right -->
         <Grid Grid.Row="1">
+            <!--
+                The list takes a fixed width and the preview takes the rest, rather than the two splitting the
+                window evenly as they did. Measured from a screenshot of the split the user asked for: 551px of
+                list in a 1254px window, so 552 here. Absolute rather than a share of the width because the list's
+                columns are fixed - widening the window should give the room to the picture, which is what it is
+                for, not to the Content column. The splitter still moves it, and where it is left is remembered.
+            -->
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1*" MinWidth="300" />
+                <ColumnDefinition x:Name="ListColumn" Width="552" MinWidth="300" />
                 <!-- 6px is the grab area, not the visible divider: the seam drawn inside it is 1px. -->
                 <ColumnDefinition Width="6" />
-                <ColumnDefinition Width="1*" MinWidth="240" />
+                <ColumnDefinition Width="*" MinWidth="240" />
             </Grid.ColumnDefinitions>
 
             <!--

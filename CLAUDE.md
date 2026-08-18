@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 936 in Debug (`dotnet test`) - 883 in Core.Tests, 53 in Interop.Tests; **934 in Release**, see below |
+| Tests | 940 in Debug (`dotnet test`) - 887 in Core.Tests, 53 in Interop.Tests; **938 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1131,6 +1131,15 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     window writes them itself, so a dialog that reset them would undo a resize every time Settings was opened.
   - The XAML default moved too, since the UI smoke harness constructs the window with no settings - which is also
     why every history screenshot in the manual is now 1260x770.
+  - **The splitter is remembered as well, and the list is now a FIXED width rather than half the window.** Asked for
+    in the same sitting: the list pane was `1*` against the preview's `1*`, and it is 552 now - measured from the
+    screenshot of the split the user wanted, 551px of list in a 1254px window. Absolute rather than a share, because
+    the list's columns are fixed: widening the window should give the room to the picture, which is what the extra
+    width is for, not to the Content column. `HistoryListWidth` remembers where the splitter is left.
+  - **`ApplyListWidth` runs on `Loaded`, not before the first show.** `ActualWidth` is zero until the window has laid
+    out, and `WindowGeometry.FitPane` fitting against zero would collapse the list to its minimum on every opening -
+    which is what the fourth of its tests pins. The other cases: a split left wide on a maximised window is brought
+    in so the preview keeps its 240px minimum, and the list's own minimum wins when even that will not fit.
 - **A picture at 100% was blurry because it landed on a HALF pixel (2026-08-18).** Reported as "even for 100% it is
   showing more than 100% I think, that is why we are not seeing the clarity, they are blurred". The numbers were
   innocent - the clip really was 278x400, its DIB carried `XPelsPerMeter=0` so WPF read it as 96 dpi, and the display
@@ -1709,8 +1718,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 936 tests (Debug)
-dotnet test -c Release                              # 934 - what CI runs, and it is not the same set
+dotnet test                                         # 940 tests (Debug)
+dotnet test -c Release                              # 938 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

@@ -62,4 +62,33 @@ public class WindowGeometryTests
         Assert.Equal(1260, width);
         Assert.Equal(770, height);
     }
+    [Fact]
+    public void A_list_width_that_fits_is_left_alone()
+    {
+        // The default split: 552 of list in a 1236px content area, which is what was asked for.
+        Assert.Equal(552, WindowGeometry.FitPane(552, 1236, 300, 240, 6));
+    }
+
+    [Fact]
+    public void A_list_width_remembered_from_a_wider_window_is_brought_in()
+    {
+        // Left at 900 on a maximised window, then opened at 1000: honouring it would leave the preview 94px, so
+        // the user would find a pane they cannot use and nothing to explain why.
+        Assert.Equal(1000 - 6 - 240, WindowGeometry.FitPane(900, 1000, 300, 240, 6));
+    }
+
+    [Fact]
+    public void The_lists_own_minimum_wins_when_even_that_will_not_fit()
+    {
+        Assert.Equal(300, WindowGeometry.FitPane(552, 400, 300, 240, 6));
+    }
+
+    [Fact]
+    public void A_window_with_no_width_yet_leaves_the_remembered_split_alone()
+    {
+        // ActualWidth is zero until the window has laid out. Fitting against that would collapse the list to its
+        // minimum on every opening, which is exactly the bug this guards.
+        Assert.Equal(552, WindowGeometry.FitPane(552, 0, 300, 240, 6));
+    }
+
 }

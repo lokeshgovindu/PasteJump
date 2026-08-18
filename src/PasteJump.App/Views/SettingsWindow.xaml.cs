@@ -2054,6 +2054,7 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.HistoryWindowWidth)] = "Advanced",
         [nameof(PasteJumpSettings.HistoryWindowHeight)] = "Advanced",
         [nameof(PasteJumpSettings.HistoryWindowMaximised)] = "Advanced",
+        [nameof(PasteJumpSettings.HistoryListWidth)] = "Advanced",
         [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
@@ -2292,6 +2293,7 @@ public partial class SettingsWindow : Window
         settings.HistoryWindowWidth = _baseline.HistoryWindowWidth;
         settings.HistoryWindowHeight = _baseline.HistoryWindowHeight;
         settings.HistoryWindowMaximised = _baseline.HistoryWindowMaximised;
+        settings.HistoryListWidth = _baseline.HistoryListWidth;
 
         if (!int.TryParse(MaxClipsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var maxClips)
             || maxClips < 1)

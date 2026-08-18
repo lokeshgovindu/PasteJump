@@ -68,6 +68,17 @@ public sealed class PasteJumpSettings
     public int HistoryWindowHeight { get; set; } = 770;
 
     /// <summary>
+    /// How wide the clipboard list is, leaving the rest of the window to the preview. Remembered with the window's
+    /// own size, and moved by dragging the splitter.
+    /// </summary>
+    /// <remarks>
+    /// 552 is measured rather than chosen: it is the split the user asked for, 551px of list in a 1254px window.
+    /// Fitted by <see cref="WindowGeometry.FitPane"/> on the way in, so a wide split remembered on a maximised
+    /// window cannot leave the preview a sliver when the window opens smaller.
+    /// </remarks>
+    public int HistoryListWidth { get; set; } = 552;
+
+    /// <summary>
     /// Whether the history window was maximised when it was last closed.
     /// </summary>
     /// <remarks>
@@ -574,6 +585,7 @@ public sealed class PasteJumpSettings
         ClipboardRepublishMs = Math.Clamp(ClipboardRepublishMs, SettingsBounds.ClipboardRepublishMs.Min, SettingsBounds.ClipboardRepublishMs.Max);
         HistoryWindowWidth = Math.Clamp(HistoryWindowWidth, SettingsBounds.HistoryWindowWidth.Min, SettingsBounds.HistoryWindowWidth.Max);
         HistoryWindowHeight = Math.Clamp(HistoryWindowHeight, SettingsBounds.HistoryWindowHeight.Min, SettingsBounds.HistoryWindowHeight.Max);
+        HistoryListWidth = Math.Clamp(HistoryListWidth, SettingsBounds.HistoryListWidth.Min, SettingsBounds.HistoryListWidth.Max);
 
         // Trimmed rather than validated against installed families: a font that is not on this machine may well be
         // on the next one the settings file travels to, and dropping the name here would silently lose it.

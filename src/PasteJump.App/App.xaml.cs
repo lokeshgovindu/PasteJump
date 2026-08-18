@@ -850,6 +850,9 @@ public partial class App : Application
                 _historyWindow.WindowState = WindowState.Maximized;
             }
 
+            // The split needs a laid-out window to fit against, so it waits for Loaded - see ApplyListWidth.
+            _historyWindow.Loaded += (_, _) => _historyWindow?.ApplyListWidth(_settings.HistoryListWidth);
+
             _historyWindow.Closed += (_, _) =>
             {
                 RememberHistoryWindowSize(_historyWindow);
@@ -1055,6 +1058,9 @@ public partial class App : Application
 
         var maximised = window.WindowState == WindowState.Maximized;
         var bounds = window.RestoreBounds;
+        var listWidth = window is HistoryWindow history && history.CurrentListWidth > 0
+            ? history.CurrentListWidth
+            : _settings.HistoryListWidth;
 
         // An empty RestoreBounds means the window never really laid out - nothing worth saving over what we have.
         var width = bounds.Width > 0 ? (int)Math.Round(bounds.Width) : _settings.HistoryWindowWidth;
@@ -1062,7 +1068,8 @@ public partial class App : Application
 
         if (width == _settings.HistoryWindowWidth
             && height == _settings.HistoryWindowHeight
-            && maximised == _settings.HistoryWindowMaximised)
+            && maximised == _settings.HistoryWindowMaximised
+            && listWidth == _settings.HistoryListWidth)
         {
             return;
         }
@@ -1070,6 +1077,7 @@ public partial class App : Application
         _settings.HistoryWindowWidth = width;
         _settings.HistoryWindowHeight = height;
         _settings.HistoryWindowMaximised = maximised;
+        _settings.HistoryListWidth = listWidth;
         _settings.Normalise();
         _settingsStore.Save(_settings);
     }
