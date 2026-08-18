@@ -1112,6 +1112,26 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     every resource said 18. Verified by making `ApplyFont` return early: 3 failures.
   - Applied through `PasteJumpPasteHost.SetOverlayFont`, which remembers as well as applies - the overlay is
     built lazily on the first gesture, long after the settings were read, exactly as `SetPreviewSize` handles.
+- **A picture at 100% was blurry because it landed on a HALF pixel (2026-08-18).** Reported as "even for 100% it is
+  showing more than 100% I think, that is why we are not seeing the clarity, they are blurred". The numbers were
+  innocent - the clip really was 278x400, its DIB carried `XPelsPerMeter=0` so WPF read it as 96 dpi, and the display
+  was at 96 dpi too, so nothing was being scaled. Two things about *how it was drawn* were wrong, and both had to be
+  fixed:
+  - **The `Image` is centred, and the pane had no `UseLayoutRounding`.** Centring splits the leftover space in two,
+    so an odd number of leftover pixels puts the image on a fractional offset - measured at **160.0187** in the
+    harness - and WPF then resamples the entire bitmap to draw it there. A fifth of a hundredth of a pixel is enough
+    to soften every glyph in a screenshot. `UseLayoutRounding="True"` on `PreviewImageHost` is the fix.
+  - **WPF's default resampling is `Linear`, which is wrong at both ends.** `ApplyScalingMode` now picks by direction:
+    **`NearestNeighbor` at 1:1 and above**, because a screenshot's text and hairlines must appear exactly as
+    captured and bilinear smears them - at 400% it is the difference between reading a pixel and guessing at it -
+    and **`HighQuality` (Fant) when shrinking**, because reducing a 4K screenshot with nearest-neighbour drops whole
+    rows of text. Not "best everywhere": Fant costs more, so it is used only where it earns it.
+  - **The overlay's preview got `HighQuality` too.** Its `StretchDirection=DownOnly` means it only ever shrinks, so
+    it was the minification case all along.
+  - **The harness asserts three separate facts and each one is invisible in a screenshot**: the scale is exactly 1,
+    the origin is whole-pixel, and the resampling matches the direction. Verified by removing the fix: the origin
+    came back as `160.0187530517578` and the mode as `Unspecified`, failing three checks. Note that a screenshot
+    diff would *not* have caught this - a blurry render and a crisp one are both plausible-looking pictures.
 - **The overlay opened on a bare `V`, and the cause was Ctrl being the last modifier tracked from transitions
   (2026-08-18).** Reported as "sometimes even press just v (without ctrl), I am seeing the PasteJump overlay" - the
   worst thing this application can do, since it takes an unmodified letter away from whatever is being typed into.

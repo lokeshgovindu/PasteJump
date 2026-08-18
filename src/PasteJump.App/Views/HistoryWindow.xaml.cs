@@ -1251,6 +1251,8 @@ public partial class HistoryWindow : Window
         ImageScale.ScaleX = scale;
         ImageScale.ScaleY = scale;
 
+        ApplyScalingMode(scale);
+
         ZoomReadout.Text = _zoom is null
             ? $"Fit · {scale * 100:0}%"
             : $"{scale * 100:0}%";
@@ -2160,4 +2162,43 @@ public partial class HistoryWindow : Window
             ? $"No duplicates found among the {before} {plural}."
             : $"Removed {removed} duplicate {(removed == 1 ? noun : plural)}. {before - removed} left.";
     }
+    /// <summary>
+    /// Chooses how the bitmap is resampled, from the direction the scale goes in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// WPF's default is <c>Linear</c>, which is the wrong choice at both ends and is half the reason a picture at
+    /// 100% looked blurry. <b>At 1:1 or larger, NearestNeighbor</b>: a screenshot is the common case here and its
+    /// text and hairlines must stay exactly as captured, where bilinear smears every edge - and at 400% it is the
+    /// difference between reading a pixel and guessing at it.
+    /// </para>
+    /// <para>
+    /// <b>Shrinking, HighQuality</b>, which is Fant rather than bilinear: reducing a 4K screenshot to fit a small
+    /// pane throws away most of the pixels, and nearest-neighbour would drop whole rows of text, producing the
+    /// aliased mess this pane used to show at Fit. That is a real trade rather than "best everywhere" - Fant is
+    /// slower, which is why it is used only where it earns it.
+    /// </para>
+    /// </remarks>
+    private void ApplyScalingMode(double scale)
+        => RenderOptions.SetBitmapScalingMode(
+            PreviewImage,
+            scale >= 1 ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.HighQuality);
+
+    /// <summary>The resampling in force, so the UI smoke harness can assert it. Harness only.</summary>
+    public BitmapScalingMode ScalingModeForSmokeTest() => RenderOptions.GetBitmapScalingMode(PreviewImage);
+
+    /// <summary>
+    /// Where the picture actually lands, in device pixels, and at what scale. Harness only.
+    /// </summary>
+    /// <remarks>
+    /// A fractional offset here is invisible in a screenshot comparison and is exactly what made 100% blurry, so it
+    /// is asserted rather than eyeballed.
+    /// </remarks>
+    public (double X, double Y, double Scale) PicturePlacementForSmokeTest()
+    {
+        var origin = PreviewImage.TransformToAncestor(this).Transform(new Point(0, 0));
+
+        return (origin.X, origin.Y, ImageScale.ScaleX);
+    }
+
 }

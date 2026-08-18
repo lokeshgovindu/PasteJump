@@ -398,7 +398,15 @@
                             Stretch=None at all times - fitting is done by computing a scale rather than by letting
                             the Image stretch, so the percentage readout can tell the truth in Fit mode too.
                         -->
-                        <Grid x:Name="PreviewImageHost" Grid.Row="1" Visibility="Collapsed">
+                        <!--
+                            UseLayoutRounding is what makes a picture at 100% actually crisp, and its absence is
+                            why one looked blurry. The Image is centred, so the space left over is split in two -
+                            and whenever that leftover is an odd number of pixels the image starts on a HALF pixel.
+                            WPF then resamples the whole bitmap to draw it there, which on a screenshot of text is
+                            plainly visible and reads as "100% is not really 100%". Rounding the layout puts the
+                            image on whole pixels, so 1:1 really is 1:1.
+                        -->
+                        <Grid x:Name="PreviewImageHost" Grid.Row="1" Visibility="Collapsed" UseLayoutRounding="True">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />

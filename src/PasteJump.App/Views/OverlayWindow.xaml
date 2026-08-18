@@ -257,12 +257,19 @@
                     with a gap beside it, which reads as a layout fault rather than as a small picture. Centring also
                     suits the copied-image-file case, where the thumbnail sits under its path like a caption above it.
                 -->
+                <!--
+                    HighQuality (Fant) rather than WPF's default bilinear. StretchDirection=DownOnly means this
+                    image only ever SHRINKS, and reducing a screenshot bilinearly drops detail bilinear cannot
+                    average away - the same "pictures are not clear" that the history pane was reported for. It
+                    costs more per frame than Linear and is worth it once per gesture.
+                -->
                 <Image x:Name="PreviewImage"
                        Grid.Row="1"
                        MaxHeight="400"
                        MaxWidth="600"
                        Stretch="Uniform"
                        StretchDirection="DownOnly"
+                       RenderOptions.BitmapScalingMode="HighQuality"
                        HorizontalAlignment="Center"
                        Visibility="Collapsed" />
 

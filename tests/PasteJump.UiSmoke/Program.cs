@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Media;
 using PasteJump.App.Services;
 using PasteJump.App.Views;
 using PasteJump.Core;
@@ -195,6 +196,52 @@ internal static class Program
                         else
                         {
                             Console.WriteLine("  preview: the scroll bars own their presses, the picture owns its own");
+                        }
+
+                        // 100% must mean 1:1, which is three separate facts and not one of them shows up in a
+                        // screenshot comparison. Reported as "even for 100% it is showing more than 100% ... they
+                        // are blurred": the Image is centred, so an odd number of leftover pixels put it on a HALF
+                        // pixel, and WPF's default bilinear resampling then smeared the whole bitmap.
+                        history.ZoomPreviewForSmokeTest(1);
+                        Drain();
+
+                        var placement = history.PicturePlacementForSmokeTest();
+                        var mode = history.ScalingModeForSmokeTest();
+
+                        Console.WriteLine($"  preview at 100%: origin {placement.X:0.##},{placement.Y:0.##} "
+                            + $"scale {placement.Scale:0.###} resampling {mode}");
+
+                        if (Math.Abs(placement.Scale - 1) > 0.0001)
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  100% applied a scale of {placement.Scale}, so it is not 1:1");
+                        }
+
+                        if (Math.Abs(placement.X - Math.Round(placement.X)) > 0.001
+                            || Math.Abs(placement.Y - Math.Round(placement.Y)) > 0.001)
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  the picture starts at a fractional offset "
+                                + $"({placement.X}, {placement.Y}), which resamples every pixel of it");
+                        }
+
+                        if (mode != BitmapScalingMode.NearestNeighbor)
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  at 100% the resampling is {mode}, not NearestNeighbor, so a "
+                                + "screenshot's text is smoothed rather than shown as captured");
+                        }
+
+                        // And the other direction: shrinking to fit must NOT use nearest-neighbour, which drops
+                        // whole rows of pixels and aliases text into a mess.
+                        history.ZoomPreviewForSmokeTest(0.4);
+                        Drain();
+
+                        if (history.ScalingModeForSmokeTest() != BitmapScalingMode.HighQuality)
+                        {
+                            _failures++;
+                            Console.WriteLine("  FAIL  shrinking uses "
+                                + $"{history.ScalingModeForSmokeTest()}, not HighQuality");
                         }
 
                         // The tooltip's own path. It draws in a popup this harness cannot capture, so what is
