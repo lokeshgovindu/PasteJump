@@ -226,4 +226,34 @@ public sealed class SettingsClampTests
         Assert.Equal("Cascadia Mono", settings.OverlayFontFamily);
     }
 
+    [Fact]
+    public void The_history_window_size_is_clamped_to_something_usable()
+    {
+        var tiny = new PasteJumpSettings { HistoryWindowWidth = 10, HistoryWindowHeight = 10 };
+        var huge = new PasteJumpSettings { HistoryWindowWidth = 999_999, HistoryWindowHeight = 999_999 };
+
+        tiny.Normalise();
+        huge.Normalise();
+
+        // The floors are the window's own MinWidth and MinHeight; a stored value below them would be ignored by
+        // WPF anyway, so clamping keeps the file honest about what is actually in force.
+        Assert.Equal(680, tiny.HistoryWindowWidth);
+        Assert.Equal(400, tiny.HistoryWindowHeight);
+        Assert.Equal(20_000, huge.HistoryWindowWidth);
+        Assert.Equal(20_000, huge.HistoryWindowHeight);
+    }
+
+    [Fact]
+    public void The_history_window_opens_at_the_size_that_was_asked_for()
+    {
+        var settings = new PasteJumpSettings();
+
+        settings.Normalise();
+
+        // 1260x770 is the size the user resized it to and asked to have as the default.
+        Assert.Equal(1260, settings.HistoryWindowWidth);
+        Assert.Equal(770, settings.HistoryWindowHeight);
+        Assert.False(settings.HistoryWindowMaximised);
+    }
+
 }

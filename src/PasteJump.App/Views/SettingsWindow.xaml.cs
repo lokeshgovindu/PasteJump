@@ -2051,6 +2051,9 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.OverlayDeletedFlashMs)] = "Advanced",
         [nameof(PasteJumpSettings.ClipboardSettleMs)] = "Advanced",
         [nameof(PasteJumpSettings.ClipboardRepublishMs)] = "Advanced",
+        [nameof(PasteJumpSettings.HistoryWindowWidth)] = "Advanced",
+        [nameof(PasteJumpSettings.HistoryWindowHeight)] = "Advanced",
+        [nameof(PasteJumpSettings.HistoryWindowMaximised)] = "Advanced",
         [nameof(PasteJumpSettings.OverlayPreviewMaxWidth)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewMaxHeight)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
@@ -2284,6 +2287,11 @@ public partial class SettingsWindow : Window
         // if you know why" is the Advanced inventory rather than a box on a tab.
         settings.ClipboardSettleMs = _baseline.ClipboardSettleMs;
         settings.ClipboardRepublishMs = _baseline.ClipboardRepublishMs;
+
+        // The history window writes these itself as it closes, so the dialog must carry them rather than reset them.
+        settings.HistoryWindowWidth = _baseline.HistoryWindowWidth;
+        settings.HistoryWindowHeight = _baseline.HistoryWindowHeight;
+        settings.HistoryWindowMaximised = _baseline.HistoryWindowMaximised;
 
         if (!int.TryParse(MaxClipsBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var maxClips)
             || maxClips < 1)

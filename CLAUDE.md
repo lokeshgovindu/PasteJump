@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 929 in Debug (`dotnet test`) - 876 in Core.Tests, 53 in Interop.Tests; **927 in Release**, see below |
+| Tests | 936 in Debug (`dotnet test`) - 883 in Core.Tests, 53 in Interop.Tests; **934 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1112,6 +1112,25 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     every resource said 18. Verified by making `ApplyFont` return early: 3 failures.
   - Applied through `PasteJumpPasteHost.SetOverlayFont`, which remembers as well as applies - the overlay is
     built lazily on the first gesture, long after the settings were read, exactly as `SetPreviewSize` handles.
+- **The history window remembers its size, and 1260x770 is the default because that is the size it was asked for
+  (2026-08-18).** Asked as "I think we can increase the setting window size", with three screenshots of the window
+  resized by hand; the PNGs were measured rather than eyeballed - 1248x755, then 1260x770 twice, which settled it.
+  The old default was 1020x640.
+  - **Remembering it is the actual fix.** `ShowHistory` creates the window on each opening and `Closed` sets the
+    field to null, so a resize lasted exactly as long as the window did. `HistoryWindowWidth`/`Height` are written
+    as it closes and applied before the first show, so it opens where it was rather than jumping afterwards.
+  - **`RestoreBounds`, not `ActualWidth`.** While a window is maximised those two report the screen, so saving them
+    would throw away the size the user chose and leave Restore with nowhere to go. `HistoryWindowMaximised` is a
+    separate setting for that reason - a state remembered as a size is not the same thing.
+  - **`WindowGeometry.FitTo` is in `Core` and tested**, because remembering a size introduces a way to be unusable
+    that a constant could not: a size saved on a 4K monitor, restored on a laptop, puts the resize grip and often the
+    buttons off the screen. The window's own minimum wins over a work area smaller than itself - honouring that work
+    area would hand WPF a height it ignores, so the rule would only look as though it had been applied - and a work
+    area of zero, which is what a disconnected monitor reports, leaves the wanted size alone.
+  - **The three settings are Advanced-only and `TryBuild` carries them**, like the other knobs with no control: the
+    window writes them itself, so a dialog that reset them would undo a resize every time Settings was opened.
+  - The XAML default moved too, since the UI smoke harness constructs the window with no settings - which is also
+    why every history screenshot in the manual is now 1260x770.
 - **A picture at 100% was blurry because it landed on a HALF pixel (2026-08-18).** Reported as "even for 100% it is
   showing more than 100% I think, that is why we are not seeing the clarity, they are blurred". The numbers were
   innocent - the clip really was 278x400, its DIB carried `XPelsPerMeter=0` so WPF read it as 96 dpi, and the display
@@ -1690,8 +1709,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 929 tests (Debug)
-dotnet test -c Release                              # 927 - what CI runs, and it is not the same set
+dotnet test                                         # 936 tests (Debug)
+dotnet test -c Release                              # 934 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

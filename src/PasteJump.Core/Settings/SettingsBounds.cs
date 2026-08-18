@@ -59,6 +59,16 @@ public static class SettingsBounds
     /// </summary>
     public static SettingBound ClipboardRepublishMs { get; } = new(0, 5_000);
 
+    /// <summary>
+    /// The history window's remembered size. The floors are the window's own MinWidth and MinHeight - a smaller
+    /// stored value would be ignored by WPF anyway, so clamping here keeps the file honest about what is in force.
+    /// The ceiling is deliberately generous: someone with four 4K monitors may legitimately want a very wide window.
+    /// </summary>
+    public static SettingBound HistoryWindowWidth { get; } = new(680, 20_000);
+
+    /// <inheritdoc cref="HistoryWindowWidth"/>
+    public static SettingBound HistoryWindowHeight { get; } = new(400, 20_000);
+
     public static SettingBound OverlayFontSize { get; } = new(9, 24);
 
     public static SettingBound OverlayPreviewChars { get; } = new(40, 4_000);

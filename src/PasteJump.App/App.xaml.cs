@@ -832,7 +832,30 @@ public partial class App : Application
                 _settings.HistoryPreviewMaxWidth,
                 _settings.ClipJoinSeparator));
             _historyWindow.DensityChanged += OnHistoryDensityChanged;
-            _historyWindow.Closed += (_, _) => _historyWindow = null;
+
+            // Size restored before the first show, so the window appears where it was rather than jumping.
+            var (width, height) = WindowGeometry.FitTo(
+                _settings.HistoryWindowWidth,
+                _settings.HistoryWindowHeight,
+                SystemParameters.WorkArea.Width,
+                SystemParameters.WorkArea.Height,
+                _historyWindow.MinWidth,
+                _historyWindow.MinHeight);
+
+            _historyWindow.Width = width;
+            _historyWindow.Height = height;
+
+            if (_settings.HistoryWindowMaximised)
+            {
+                _historyWindow.WindowState = WindowState.Maximized;
+            }
+
+            _historyWindow.Closed += (_, _) =>
+            {
+                RememberHistoryWindowSize(_historyWindow);
+                _historyWindow = null;
+            };
+
             _historyWindow.Show();
         }
         else
@@ -1010,6 +1033,47 @@ public partial class App : Application
     /// <see cref="SettingsWindow.ReloadRetention"/> exists for.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Saves the history window's size as it closes, so the next opening matches the last one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>RestoreBounds</c> rather than <c>ActualWidth</c>: while a window is maximised those two report the screen,
+    /// so remembering them would lose the size the user had chosen and leave Restore with nowhere to go. Maximised
+    /// is remembered as the state it is, separately.
+    /// </para>
+    /// <para>
+    /// Written only when something changed, because this runs on every close and the settings file is on disk.
+    /// </para>
+    /// </remarks>
+    private void RememberHistoryWindowSize(Window? window)
+    {
+        if (window is null)
+        {
+            return;
+        }
+
+        var maximised = window.WindowState == WindowState.Maximized;
+        var bounds = window.RestoreBounds;
+
+        // An empty RestoreBounds means the window never really laid out - nothing worth saving over what we have.
+        var width = bounds.Width > 0 ? (int)Math.Round(bounds.Width) : _settings.HistoryWindowWidth;
+        var height = bounds.Height > 0 ? (int)Math.Round(bounds.Height) : _settings.HistoryWindowHeight;
+
+        if (width == _settings.HistoryWindowWidth
+            && height == _settings.HistoryWindowHeight
+            && maximised == _settings.HistoryWindowMaximised)
+        {
+            return;
+        }
+
+        _settings.HistoryWindowWidth = width;
+        _settings.HistoryWindowHeight = height;
+        _settings.HistoryWindowMaximised = maximised;
+        _settings.Normalise();
+        _settingsStore.Save(_settings);
+    }
+
     private void OnHistoryDensityChanged(GridDensity density)
     {
         if (_settings.GridDensity == density)

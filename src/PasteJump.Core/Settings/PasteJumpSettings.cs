@@ -49,6 +49,34 @@ public sealed class PasteJumpSettings
     public bool MonitorClipboard { get; set; } = true;
 
     /// <summary>
+    /// The clipboard history window's size, remembered between openings.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The window is created fresh each time it opens and destroyed when it closes, so before this a resize lasted
+    /// exactly as long as the window did - which is what "we can increase the window size" was really asking about.
+    /// The default is the size the user resized it to and asked for: 1260 x 770.
+    /// </para>
+    /// <para>
+    /// Fitted to the work area on the way in by <see cref="WindowGeometry.FitTo"/>, so a size remembered on a large
+    /// monitor cannot open a window taller than the screen it lands on.
+    /// </para>
+    /// </remarks>
+    public int HistoryWindowWidth { get; set; } = 1260;
+
+    /// <inheritdoc cref="HistoryWindowWidth"/>
+    public int HistoryWindowHeight { get; set; } = 770;
+
+    /// <summary>
+    /// Whether the history window was maximised when it was last closed.
+    /// </summary>
+    /// <remarks>
+    /// Kept separately from the size, which continues to hold the restored size: maximising is a state, and
+    /// remembering it as a size would open a window filling the screen that "restore" then had nowhere to go from.
+    /// </remarks>
+    public bool HistoryWindowMaximised { get; set; }
+
+    /// <summary>
     /// How long to let the clipboard settle after a change notification before reading it, in milliseconds.
     /// <para>
     /// <b>One copy is not one notification.</b> An OLE writer publishes in two steps - <c>OleSetClipboard</c>
@@ -544,6 +572,8 @@ public sealed class PasteJumpSettings
         OverlayFontSize = Math.Clamp(OverlayFontSize, SettingsBounds.OverlayFontSize.Min, SettingsBounds.OverlayFontSize.Max);
         ClipboardSettleMs = Math.Clamp(ClipboardSettleMs, SettingsBounds.ClipboardSettleMs.Min, SettingsBounds.ClipboardSettleMs.Max);
         ClipboardRepublishMs = Math.Clamp(ClipboardRepublishMs, SettingsBounds.ClipboardRepublishMs.Min, SettingsBounds.ClipboardRepublishMs.Max);
+        HistoryWindowWidth = Math.Clamp(HistoryWindowWidth, SettingsBounds.HistoryWindowWidth.Min, SettingsBounds.HistoryWindowWidth.Max);
+        HistoryWindowHeight = Math.Clamp(HistoryWindowHeight, SettingsBounds.HistoryWindowHeight.Min, SettingsBounds.HistoryWindowHeight.Max);
 
         // Trimmed rather than validated against installed families: a font that is not on this machine may well be
         // on the next one the settings file travels to, and dropping the name here would silently lose it.
