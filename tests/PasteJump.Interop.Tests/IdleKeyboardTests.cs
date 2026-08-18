@@ -157,6 +157,42 @@ public class IdleKeyboardTests
     }
 
     /// <summary>
+    /// The same sweep after a Ctrl release went missing: with the live keyboard saying Ctrl is up, no key is ours -
+    /// including the trigger.
+    /// </summary>
+    /// <remarks>
+    /// This is the whole-keyboard version of a real report: "sometimes even press just v (without ctrl), I am
+    /// seeing the PasteJump overlay". Ctrl was tracked from key transitions alone, so a key-up that never reached
+    /// the hook - the secure desktop, a UAC prompt, a lock, an RDP session change, or our hook dropped for
+    /// exceeding LowLevelHooksTimeout - left the flag stuck and the trigger opened a session by itself. The
+    /// release is simulated the way the hook experiences it: the key-up is simply never delivered.
+    /// </remarks>
+    [Fact]
+    public void After_a_missed_Ctrl_release_nothing_is_swallowed()
+    {
+        var swallowed = new List<int>();
+
+        for (var vk = 0; vk < 256; vk++)
+        {
+            var (recognizer, _) = Build();
+
+            // Ctrl goes down and its key-up never arrives.
+            recognizer.CtrlHeld = true;
+            recognizer.Handle(GestureKey.Control, isDown: true);
+
+            // The live keyboard is the only thing that knows, and it says Ctrl is up.
+            recognizer.CtrlHeld = false;
+
+            if (recognizer.Handle(VirtualKeyTranslator.ToGestureKey(vk, VkV), isDown: true))
+            {
+                swallowed.Add(vk);
+            }
+        }
+
+        Assert.Empty(swallowed);
+    }
+
+    /// <summary>
     /// With Alt, Win or Shift also held, the trigger itself is refused - AltGr is Ctrl+Alt on many layouts,
     /// Win chords belong to the shell, and Ctrl+Shift+V is how terminals paste. Swept over the whole keyboard
     /// rather than just the trigger, because the gate is meant to cover every key and not only the entry one.

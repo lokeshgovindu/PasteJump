@@ -344,4 +344,94 @@ public class GestureRecognizerTests
         Assert.Equal(1, host.RestoreCount);
         Assert.False(recognizer.IsControlDown);
     }
+    /// <summary>
+    /// A Ctrl release this application never saw must not leave the trigger key opening a session on its own.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reported as "sometimes even press just v (without ctrl), I am seeing the PasteJump overlay" - the worst
+    /// failure available to this application, since it takes an unmodified letter away from whatever is being
+    /// typed into. The cause was that Ctrl was the one modifier still tracked purely from key transitions, so a
+    /// key-up that never reached the hook left the flag stuck at true: the secure desktop taking over for
+    /// Ctrl+Alt+Del or a UAC prompt, a lock or RDP session change, another hook suppressing it, or Windows
+    /// dropping our hook for exceeding LowLevelHooksTimeout.
+    /// </para>
+    /// <para>
+    /// The missed release is simulated the only honest way - by NOT sending the key-up, which is exactly what the
+    /// hook experiences - and then telling the recogniser what the live keyboard says, as the host does on every
+    /// keystroke.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_missed_Ctrl_release_does_not_let_the_trigger_open_a_session_alone()
+    {
+        var (recognizer, controller, _) = Build();
+
+        // Ctrl down, then a full gesture, then Ctrl's key-up goes missing entirely.
+        recognizer.CtrlHeld = true;
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        Assert.True(controller.IsActive);
+
+        // The next keystroke arrives with Ctrl genuinely up, which is all the host reports.
+        recognizer.CtrlHeld = false;
+
+        var swallowed = recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        Assert.False(swallowed);
+        Assert.False(controller.IsActive);
+        Assert.False(recognizer.IsControlDown);
+        Assert.Equal(1, recognizer.MissedControlReleaseCount);
+    }
+
+    /// <summary>
+    /// And a bare trigger key with no Ctrl at any point is never claimed - the same property, from the other end.
+    /// </summary>
+    [Fact]
+    public void The_trigger_key_alone_is_never_swallowed()
+    {
+        var (recognizer, controller, _) = Build();
+
+        Assert.False(recognizer.Handle(GestureKey.Paste, isDown: true));
+        Assert.False(controller.IsActive);
+    }
+
+    /// <summary>
+    /// A session whose Ctrl-up went missing is abandoned rather than pasted, and abandoning it hands the keyboard
+    /// back.
+    /// </summary>
+    /// <remarks>
+    /// Releasing Ctrl is what asks for a paste, so a release we merely inferred must not paste: this is precisely
+    /// the case where the user's intent is unknown. Leaving the session open instead would be worse still - an
+    /// overlay on screen, the hook swallowing every key, and no way to close it.
+    /// </remarks>
+    [Fact]
+    public void A_session_whose_Ctrl_release_went_missing_is_abandoned_not_pasted()
+    {
+        var (recognizer, controller, host) = Build();
+
+        recognizer.CtrlHeld = true;
+        recognizer.Handle(GestureKey.Control, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+        recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        Assert.True(controller.IsActive);
+
+        var pastesBefore = host.PastedClips.Count;
+
+        // Any later keystroke, with the live keyboard saying Ctrl is up. Deliberately NOT Escape: that ends a
+        // session by itself, so the first version of this test passed with the reconciliation removed - it proved
+        // nothing. The trigger key is the honest choice, since with a session open it would otherwise step.
+        recognizer.CtrlHeld = false;
+        var swallowed = recognizer.Handle(GestureKey.Paste, isDown: true);
+
+        Assert.False(controller.IsActive);
+        Assert.False(swallowed);
+        Assert.Equal(pastesBefore, host.PastedClips.Count);
+
+        // And the keyboard is the application's again: nothing is swallowed once the session is gone.
+        Assert.False(recognizer.ShouldSwallowUnhandled());
+    }
+
 }

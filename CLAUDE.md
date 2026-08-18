@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 925 in Debug (`dotnet test`) - 873 in Core.Tests, 52 in Interop.Tests; **923 in Release**, see below |
+| Tests | 929 in Debug (`dotnet test`) - 876 in Core.Tests, 53 in Interop.Tests; **927 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1112,6 +1112,37 @@ Every one of these compiles, builds clean, and silently defeats the theme.
     every resource said 18. Verified by making `ApplyFont` return early: 3 failures.
   - Applied through `PasteJumpPasteHost.SetOverlayFont`, which remembers as well as applies - the overlay is
     built lazily on the first gesture, long after the settings were read, exactly as `SetPreviewSize` handles.
+- **The overlay opened on a bare `V`, and the cause was Ctrl being the last modifier tracked from transitions
+  (2026-08-18).** Reported as "sometimes even press just v (without ctrl), I am seeing the PasteJump overlay" - the
+  worst thing this application can do, since it takes an unmodified letter away from whatever is being typed into.
+  Entry is `key == GestureKey.Paste && <ctrl> && !IsActive`, and `<ctrl>` was `IsControlDown`, which is set from
+  Ctrl's own key events. **A key-up that never reaches the hook therefore leaves it stuck at true**, and from then on
+  the trigger key opens a session by itself.
+  - **A missed release is not hypothetical.** The secure desktop taking over for Ctrl+Alt+Del or a UAC prompt, a
+    lock or an RDP session change, another `WH_KEYBOARD_LL` hook earlier in the chain suppressing it, or Windows
+    dropping our hook for exceeding `LowLevelHooksTimeout` and every event in the gap with it. "Sometimes" is
+    exactly the shape this takes.
+  - **`CtrlHeld` is read live from `GetAsyncKeyState`, exactly as `AltHeld`, `WinHeld` and `ShiftHeld` already were
+    - Ctrl was simply the one left behind.** Note the asymmetry that made it worse than the others: a stuck Alt only
+    *refuses* the gesture, while a stuck Ctrl *offers* it on an unmodified keystroke. Four reads per keystroke inside
+    the hook, which is nowhere near its budget.
+  - **The entry test reads the live state; the commit still runs off the key-up transition.** That split is
+    load-bearing: at the instant the hook reports Ctrl going up, `GetAsyncKeyState` can still report it down, so a
+    live check there would miss the release that ends the gesture and pastes.
+  - **`HandleControl` also sets `CtrlHeld`**, which is not a second source of truth for the same reason Shift's
+    isn't: the host refreshes it from the keyboard immediately before the call, so the two can only agree - and it
+    keeps every Core test, which drives the recogniser purely through key events, working without a live keyboard.
+  - **A session whose Ctrl-up went missing is ABORTED, not committed.** Releasing Ctrl is what asks for a paste, and
+    this is precisely the case where that intent is unknown - so nothing is pasted and the clipboard is put back.
+    Leaving it open would be worse than either: an overlay on screen with the hook swallowing every key and no way
+    to close it. `MissedControlReleaseCount` counts them, so a machine where something eats hook events says so.
+  - **`IdleKeyboardTests.After_a_missed_Ctrl_release_nothing_is_swallowed`** is the guard: the same 256-key sweep as
+    the other four states, with the key-up deliberately never delivered. Verified by reintroducing the defect - the
+    sweep fails, plus 2 of the 3 recogniser tests.
+  - **One of those tests was vacuous first**, and the counter-check caught it: it ended with `GestureKey.Escape`,
+    which closes a session on its own, so it passed with the reconciliation deleted. It uses the trigger key now,
+    which would otherwise step. Same lesson as the pan-routing test: when a test of a guard passes, check it can
+    fail.
 - **Some applications publish one copy TWICE, ~200 ms apart, the second time with more formats (2026-08-17).** This
   is the real cause of the "Same as the last copy" notice on a copy made once, and it took **three attempts and an
   instrument** to find, because the first two fixes were guesses. The capture log settled it in one reproduction -
@@ -1639,8 +1670,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 925 tests (Debug)
-dotnet test -c Release                              # 923 - what CI runs, and it is not the same set
+dotnet test                                         # 929 tests (Debug)
+dotnet test -c Release                              # 927 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

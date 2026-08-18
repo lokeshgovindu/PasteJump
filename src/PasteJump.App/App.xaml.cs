@@ -516,9 +516,13 @@ public partial class App : Application
             return false;
         }
 
-        // Read live rather than tracked from transitions, because a missed key-up leaves a tracked flag stuck -
-        // and a stuck Alt would refuse to open the gesture at all. Three cheap user-mode reads per keystroke;
-        // the hook's budget is LowLevelHooksTimeout, which this is nowhere near.
+        // Read live rather than tracked from transitions, because a missed key-up leaves a tracked flag stuck. For
+        // Alt that only refuses the gesture; for Ctrl it does the opposite and opens one on an unmodified key, which
+        // is why all four are read here. Four cheap user-mode reads per keystroke; the hook's budget is
+        // LowLevelHooksTimeout, which this is nowhere near.
+        // Ctrl first, because it is the one the entry test reads: everything below only ever refuses the gesture,
+        // while a stuck Ctrl offers it on a bare keystroke.
+        _recognizer.CtrlHeld = VirtualKeyTranslator.IsCtrlDown();
         _recognizer.AltHeld = VirtualKeyTranslator.IsAltDown();
         _recognizer.WinHeld = VirtualKeyTranslator.IsWinDown();
         _recognizer.ShiftHeld = VirtualKeyTranslator.IsShiftDown();

@@ -40,6 +40,32 @@ public sealed class PasteGestureRecognizer
     public bool WinHeld { get; set; }
 
     /// <summary>
+    /// Whether Ctrl is held, from the live keyboard state - the fact the whole gesture turns on.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The last modifier to move here, and the one that mattered most. <see cref="IsControlDown"/> is tracked from
+    /// transitions, so a Ctrl key-up this application never saw left it stuck at true - and a stuck Ctrl does not
+    /// merely refuse the gesture the way a stuck Alt would: it makes <b>the trigger key open a session on its
+    /// own</b>. Reported as "sometimes even press just v (without ctrl), I am seeing the PasteJump overlay", which
+    /// is the worst thing this application can do - taking an unmodified letter away from whatever is being typed
+    /// into.
+    /// </para>
+    /// <para>
+    /// A release goes missing whenever the key-up never reaches the hook: the secure desktop taking over for
+    /// Ctrl+Alt+Del or a UAC prompt, a lock or an RDP session change, another hook earlier in the chain
+    /// suppressing it, or Windows dropping our hook for exceeding <c>LowLevelHooksTimeout</c> and every event in
+    /// the gap with it. None of that is rare enough to leave to chance.
+    /// </para>
+    /// <para>
+    /// The entry test uses this, while the commit still runs off the key-up transition. That split is deliberate:
+    /// at the moment the hook reports Ctrl going up, the live state can still read as down, so a live check there
+    /// would miss the very release that ends the gesture.
+    /// </para>
+    /// </remarks>
+    public bool CtrlHeld { get; set; }
+
+    /// <summary>
     /// Whether Shift is held, also from the live keyboard state.
     /// <para>
     /// It was tracked from Shift's own key transitions, and moving it here fixes a latent bug as well as making
@@ -51,6 +77,12 @@ public sealed class PasteGestureRecognizer
     public bool ShiftHeld { get; set; }
 
     public bool IsSessionActive => _controller.IsActive;
+
+    /// <summary>
+    /// How many times a Ctrl release had to be inferred from the live keyboard state because the key-up never
+    /// arrived. Diagnostics: a number climbing here means something on this machine is eating our hook events.
+    /// </summary>
+    public int MissedControlReleaseCount { get; private set; }
 
     /// <summary>Raised after every state change, so the overlay can be repositioned or redrawn.</summary>
     public event Action<PasteCommitKind>? Committed;
@@ -64,6 +96,27 @@ public sealed class PasteGestureRecognizer
         // overlay's POP chip - sees the state as of this keystroke. The host keeps ShiftHeld current from the
         // live keyboard; this is the one place it reaches the controller.
         _controller.ShiftHeld = ShiftHeld;
+
+        // A Ctrl release we never saw. The live state is the truth, so reconcile before anything reads the tracked
+        // flag - and end a session that is only still open because its Ctrl-up went missing. Leaving it open would
+        // mean an overlay on screen with the hook swallowing every key and no way to close it, which is the failure
+        // the Alt and Win exceptions in ShouldSwallowUnhandled exist to avoid.
+        //
+        // Aborted rather than committed: releasing Ctrl is what asks for a paste, and this is precisely the case
+        // where we do not know that the user did. Nothing is pasted and the clipboard is put back.
+        if (IsControlDown && !CtrlHeld)
+        {
+            IsControlDown = false;
+            MissedControlReleaseCount++;
+
+            if (_controller.IsActive)
+            {
+                var abandoned = _controller.Abort();
+                _searchBuffer.Clear();
+                _swallowedDownKeys.Clear();
+                Committed?.Invoke(abandoned);
+            }
+        }
 
         switch (key)
         {
@@ -160,6 +213,7 @@ public sealed class PasteGestureRecognizer
         _searchBuffer.Clear();
         _swallowedDownKeys.Clear();
         IsControlDown = false;
+        CtrlHeld = false;
         AltHeld = false;
         WinHeld = false;
         ShiftHeld = false;
@@ -173,6 +227,12 @@ public sealed class PasteGestureRecognizer
     private bool HandleControl(bool isDown)
     {
         IsControlDown = isDown;
+
+        // Tracked here as well as read live by the host, which is the same arrangement Shift has and for the same
+        // reason: the host refreshes CtrlHeld from the keyboard immediately before this call, so the two can only
+        // agree, and keeping the transition means a caller driving the recogniser purely through key events - every
+        // test in Core, and the whole-keyboard sweep - still works without a live keyboard.
+        CtrlHeld = isDown;
 
         if (isDown)
         {
@@ -220,7 +280,7 @@ public sealed class PasteGestureRecognizer
         var searching = _controller.State == PasteSessionState.Searching;
 
         // ---- entry
-        if (key == GestureKey.Paste && IsControlDown && !_controller.IsActive)
+        if (key == GestureKey.Paste && CtrlHeld && !_controller.IsActive)
         {
             // Ctrl+Shift+V is not ours. It is how every terminal pastes - Visual Studio's, VS Code's,
             // Windows Terminal's - and how browsers and editors paste as plain text. Starting a session here

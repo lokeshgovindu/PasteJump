@@ -74,6 +74,17 @@ public static class VirtualKeyTranslator
     public static bool IsAltDown() => IsDown(NativeConstants.VK_MENU);
 
     /// <summary>
+    /// Whether Ctrl is down right now.
+    /// <para>
+    /// The gesture's entry condition, and the reason it is read rather than tracked: a Ctrl key-up that never
+    /// reaches the hook - the secure desktop, a UAC prompt, a lock, an RDP session change, or our hook being
+    /// dropped for exceeding <c>LowLevelHooksTimeout</c> - left the tracked flag stuck at true, and a stuck Ctrl
+    /// makes the trigger key open a session on its own. Reported as the overlay appearing on a bare "v".
+    /// </para>
+    /// </summary>
+    public static bool IsCtrlDown() => IsDown(NativeConstants.VK_CONTROL);
+
+    /// <summary>
     /// Whether Shift is down right now.
     /// <para>
     /// Read live rather than tracked from transitions, and that is a fix rather than a preference: paste
