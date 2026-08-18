@@ -1959,8 +1959,9 @@ public partial class HistoryWindow : Window
 
         StatusText.Text = selected[0].IsClip
             ? $"Deleted {selected.Count} clip{(selected.Count == 1 ? string.Empty : "s")}. "
-                + "The history entries are still there."
-            : $"Deleted {selected.Count} histor{(selected.Count == 1 ? "y entry" : "y entries")}.";
+                + "The searchable history is a separate store and is not affected."
+            : $"Deleted {selected.Count} histor{(selected.Count == 1 ? "y entry" : "y entries")}. "
+                + "The clips Ctrl+V walks are a separate store and are not affected.";
     }
 
     /// <summary>
@@ -2000,7 +2001,7 @@ public partial class HistoryWindow : Window
         Refresh();
 
         StatusText.Text = $"Cleared {going} clip{(going == 1 ? string.Empty : "s")}. "
-            + "The history entries are still there.";
+            + "The searchable history is a separate store and is not affected.";
     }
 
     /// <summary>Pins or unpins the selected clips. Pinned clips sort first and survive DELETE ALL.</summary>
