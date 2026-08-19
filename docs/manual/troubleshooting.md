@@ -47,6 +47,39 @@ History retention. It means "do not keep history older than N days" and runs at 
 
 It says so in the status line when it is showing a subset. Raise **Rows the History Window Loads** under **Settings, History**.
 
+## One copy became two clips
+
+Some applications publish a copy **twice** — the plain text first, then the same text again a fraction of a second later with the formatted versions added. Windows Terminal running a busy console application does this, and each publish raises its own clipboard notification.
+
+PasteJump treats the second one as the same copy: within one second, an identical copy carrying *more* than what was stored replaces the stored clip in place, so you get one entry and the richer formats. Two knobs govern it, both in **Settings, Advanced** and both fine to leave alone:
+
+| Setting | What it does |
+| --- | --- |
+| **ClipboardSettleMs** | How long to let the clipboard stop changing before reading it, in milliseconds. 120 by default, measured rather than chosen. `0` reads on every notification, which is what PasteJump did before. |
+| **ClipboardRepublishMs** | How long after storing a clip a second publish of the same content counts as that same copy rather than a repeat. 1000 by default; `0` switches the behaviour off. |
+
+## "Same as the last copy" on a copy you made once
+
+Fixed in **2026.1.0.167**. It was the second publish described above being recognised as a repeat. If you see it on a build at least that new, the capture log below will say what happened.
+
+## Reading the capture log
+
+PasteJump keeps a one-line-per-decision account of what capture did, in `logs\capture.log` beside the clip database — **Settings, Advanced** shows where that is. It looks like this:
+
+| Line | Meaning |
+| --- | --- |
+| **notify seq=… read scheduled** | A clipboard change arrived; the read waits for it to settle. |
+| **notify … coalesced** | Another notification for the same copy; the wait starts again. |
+| **read … kind=… bytes=…** | What was actually on the clipboard. |
+| **STORED clip …** | A new clip was added. |
+| **ENRICHED clip …** | The same copy was published again with more formats, so the clip was upgraded in place. |
+| **SUPPRESSED as a repeat** | You copied the same thing twice; this is what shows the "Same as the last copy" notice. |
+| **skipped: …** | An excluded application, our own write, or a failed read. |
+
+## A clip says `[binary: something]`
+
+That is a clip which is not text, an image or files, and the name is the clipboard format it holds. A common one is `System.Drawing.Bitmap`, which means the program put a .NET object on the clipboard instead of a picture — PasteJump stored faithfully what it was given, and the format name is there so the reason is visible on the row rather than only in the database.
+
 ## A copy was not recorded
 
 The clipboard is a machine-wide lock, and another process can hold it. PasteJump retries with backoff and then twice more on a delay, but if a program holds the clipboard longer than that the copy is dropped. This is inherent to the Win32 clipboard rather than fixable — only made rarer.

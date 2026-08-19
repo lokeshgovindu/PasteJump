@@ -72,6 +72,60 @@ to <code>0</code>. PasteJump offers this after an import for exactly this reason
 <p>It says so in the status line when it is showing a subset. Raise <b>Rows the History Window Loads</b>
 under <b>Settings, History</b>.</p>
 
+<h2>One copy became two clips</h2>
+
+<p>Some applications publish a copy <b>twice</b> &mdash; the plain text first, then the same text again a fraction
+of a second later with the formatted versions added. Windows Terminal running a busy console application does this,
+and each publish raises its own clipboard notification.</p>
+
+<p>PasteJump treats the second one as the same copy: within one second, an identical copy carrying <i>more</i> than
+what was stored replaces the stored clip in place, so you get one entry and the richer formats. Two knobs govern it,
+both in <b>Settings, Advanced</b> and both fine to leave alone:</p>
+
+<table>
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td class="name">ClipboardSettleMs</td><td>How long to let the clipboard stop changing before reading it, in
+milliseconds. 120 by default, measured rather than chosen. <code>0</code> reads on every notification, which is what
+PasteJump did before.</td></tr>
+<tr><td class="name">ClipboardRepublishMs</td><td>How long after storing a clip a second publish of the same content
+counts as that same copy rather than a repeat. 1000 by default; <code>0</code> switches the behaviour off.</td></tr>
+</table>
+
+<h2>&quot;Same as the last copy&quot; on a copy you made once</h2>
+
+<p>Fixed in <b>2026.1.0.167</b>. It was the second publish described above being recognised as a repeat. If you see
+it on a build at least that new, the capture log below will say what happened.</p>
+
+<h2>Reading the capture log</h2>
+
+<p>PasteJump keeps a one-line-per-decision account of what capture did, in <code>logs\capture.log</code> beside the
+clip database &mdash; <b>Settings, Advanced</b> shows where that is. It looks like this:</p>
+
+<table>
+<tr><th>Line</th><th>Meaning</th></tr>
+<tr><td class="name">notify seq=&hellip; read scheduled</td><td>A clipboard change arrived; the read waits for it to
+settle.</td></tr>
+<tr><td class="name">notify &hellip; coalesced</td><td>Another notification for the same copy; the wait starts
+again.</td></tr>
+<tr><td class="name">read &hellip; kind=&hellip; bytes=&hellip;</td><td>What was actually on the clipboard.</td></tr>
+<tr><td class="name">STORED clip &hellip;</td><td>A new clip was added.</td></tr>
+<tr><td class="name">ENRICHED clip &hellip;</td><td>The same copy was published again with more formats, so the clip
+was upgraded in place.</td></tr>
+<tr><td class="name">SUPPRESSED as a repeat</td><td>You copied the same thing twice; this is what shows the
+&quot;Same as the last copy&quot; notice.</td></tr>
+<tr><td class="name">skipped: &hellip;</td><td>An excluded application, our own write, or a failed read.</td></tr>
+</table>
+
+<div class="note"><b>What it does not contain</b> Nothing you copied. It records kinds, byte and format counts, the
+source program, and for text a length and a short hash &mdash; never the text itself.</div>
+
+<h2>A clip says <code>[binary: something]</code></h2>
+
+<p>That is a clip which is not text, an image or files, and the name is the clipboard format it holds. A common one
+is <code>System.Drawing.Bitmap</code>, which means the program put a .NET object on the clipboard instead of a
+picture &mdash; PasteJump stored faithfully what it was given, and the format name is there so the reason is visible
+on the row rather than only in the database.</p>
+
 <h2>A copy was not recorded</h2>
 
 <p>The clipboard is a machine-wide lock, and another process can hold it. PasteJump retries with backoff

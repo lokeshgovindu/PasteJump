@@ -41,6 +41,12 @@ Afterwards the status line accounts for every row you selected, including any it
 
 The same thing works during the gesture, without opening this window: press `J` to mark clips and release `Ctrl`. See [the gesture](gesture.md).
 
+## Size and layout are remembered
+
+The window opens at 1260 × 770 to begin with, and after that at whatever size you last left it — maximised included. Dragging the divider between the list and the preview is remembered too.
+
+The list keeps a fixed width and the preview takes the rest, so widening the window gives the extra room to the picture rather than to the Content column. A size remembered from a large monitor is brought in to fit a smaller one, so the window can never open with its edges off the screen.
+
 ## Showing one kind of clip
 
 The second control in the toolbar narrows the list to one kind: **All kinds**, **Text**, **Images** or **Files**. It is the same filter the `K` key applies during the paste gesture, so both places mean the same thing by "images".

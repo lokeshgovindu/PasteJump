@@ -1745,6 +1745,20 @@ powershell -ExecutionPolicy Bypass -File tools/update-help-images.ps1   # after 
 powershell -ExecutionPolicy Bypass -File tools/build-help.ps1 -Show
 ```
 
+**There is a feature video, and it is generated rather than recorded.** `tools/make-feature-video.ps1` renders every
+window through the smoke harness, composes captioned 1080p frames with `System.Drawing`, and encodes them with
+`ffmpeg` into `artifacts/PasteJump-tour.mp4` (~67 s). So it cannot drift from the application, and a UI change costs
+one command rather than a re-recording. Three things it had to learn:
+**PowerShell 5.1's `-Encoding utf8` writes a BOM and ffmpeg's concat demuxer rejects the file** with "Invalid data
+found when processing input", which says nothing about a byte order mark - the list is written with
+`UTF8Encoding($false)`; **a small shot is enlarged by a WHOLE number with `NearestNeighbor`**, because the overlay is
+439x86 and at 1:1 it is a postage stamp in a 1080p frame, while a fractional or bicubic upscale resamples its glyphs
+into exactly the mush this application was reported for - blocky is honest, blurry is not; and the MP4 is **not
+committed**, since regenerating it per UI change would bloat the history for a file that belongs on a release.
+**What it cannot show is the gesture**, because the overlay exists only while Ctrl is physically held and no script
+can hold a key for a camera. `docs/video-script.md` is the storyboard for that half - ten shots, about 70 seconds,
+recorded by hand.
+
 **The screenshots come from the UI smoke harness, never from a hand-taken capture.** That is what stops
 them drifting from the real XAML, and it is why the harness now renders three realistic `OverlayWindow`
 frames (text with chips, search, DELETE ALL) instead of one empty window — which also means `RenderBody`'s
