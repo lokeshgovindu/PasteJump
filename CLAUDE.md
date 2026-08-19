@@ -1764,6 +1764,11 @@ recorded by hand.
 screenshot is unreadable, whereas the overlay is 439px wide and pixel-doubles into something legible - and stepping
 through its states is as close as a still medium gets to the gesture. `docs/tour.gif` (18 frames, 556 KB, 1000px) is
 the captioned tour for the README and the website, where a page is wide enough to read it.
+**The in-CHM GIF is 1:1 and must stay that way, and the CHM decides its size.** The help window is 800px wide with a
+220px contents pane, so a page has about 540px - and `styles.css` sets `max-width:100%` on a shot, so anything wider
+is scaled DOWN by the viewer. A pixel-doubled overlay came to 1016px, was drawn at roughly half size, and every glyph
+blurred: reported as "it is too big so the text is blurred", which is the preview pane's 100%-means-100% lesson in a
+second place. At 1:1 the frame is 508px, nothing scales it, and the text is exactly as the application drew it.
 **A video cannot be embedded in a CHM at all** - the viewer is the old IE engine with no HTML5 video, and ActiveX is
 blocked - so `gesture.html` links to the copy published on the website (`docs/PasteJump-tour.mp4`) and says why.
 Two things to know: **the wide GIF must be built from the frame FILES with `-framerate`, not from the concat list with

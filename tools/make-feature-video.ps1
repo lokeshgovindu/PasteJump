@@ -227,7 +227,16 @@ $sizes = $paths | ForEach-Object {
     $size
 }
 
-$zoom = 2
+# 1:1, NOT pixel-doubled, and this is the size the CHM decides.
+#
+# The help window is 800px wide with a 220px contents pane, so a page has about 540px to draw in - and
+# styles.css sets max-width:100% on a shot, so anything wider is scaled DOWN by the viewer. A doubled overlay
+# came to 1016px and was therefore drawn at roughly half size, which blurred every glyph: reported as "it's too
+# big so the text is blurred", and the same lesson as the preview pane that had to learn 100% means 100%.
+#
+# At 1:1 the overlay is 508px including its margin, which fits, so the viewer scales nothing and the text is
+# exactly as the application drew it. Small, and sharp; the wide GIF below is where size can be spent.
+$zoom = 1
 # Cast: Measure-Object returns a double, and Bitmap wants two ints.
 $canvasW = [int]((($sizes | ForEach-Object { $_.W } | Measure-Object -Maximum).Maximum + 24) * $zoom)
 $canvasH = [int]((($sizes | ForEach-Object { $_.H } | Measure-Object -Maximum).Maximum + 24) * $zoom)
