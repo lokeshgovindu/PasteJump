@@ -191,5 +191,108 @@ $size = [Math]::Round((Get-Item $full).Length / 1MB, 1)
 $seconds = & ffprobe -v error -show_entries format=duration -of csv=p=0 $full
 Write-Host ('Wrote ' + $OutputPath + ' - ' + $size + ' MB, ' + [Math]::Round([double]$seconds, 1) + 's')
 
+
+# ---------------------------------------------------------------------------------------------------------------
+# The two GIFs. One command produces all three files because they come from the same render, and a tour that is
+# current in the MP4 and stale in the CHM would be worse than having only one of them.
+# ---------------------------------------------------------------------------------------------------------------
+
+# 1. The overlay walkthrough, which is what goes IN the help file.
+#
+# The full tour cannot: scaled small enough for a CHM page, a 1260px window screenshot is unreadable. The overlay
+# is 439px wide, so pixel-doubled it is legible at 968px - and stepping through its states is the closest a still
+# medium gets to showing the gesture.
+#
+# Every frame must share one canvas size, which these do not (86 to 189 tall, one of them wider), so each is
+# centred on the largest.
+$overlaySteps = @(
+    'Light-OverlayWindow-TextFacts'
+    'Light-OverlayWindow-Image'
+    'Light-OverlayWindow-Search'
+    'Light-OverlayWindow-KindFilter'
+    'Light-OverlayWindow-JoinMark'
+    'Light-OverlayWindow-DeleteAll'
+    'Light-OverlayWindow-Deleted'
+)
+
+$gifFrames = Join-Path $env:TEMP 'pastejump-overlay-frames'
+if (Test-Path $gifFrames) { Remove-Item $gifFrames -Recurse -Force }
+New-Item -ItemType Directory -Path $gifFrames | Out-Null
+
+$paths = $overlaySteps | ForEach-Object { Join-Path $shots ($_ + '.png') } | Where-Object { Test-Path $_ }
+$sizes = $paths | ForEach-Object {
+    $i = [System.Drawing.Image]::FromFile($_)
+    $size = @{ W = $i.Width; H = $i.Height }
+    $i.Dispose()
+    $size
+}
+
+$zoom = 2
+# Cast: Measure-Object returns a double, and Bitmap wants two ints.
+$canvasW = [int]((($sizes | ForEach-Object { $_.W } | Measure-Object -Maximum).Maximum + 24) * $zoom)
+$canvasH = [int]((($sizes | ForEach-Object { $_.H } | Measure-Object -Maximum).Maximum + 24) * $zoom)
+$step = 0
+
+foreach ($path in $paths) {
+    $step++
+    $frame = New-Object System.Drawing.Bitmap $canvasW, $canvasH
+    $g = [System.Drawing.Graphics]::FromImage($frame)
+    $g.Clear($background)
+
+    # NearestNeighbor at a whole-number zoom: pixel doubling, so the overlay's own text survives exactly.
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+
+    $img = [System.Drawing.Image]::FromFile($path)
+    $w = $img.Width * $zoom
+    $h = $img.Height * $zoom
+    $x = [int](($canvasW - $w) / 2)
+    $y = [int](($canvasH - $h) / 2)
+
+    $g.FillRectangle((New-Object System.Drawing.SolidBrush $hairline), $x - 1, $y - 1, $w + 2, $h + 2)
+    $g.DrawImage($img, $x, $y, $w, $h)
+    $img.Dispose()
+
+    $frame.Save((Join-Path $gifFrames ('{0:D2}.png' -f $step)), [System.Drawing.Imaging.ImageFormat]::Png)
+    $g.Dispose()
+    $frame.Dispose()
+}
+
+$overlayGif = Join-Path $repo 'docs/help/images/overlay-tour.gif'
+
+Write-Host ('Encoding the overlay GIF (' + $canvasW + 'x' + $canvasH + ', ' + $paths.Count + ' states)...')
+
+# A shared palette generated from every frame, and no dithering: these are flat UI colours, where dithering only
+# adds noise and bytes.
+& ffmpeg -y -loglevel error -framerate 1/1.6 -i (Join-Path $gifFrames '%02d.png') `
+    -vf 'split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=none' -loop 0 $overlayGif
+
+# 2. The wide captioned tour, for the README and the website, where a page is wide enough to read it.
+$tourGif = Join-Path $repo 'docs/tour.gif'
+
+Write-Host 'Encoding the wide tour GIF...'
+# From the frame files with -framerate, NOT from the concat list with an fps filter. The concat input carries its
+# own timing, and sampling it at fps=1/3.5 produced a GIF containing ONE frame - which still looked like a
+# screenshot, so nothing about it read as broken. Frame counts are checked below for that reason.
+& ffmpeg -y -loglevel error -framerate (1 / $Seconds) -i (Join-Path $frames '%03d.png') `
+    -vf 'scale=1000:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=none' `
+    -loop 0 $tourGif
+
+foreach ($gif in @($overlayGif, $tourGif)) {
+    if (-not (Test-Path $gif)) { throw ('ffmpeg produced no ' + (Split-Path $gif -Leaf)) }
+
+    # The frame count is asserted because a one-frame GIF is indistinguishable from a working one at a glance: it
+    # is a still image that looks exactly like the screenshot it was made from. This is how the first attempt was
+    # caught.
+    $count = [int](& ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 $gif)
+    $kb = [Math]::Round((Get-Item $gif).Length / 1KB)
+
+    if ($count -lt 2) { throw ((Split-Path $gif -Leaf) + ' has ' + $count + ' frame - it is not animated') }
+
+    Write-Host ('Wrote ' + (Split-Path $gif -Leaf) + ' - ' + $kb + ' KB, ' + $count + ' frames')
+}
+
+if (-not $KeepFrames) { Remove-Item $gifFrames -Recurse -Force }
+
 if ($KeepFrames) { Write-Host ('Frames left in ' + $frames) }
 else { Remove-Item $frames -Recurse -Force }

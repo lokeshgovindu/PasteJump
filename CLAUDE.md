@@ -1759,6 +1759,19 @@ committed**, since regenerating it per UI change would bloat the history for a f
 can hold a key for a camera. `docs/video-script.md` is the storyboard for that half - ten shots, about 70 seconds,
 recorded by hand.
 
+**The same command emits two GIFs, and the split between them is forced by the CHM.** `docs/help/images/overlay-tour.gif`
+(7 states, 94 KB, 1016x426) is what ships *inside* the help file: scaled small enough for a CHM page a 1260px window
+screenshot is unreadable, whereas the overlay is 439px wide and pixel-doubles into something legible - and stepping
+through its states is as close as a still medium gets to the gesture. `docs/tour.gif` (18 frames, 556 KB, 1000px) is
+the captioned tour for the README and the website, where a page is wide enough to read it.
+**A video cannot be embedded in a CHM at all** - the viewer is the old IE engine with no HTML5 video, and ActiveX is
+blocked - so `gesture.html` links to the copy published on the website (`docs/PasteJump-tour.mp4`) and says why.
+Two things to know: **the wide GIF must be built from the frame FILES with `-framerate`, not from the concat list with
+an `fps` filter**, which produced a GIF containing exactly ONE frame - and a one-frame GIF is indistinguishable from a
+working one at a glance, since it is a still of the screenshot it was made from. The script now asserts
+`nb_read_frames >= 2` for both, which is what caught it. And **verify the GIF landed in the `.chm` by decompiling**
+(`hh.exe -decompile`), never by the compiler's own "Graphics" line, which lies when images are listed in `[FILES]`.
+
 **The screenshots come from the UI smoke harness, never from a hand-taken capture.** That is what stops
 them drifting from the real XAML, and it is why the harness now renders three realistic `OverlayWindow`
 frames (text with chips, search, DELETE ALL) instead of one empty window — which also means `RenderBody`'s
