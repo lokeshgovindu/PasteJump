@@ -74,8 +74,46 @@ Looked in:
 Write-Host "Compiler : $compiler"
 Write-Host "Project  : $project"
 
+# Compiled from a STAGED copy, not from docs/help itself, so every page can be stamped with the version and the
+# build time without those edits landing in the repository - and so docs/manual, which is generated from the
+# untouched sources and committed, does not gain a line that changes on every build.
+#
+# The stamp exists because a .chm travels separately from the application: it is attached to a release, copied
+# beside an exe, and mailed about. A manual with no version in it cannot be told from a five-day-old one, which is
+# exactly how a reader came to be looking at a help file that predated the feature they were looking for.
+$stageDir = Join-Path $repoRoot 'artifacts\help-src'
+
+if (Test-Path $stageDir) { Remove-Item $stageDir -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+Copy-Item (Join-Path $helpSource '*') $stageDir -Recurse -Force
+
+# The version comes from MSBuild rather than from a constant here, for the same reason pack-release.ps1 asks it:
+# the revision is the commit count and lives nowhere in the source tree.
+$version = (& dotnet msbuild (Join-Path $repoRoot 'src\PasteJump.App\PasteJump.App.csproj') `
+        '-t:PrintPasteJumpVersion' '-v:minimal' '-nologo' 2>&1 |
+    Select-String -Pattern '\d+\.\d+\.\d+\.\d+' | Select-Object -First 1).Matches.Value
+
+if (-not $version) { $version = 'unknown version' }
+
+$builtWhen = (Get-Date).ToString('yyyy-MM-dd HH:mm')
+$stamp = "<p class=`"footer stamp`">PasteJump $version &middot; manual built $builtWhen</p>"
+
+Write-Host "Version  : $version (stamped into every page)"
+
+foreach ($page in Get-ChildItem $stageDir -Filter '*.html') {
+    $html = Get-Content $page.FullName -Raw
+
+    if ($html -notmatch '</body>') {
+        Write-Warning "no </body> in $($page.Name) - not stamped"
+        continue
+    }
+
+    # Before </body>, so it is the last thing on the page whatever else it contains.
+    ($html -replace '</body>', ($stamp + "`r`n</body>")) | Set-Content $page.FullName -Encoding UTF8
+}
+
 # The compiler resolves [FILES] relative to its working directory, not to the .hhp.
-Push-Location $helpSource
+Push-Location $stageDir
 
 try {
     $log = & $compiler 'pastejump.hhp' 2>&1
@@ -85,7 +123,7 @@ finally {
     Pop-Location
 }
 
-$built = Join-Path $helpSource 'PasteJump.chm'
+$built = Join-Path $stageDir 'PasteJump.chm'
 
 # The real success test. hhc's exit code is inverted and its log is the only trustworthy signal, so this
 # checks that the file exists and that the log did not report topics it could not compile.

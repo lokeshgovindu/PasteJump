@@ -160,3 +160,13 @@ p.footer {
     color: #6b7683;
     font-size: 8.5pt;
 }
+
+/* The version and build time, stamped into every page by tools/build-help.ps1 when the .chm is compiled. It is
+   not in the sources: a line that changed on every build would churn docs/manual, which is committed. */
+p.footer.stamp {
+    margin-top: 24px;
+    padding-top: 8px;
+    border-top: 1px solid #d8d8d8;
+    color: #777777;
+    font-size: 8pt;
+}

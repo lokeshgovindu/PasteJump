@@ -178,6 +178,29 @@ if ($Sign) {
     }
 }
 
+# The manual, if one has been built and is newer than the deployed copy.
+#
+# It is on the keep list above - deliberately, since it is not build output and a redeploy must not delete it - but
+# keeping it also meant it was never REFRESHED, so Help opened a .chm from whenever it was last built by hand. That
+# is how a reader came to be looking at a five-day-old manual, hunting for a page added after it was compiled, with
+# nothing on screen to say the file was stale. Every page carries its version now, and this keeps the deployed copy
+# current.
+$freshHelp = Join-Path $repoRoot 'artifacts\help\PasteJump.chm'
+$deployedHelp = Join-Path $Destination 'PasteJump.chm'
+
+if (Test-Path $freshHelp) {
+    $isNewer = -not (Test-Path $deployedHelp) -or
+        (Get-Item $freshHelp).LastWriteTimeUtc -gt (Get-Item $deployedHelp).LastWriteTimeUtc
+
+    if ($isNewer) {
+        Copy-Item $freshHelp $deployedHelp -Force
+        Write-Host ("Refreshed PasteJump.chm ({0:N0} KB)" -f ((Get-Item $deployedHelp).Length / 1KB))
+    }
+}
+else {
+    Write-Host 'No built manual in artifacts\help - run tools/build-help.ps1 to refresh the deployed one.' -ForegroundColor DarkGray
+}
+
 $landed = Get-ChildItem $Destination -File -Recurse | Where-Object { $_.FullName -notmatch '\\data\\' }
 
 Write-Host ("Deployed to {0}: {1} files, {2:N1} MB (data\ untouched)" -f
