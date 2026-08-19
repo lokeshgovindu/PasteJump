@@ -771,7 +771,7 @@ internal static class Program
             // The hint is one of the parts, so it follows the same value rather than being hard-coded on - otherwise
             // the minimal case would render a "quietest possible" overlay with a row of key names along the bottom.
             overlay.ApplyKeyHint(chosen.KeyHint, triggerKey: 'V');
-            overlay.Render(frame, anchorX: 200, anchorY: 200);
+            overlay.Render(frame, new OverlayAnchor(200, 200, OverlayPlacement.BelowPoint));
         };
 
         return overlay;

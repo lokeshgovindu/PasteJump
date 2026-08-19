@@ -228,6 +228,19 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out POINT lpPoint);
 
+    [DllImport(User32, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    /// <summary>
+    /// Whether a window is minimised. Asked before centring the overlay on the foreground window, because
+    /// Windows parks a minimised window at -32000 with an ordinary-looking width and height - so the rectangle
+    /// cannot be used to answer this and the overlay would be placed off-screen.
+    /// </summary>
+    [DllImport(User32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(IntPtr hWnd);
+
     /// <summary>
     /// Claims a system-wide chord. Fails when another process already owns it, which is ordinary and must
     /// be reported to the user rather than treated as an error - the whole point of a global hotkey is

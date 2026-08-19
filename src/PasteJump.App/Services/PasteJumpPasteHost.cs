@@ -278,8 +278,8 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
         // A configured position wins over the caret. Both halves have to be set for it to mean anything, which
         // is why one alone is not honoured rather than being paired with a caret coordinate - a half-fixed
         // overlay that moves in one axis only reads as a bug rather than as a setting.
-        var (anchorX, anchorY) = _overlayX is { } fixedX && _overlayY is { } fixedY
-            ? (fixedX, fixedY)
+        var anchor = _overlayX is { } fixedX && _overlayY is { } fixedY
+            ? new OverlayAnchor(fixedX, fixedY, OverlayPlacement.BelowPoint)
             : ForegroundWindowInfo.GetPreferredOverlayAnchor();
 
         _overlay.SetImagePayload(model.Kind == ClipKind.Image ? TryLoadImageBytes(model) : null);
@@ -289,7 +289,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
             _overlay.Show();
         }
 
-        _overlay.Render(model, anchorX, anchorY);
+        _overlay.Render(model, anchor);
     }
 
     public void HideOverlay()

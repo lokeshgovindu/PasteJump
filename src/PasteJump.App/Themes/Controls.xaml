@@ -166,8 +166,16 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="3">
+                        <!--
+                            No Margin="{TemplateBinding Padding}" here, and that omission is load-bearing.
+                            TextBoxBase pushes the TextBox's Padding onto PART_ContentHost itself - which is why
+                            WPF's own template does not bind it either - so binding it to Margin as well applied
+                            every box's padding TWICE. Measured on the settings search box, whose Padding is
+                            26,2,24,2 to leave room for the magnifier: typed text started 55px from the box's
+                            left edge instead of 27, so the caret sat in the middle of the word "Search" in the
+                            placeholder behind it. Reported as "why is the cursor not at the beginning".
+                        -->
                         <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="{TemplateBinding Padding}"
                                       VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                       Focusable="False" />
                     </Border>

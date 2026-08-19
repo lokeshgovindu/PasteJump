@@ -1,5 +1,6 @@
 using System.Text;
 using PasteJump.Core.Abstractions;
+using PasteJump.Core.PasteMode;
 using PasteJump.Interop.Win32;
 
 namespace PasteJump.Interop;
@@ -57,17 +58,23 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
     }
 
     /// <summary>
-    /// Where to put the overlay: at the text caret when the focused control exposes one, else at
-    /// the mouse. Returned in physical screen pixels.
+    /// Where to put the overlay: at the text caret when the focused control exposes one, else centred on the
+    /// window being pasted into, and only failing both at the mouse. Returned in physical screen pixels.
     /// <para>
-    /// Caret-first placement matters because the overlay is a transient preview attached to a
-    /// typing action. Anchoring it to the mouse when the user is typing puts it on the far side of
-    /// the screen from where they are looking.
+    /// Caret-first placement matters because the overlay is a transient preview attached to a typing action.
+    /// The window comes second because <b>most modern applications expose no Win32 caret at all</b> - Edge and
+    /// every other Chromium browser, Electron, WPF, WinUI and Visual Studio all report <c>hwndCaret == 0</c> -
+    /// so the fallback is the common case, not the rare one. It used to be the mouse, which put the overlay
+    /// wherever the pointer happened to be: on the other monitor, over the taskbar, or where a click landed
+    /// minutes ago. <see cref="OverlayAnchorChooser"/> owns the order and the reasoning.
     /// </para>
     /// </summary>
-    public static (int X, int Y) GetPreferredOverlayAnchor()
+    public static OverlayAnchor GetPreferredOverlayAnchor()
     {
         var hwnd = NativeMethods.GetForegroundWindow();
+
+        (int X, int Y)? caret = null;
+        (int Left, int Top, int Right, int Bottom)? window = null;
 
         if (hwnd != IntPtr.Zero)
         {
@@ -84,15 +91,25 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
                 {
                     var point = new POINT { X = info.rcCaret.Left, Y = info.rcCaret.Bottom };
 
+                    // Checked rather than assumed: hwndCaret can name a window that has already been destroyed,
+                    // which is what Edge reports for a thread whose text field has gone. A stale handle fails
+                    // here, and a caret we cannot place is no caret at all.
                     if (NativeMethods.ClientToScreen(info.hwndCaret, ref point))
                     {
-                        return (point.X, point.Y);
+                        caret = (point.X, point.Y);
                     }
                 }
             }
+
+            // IsIconic rather than inspecting the rectangle: Windows parks a minimised window at -32000, which
+            // has a perfectly plausible width and height, so the numbers alone cannot answer this.
+            if (!NativeMethods.IsIconic(hwnd) && NativeMethods.GetWindowRect(hwnd, out var rect))
+            {
+                window = (rect.Left, rect.Top, rect.Right, rect.Bottom);
+            }
         }
 
-        return GetCursorPosition();
+        return OverlayAnchorChooser.Choose(caret, window, GetCursorPosition());
     }
 
     /// <summary>

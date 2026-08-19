@@ -198,7 +198,7 @@ public partial class OverlayWindow : Window
         => DeletedChip.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Applies a frame and positions the window at the anchor, clamped to the work area.</summary>
-    public void Render(PasteOverlayModel model, int anchorX, int anchorY)
+    public void Render(PasteOverlayModel model, OverlayAnchor anchor)
     {
         ArgumentNullException.ThrowIfNull(model);
 
@@ -272,7 +272,7 @@ public partial class OverlayWindow : Window
         // Measure before positioning: SizeToContent means ActualWidth is stale until layout runs,
         // and clamping against a stale size puts the window partly off-screen.
         UpdateLayout();
-        Position(anchorX, anchorY);
+        Position(anchor);
     }
 
     /// <summary>Supplies decoded image bytes for an image clip, or null to clear.</summary>
@@ -518,25 +518,35 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
-    /// Places the overlay near the anchor without letting it run off the monitor.
+    /// Places the overlay at the anchor without letting it run off the monitor.
     /// <para>
     /// Anchor coordinates arrive in physical pixels from Win32, but WPF positions windows in
     /// device-independent units, so they must be scaled by the DPI of the monitor the anchor is
     /// actually on - not the primary monitor's. Skipping that conversion is what puts overlays in
     /// the wrong place on mixed-DPI multi-monitor setups.
     /// </para>
+    /// <para>
+    /// The two placements are not interchangeable. A caret or a mouse pointer is a small thing the overlay must
+    /// not sit on top of, so it goes just below and right of it; the middle of a window is not, and offsetting
+    /// from it would put the overlay in that window's lower half rather than in the middle of it. Centring is
+    /// exact rather than approximate because <c>Render</c> calls <c>UpdateLayout</c> first, so
+    /// <c>ActualWidth</c> is this frame's size and not the previous frame's - the overlay changes size
+    /// substantially between a text clip and an image one.
+    /// </para>
     /// </summary>
-    private void Position(int anchorX, int anchorY)
+    private void Position(OverlayAnchor anchor)
     {
-        var scale = WindowInterop.GetScaleForPoint(anchorX, anchorY);
+        var scale = WindowInterop.GetScaleForPoint(anchor.X, anchor.Y);
 
-        var desiredLeft = (anchorX / scale) + 4;
-        var desiredTop = (anchorY / scale) + 20;
-
-        var bounds = WindowInterop.GetWorkAreaForPoint(anchorX, anchorY, scale);
+        var bounds = WindowInterop.GetWorkAreaForPoint(anchor.X, anchor.Y, scale);
 
         var width = ActualWidth > 0 ? ActualWidth : 360;
         var height = ActualHeight > 0 ? ActualHeight : 140;
+
+        var centred = anchor.Placement == OverlayPlacement.CentredOn;
+
+        var desiredLeft = centred ? (anchor.X / scale) - (width / 2) : (anchor.X / scale) + 4;
+        var desiredTop = centred ? (anchor.Y / scale) - (height / 2) : (anchor.Y / scale) + 20;
 
         if (desiredLeft + width > bounds.Right)
         {
@@ -546,8 +556,11 @@ public partial class OverlayWindow : Window
         if (desiredTop + height > bounds.Bottom)
         {
             // Flip above the caret rather than clamping to the bottom edge, so the overlay does
-            // not cover the line the user is typing on.
-            desiredTop = (anchorY / scale) - height - 6;
+            // not cover the line the user is typing on. Nothing to avoid when centred on a window, where
+            // flipping would move the overlay a whole window-height away from where it was asked to be.
+            desiredTop = centred
+                ? bounds.Bottom - height - 4
+                : (anchor.Y / scale) - height - 6;
         }
 
         // Snapped to whole device pixels. Everything above divides physical pixels by the scale factor, so
@@ -556,6 +569,7 @@ public partial class OverlayWindow : Window
         Left = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Left, desiredLeft), scale);
         Top = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Top, desiredTop), scale);
     }
+
     /// <summary>
     /// The largest <c>FontSize</c> any text in the overlay actually draws at. UI smoke harness only.
     /// </summary>

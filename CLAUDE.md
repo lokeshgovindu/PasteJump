@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 940 in Debug (`dotnet test`) - 887 in Core.Tests, 53 in Interop.Tests; **938 in Release**, see below |
+| Tests | 949 in Debug (`dotnet test`) - 896 in Core.Tests, 53 in Interop.Tests; **947 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -123,8 +123,8 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      841 tests.
-tests/PasteJump.Interop.Tests   52 tests. Interop logic needing no message loop or live keyboard.
+tests/PasteJump.Core.Tests      896 tests.
+tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
@@ -711,6 +711,33 @@ that immediately caught two real bugs. Expect to do the same again.
 - **The overlay must never take focus.** `WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW`
   applied in code, not just the XAML flags. Focus theft sends the user's paste into our overlay.
   Search input therefore arrives through the hook, not a focused text box.
+- **Most applications expose no Win32 caret, so the overlay's fallback placement is the common case rather
+  than the rare one (fixed 2026-08-19).** Reported as "I am not able to see the paste overlay in MSEdge
+  browser", and the overlay was never hidden - it was on the other monitor. `GetPreferredOverlayAnchor` used
+  the caret and fell back to **the mouse pointer**, and Edge has no caret to find: measured with a focused,
+  blinking textarea, `GetGUIThreadInfo` returns `hwndCaret == 0`. Reproduced end to end by driving the real
+  gesture - Edge maximised at (1916,-4)-(3844,1036) on the second monitor, pointer parked at (58,996) on the
+  first, overlay rendered **visible and correct at (62,575)**, ~1,900px from the window being pasted into.
+  Move the pointer over the textarea and it landed at (2404,440), which is `anchor + 4,+20` exactly.
+  - **It is not Edge-specific, and that is the part worth keeping.** A Win32 caret exists only in edit and
+    richedit controls - the Run dialog reports an `Edit` window with a 1x15 caret rect - while everything that
+    draws its own caret reports none: Edge and every Chromium browser, Electron, WPF, WinUI and Visual Studio
+    all measured at `hwndCaret == 0`. Windows Terminal and the Windows 11 Notepad too. Browsers merely make it
+    obvious, because browsing is mouse-driven and the pointer ends up wherever you last clicked.
+  - **The fallback is now the centre of the foreground window**, which cannot be on the wrong monitor. The
+    mouse survives only as the last resort, for when there is no foreground window at all.
+  - **The choice lives in `OverlayAnchorChooser` (`Core`), not in `Interop`.** The preference order is the
+    whole of the logic and it is pure arithmetic, so it is testable; `Interop` only gathers the three inputs.
+    `OverlayAnchorTests` pins the order, including the reported case with the real measured rectangles.
+  - **`OverlayPlacement` is why the anchor is a record rather than a pair of ints.** A caret is a small thing
+    the overlay must not cover, so it sits below-right of it; the middle of a window is not, and offsetting
+    from it would put the overlay in that window's lower half. `Position` also declines to flip above when
+    centred - flipping exists to avoid covering the line being typed, and there is nothing to avoid here.
+  - **`IsIconic`, not an inspection of the rectangle.** Windows parks a minimised window at -32000 with a
+    perfectly plausible width and height, so the numbers alone cannot answer whether the rect is usable.
+  - **`ClientToScreen`'s return value is checked, and that was already right.** Edge reports an `hwndCaret`
+    that names an already-destroyed window once its text field has gone; the call fails and the caret is
+    discarded rather than becoming (0,0), which would anchor the overlay to the corner of the primary monitor.
 - **A clipboard holding only OLE bookkeeping is not a clip.** `OleSetClipboard` announces the data object
   before `OleFlushClipboard` renders anything, so a read landing between the two sees `DataObject` — eight
   bytes of OLE state and none of what was copied. Stored, that became a `[binary]` 8-byte clip from the
@@ -898,6 +925,28 @@ that immediately caught two real bugs. Expect to do the same again.
 
 Every one of these compiles, builds clean, and silently defeats the theme.
 
+- **Never bind a `TextBox` template's `Padding` to anything — `TextBoxBase` already applies it (fixed
+  2026-08-19).** The themed template had `Margin="{TemplateBinding Padding}"` on `PART_ContentHost`, and WPF
+  pushes the TextBox's `Padding` onto that same ScrollViewer itself, so **every text box in the application
+  inset its text by twice its padding**. WPF's own template binds it nowhere, which is the tell. Reported as
+  "why is the cursor in settings dialog not at the begin?", with a screenshot of the caret sitting in the middle
+  of the word *Search* in the placeholder behind it.
+  - **The search boxes are where it shows, because their padding is large on purpose.** `Padding="26,2,24,2"`
+    leaves room for the magnifier glyph and the clear button, so doubling put typed text 55px from the box's
+    left edge instead of 27 - while `SearchCue`, an ordinary `TextBlock` at `Margin="27"`, stayed where the
+    text was *supposed* to start. Measured: placeholder ink at x=44, typed ink at x=72. After the fix, x=44
+    against x=45, the 1px being antialiasing on a grey glyph against a black one.
+  - **So the three cues' `Margin="27"` was right all along** and needed no change - the comments explaining
+    it as "Padding plus the 1px border" were correct about the intent and defeated by the template. Do not
+    "fix" alignment by tuning a cue margin; measure where the text actually lands first.
+  - **Judge this by the ink, not by `GetRectFromCharacterIndex`.** The caret rect came back 2px right of the
+    content origin, which sent me looking for a 2px error that does not exist. And use **one** ink threshold
+    for both shots: a looser one catches the grey magnifier glyph and reports it as the placeholder's first
+    ink, which manufactured a 7px discrepancy out of nothing.
+  - **The blast radius was checked by pixel-diffing every rendered window, not by reasoning.** Text now sits
+    where its padding says everywhere, which moves it a few pixels in every box; `TagEditorWindow` is **8px
+    shorter**, because its height is content-driven and it was carrying 8px of duplicated vertical padding.
+    The 15.7% diff on `HistoryWindow` is the preview pane's text reflowing plus the clock in the seeded row.
 - **Small text needs `TextOptions.TextFormattingMode="Display"`.** WPF's default is `Ideal`, which preserves
   exact glyph advances for faithful scaling and renders 11–12px UI text visibly soft. The overlay and the
   toast are nothing but small text, so both set it. This is the actual cause when someone reports the toast
@@ -1719,8 +1768,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 940 tests (Debug)
-dotnet test -c Release                              # 938 - what CI runs, and it is not the same set
+dotnet test                                         # 949 tests (Debug)
+dotnet test -c Release                              # 947 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

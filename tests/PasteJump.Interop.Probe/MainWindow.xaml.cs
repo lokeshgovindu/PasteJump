@@ -211,11 +211,11 @@ public partial class MainWindow : Window
         _overlay ??= new ProbeOverlay();
         _overlay.Show();
 
-        var (x, y) = ForegroundWindowInfo.GetPreferredOverlayAnchor();
+        var anchor = ForegroundWindowInfo.GetPreferredOverlayAnchor();
+        var (x, y) = (anchor.X, anchor.Y);
         var dpi = ForegroundWindowInfo.GetDpiForPoint(x, y);
 
-        _overlay.ShowAt(x, y, dpi);
-        Log($"probe overlay shown at physical ({x},{y}), monitor dpi={dpi}. " +
+        Log($"probe overlay shown at physical ({x},{y}) by {anchor.Placement}, monitor dpi={dpi}. " +
             "It must not take focus, and clicks must fall through it.");
     }
 
