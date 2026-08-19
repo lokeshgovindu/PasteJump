@@ -722,7 +722,12 @@ that immediately caught two real bugs. Expect to do the same again.
   - **It is not Edge-specific, and that is the part worth keeping.** A Win32 caret exists only in edit and
     richedit controls - the Run dialog reports an `Edit` window with a 1x15 caret rect - while everything that
     draws its own caret reports none: Edge and every Chromium browser, Electron, WPF, WinUI and Visual Studio
-    all measured at `hwndCaret == 0`. Windows Terminal and the Windows 11 Notepad too. Browsers merely make it
+    all measured at `hwndCaret == 0`, as does Windows Terminal. **Notepad, including the Windows 11 one, DOES
+    report a caret** - `hwndCaret = 0x6611B4`, with the overlay landing beside it at (355,290) while the mouse
+    sat at (2512,710) on the other monitor. An earlier draft of this note claimed otherwise, from a measurement
+    whose `SetForegroundWindow` had silently failed and had actually sampled Terminal: **when a probe names the
+    window it targeted, check that window is really in the foreground before believing the reading.** Browsers
+    merely make it
     obvious, because browsing is mouse-driven and the pointer ends up wherever you last clicked.
   - **The fallback is now the centre of the foreground window**, which cannot be on the wrong monitor. The
     mouse survives only as the last resort, for when there is no foreground window at all.
