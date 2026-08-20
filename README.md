@@ -278,6 +278,18 @@ screen.
 could be seen; the overlay steps aside to a corner. The same goes for any window you have pinned always-on-top —
 PasteJump would rather sit beside it than cover it.
 
+All of that is the default. **Settings → Appearance → Where the Overlay Appears** offers five answers:
+
+| Choice | Where the overlay goes |
+|---|---|
+| Automatically *(default)* | Beside the caret; else centred on the window being pasted into |
+| At the text caret, or the pointer | Beside the caret; else at the pointer — what PasteJump did before |
+| At the mouse pointer | Always at the pointer, caret or not |
+| Centred on the window | Always centred on the target window |
+| At a fixed position | Pinned to `OverlayX`/`OverlayY`; falls back to Automatic if either is empty |
+
+Only the pinned choice overrides the Start menu rule, on the grounds that naming a spot is saying what you want.
+
 ---
 
 ## Two stores: clips and history

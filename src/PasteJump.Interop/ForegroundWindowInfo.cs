@@ -1,6 +1,7 @@
 using System.Text;
 using PasteJump.Core.Abstractions;
 using PasteJump.Core.PasteMode;
+using PasteJump.Core.Settings;
 using PasteJump.Interop.Win32;
 
 namespace PasteJump.Interop;
@@ -69,7 +70,11 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
     /// minutes ago. <see cref="OverlayAnchorChooser"/> owns the order and the reasoning.
     /// </para>
     /// </summary>
-    public static OverlayAnchor GetPreferredOverlayAnchor()
+    /// <param name="preference">What the user asked for. See <see cref="OverlayPosition"/>.</param>
+    /// <param name="fixedPoint">The pinned position, when both coordinates are set. Null degrades to Automatic.</param>
+    public static OverlayAnchor GetPreferredOverlayAnchor(
+        OverlayPosition preference = OverlayPosition.Automatic,
+        (int X, int Y)? fixedPoint = null)
     {
         var hwnd = NativeMethods.GetForegroundWindow();
 
@@ -116,7 +121,7 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
             }
         }
 
-        return OverlayAnchorChooser.Choose(caret, window, GetCursorPosition(), topmost);
+        return OverlayAnchorChooser.Choose(caret, window, GetCursorPosition(), topmost, preference, fixedPoint);
     }
 
     /// <summary>

@@ -1,3 +1,5 @@
+using PasteJump.Core.Settings;
+
 namespace PasteJump.Core.PasteMode;
 
 /// <summary>How the overlay sits against its anchor point.</summary>
@@ -77,33 +79,82 @@ public static class OverlayAnchorChooser
     /// window can leave the overlay perfectly rendered and completely invisible. See
     /// <see cref="OverlayPlacementSolver"/> for the measurement that established this.
     /// </param>
+    /// <param name="preference">
+    /// What the user asked for. <see cref="OverlayPosition.Automatic"/> is the caret-then-window behaviour the
+    /// rest of this method describes; the others override the fallback, and one overrides the caret as well.
+    /// </param>
+    /// <param name="fixedPoint">
+    /// The pinned position, for <see cref="OverlayPosition.FixedPoint"/>. Null when either coordinate is unset,
+    /// which degrades to <see cref="OverlayPosition.Automatic"/> rather than anchoring to (0,0).
+    /// </param>
     public static OverlayAnchor Choose(
         (int X, int Y)? caret,
         (int Left, int Top, int Right, int Bottom)? foregroundWindow,
         (int X, int Y) cursor,
-        bool foregroundIsTopmost = false)
+        bool foregroundIsTopmost = false,
+        OverlayPosition preference = OverlayPosition.Automatic,
+        (int X, int Y)? fixedPoint = null)
     {
-        if (caret is { } point)
+        if (preference == OverlayPosition.FixedPoint)
+        {
+            // Honoured absolutely, including over a window Windows draws above ours. Somebody who pins the overlay
+            // to a spot has said where they want it, and second-guessing that leaves no way to say "there, always".
+            if (fixedPoint is { } pinned)
+            {
+                return new OverlayAnchor(pinned.X, pinned.Y, OverlayPlacement.BelowPoint);
+            }
+
+            // Degraded to Automatic outright rather than falling through, which would land on the window centre
+            // and quietly make "fixed position, unset" mean something different from every other unset setting.
+            preference = OverlayPosition.Automatic;
+        }
+
+        var window = foregroundWindow is { } rect && rect.Right > rect.Left && rect.Bottom > rect.Top
+            ? rect
+            : ((int Left, int Top, int Right, int Bottom)?)null;
+
+        // The caret is checked BEFORE the topmost rule, and that order matters. An always-on-top editor does have
+        // a caret, and the overlay can normally be drawn above an ordinary topmost window - it is only the shell's
+        // own surfaces that outrank us. Stepping aside there would move the overlay away from the one signal that
+        // is better than any fallback. The Start menu, which is what the topmost rule exists for, exposes no caret
+        // anyway, so nothing is lost.
+        if (preference is (OverlayPosition.Automatic or OverlayPosition.CaretOrMouse) && caret is { } point)
         {
             return new OverlayAnchor(point.X, point.Y, OverlayPlacement.BelowPoint);
         }
 
-        // A rectangle with no area is not a window to centre on. It is reachable: a window mid-creation, and
-        // anything that has told Windows it occupies nothing.
-        if (foregroundWindow is { } window && window.Right > window.Left && window.Bottom > window.Top)
+        // Otherwise, applies whatever the preference: it is not a preference but the difference between being seen
+        // and not. No position on top of the Start menu can be seen, so every remaining mode steps aside from one.
+        if (foregroundIsTopmost && window is { } avoid)
         {
-            var centreX = window.Left + ((window.Right - window.Left) / 2);
-            var centreY = window.Top + ((window.Bottom - window.Top) / 2);
-
-            return foregroundIsTopmost
-                ? new OverlayAnchor(
-                    centreX,
-                    centreY,
-                    OverlayPlacement.OutsideWindow,
-                    new ScreenBox(window.Left, window.Top, window.Right, window.Bottom))
-                : new OverlayAnchor(centreX, centreY, OverlayPlacement.CentredOn);
+            return new OverlayAnchor(
+                avoid.Left + ((avoid.Right - avoid.Left) / 2),
+                avoid.Top + ((avoid.Bottom - avoid.Top) / 2),
+                OverlayPlacement.OutsideWindow,
+                new ScreenBox(avoid.Left, avoid.Top, avoid.Right, avoid.Bottom));
         }
 
+        if (preference == OverlayPosition.MousePointer)
+        {
+            return new OverlayAnchor(cursor.X, cursor.Y, OverlayPlacement.BelowPoint);
+        }
+
+        if (preference == OverlayPosition.CaretOrMouse)
+        {
+            return new OverlayAnchor(cursor.X, cursor.Y, OverlayPlacement.BelowPoint);
+        }
+
+        // Reached by Automatic with no caret to use, and by WindowCentre always. A rectangle with no area was
+        // already discarded above: a window mid-creation, or anything that has told Windows it occupies nothing.
+        if (window is { } target)
+        {
+            return new OverlayAnchor(
+                target.Left + ((target.Right - target.Left) / 2),
+                target.Top + ((target.Bottom - target.Top) / 2),
+                OverlayPlacement.CentredOn);
+        }
+
+        // Nothing else is known - no caret, no usable window. The pointer is always somewhere.
         return new OverlayAnchor(cursor.X, cursor.Y, OverlayPlacement.BelowPoint);
     }
 }

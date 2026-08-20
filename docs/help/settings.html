@@ -258,10 +258,20 @@ of the document underneath.</td></tr>
 <tr><td class="name">Characters of Text Shown</td><td>How much of a text clip the overlay shows before
 eliding it. About what is worth reading in the second the gesture lasts, so it is far smaller than the
 amount stored.</td></tr>
-<tr><td class="name">Fixed Position (x, y)</td><td>Leave both empty &mdash; the default &mdash; to have
-the overlay appear beside the text caret, or beside the pointer where an application does not report one.
-Fill in both to pin it to one place on screen. One without the other is not accepted, because it would
-track the caret in one axis and not the other.</td></tr>
+<tr><td class="name">Where the Overlay Appears</td><td>The overlay follows the text caret whenever the
+application tells Windows where it is. Most modern ones do not &mdash; see
+<a href="gesture.html">Where the overlay appears</a> for which &mdash; and this chooses what happens then.
+<b>Automatically</b> centres it on the window being pasted into, which can never be on another monitor;
+<b>At the text caret, or the pointer</b> is what PasteJump did before, and puts it wherever the mouse was last
+left; <b>At the mouse pointer</b> uses the pointer even when there is a caret; <b>Centred on the window</b>
+ignores the caret entirely; and <b>At a fixed position</b> pins it to the coordinates below. Whatever you
+choose, the overlay steps aside from anything Windows draws above it, such as the Start menu &mdash; there is
+no position on top of one that could be seen.</td></tr>
+<tr><td class="name">Fixed Position (x, y)</td><td>Only used when the setting above is
+<b>At a fixed position</b>. Physical pixels from the top-left of the primary monitor. Both halves are
+required: one without the other would track the caret in one axis and not the other, so a half-filled
+position is refused rather than half-honoured &mdash; and left empty it falls back to <b>Automatically</b>
+rather than pinning the overlay to the corner of the screen.</td></tr>
 <tr><td class="name">Show a Key Reminder Along the Bottom</td><td>One muted line across the foot of the
 overlay naming the keys worth knowing when you have lost your place: <code>A</code> back to the newest clip,
 stepping, <code>X</code> to delete, <code>Esc</code> to cancel, and <code>F1</code> for the full list. On by

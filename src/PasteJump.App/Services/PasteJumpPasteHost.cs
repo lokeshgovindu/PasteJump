@@ -7,6 +7,7 @@ using PasteJump.Core.Imaging;
 using PasteJump.Core.Model;
 using PasteJump.Core.Paste;
 using PasteJump.Core.PasteMode;
+using PasteJump.Core.Settings;
 using PasteJump.Core.Storage;
 using PasteJump.Interop;
 
@@ -31,6 +32,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
     private int? _overlayX;
     private int? _overlayY;
+    private OverlayPosition _overlayPosition = OverlayPosition.Automatic;
 
     private bool _showKeyHint = true;
     private char _triggerKey = 'V';
@@ -88,10 +90,11 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     /// value taken from one display still lands correctly on a mixed-DPI desktop.
     /// </para>
     /// </summary>
-    public void SetOverlayAnchor(int? x, int? y)
+    public void SetOverlayAnchor(int? x, int? y, OverlayPosition position = OverlayPosition.Automatic)
     {
         _overlayX = x;
         _overlayY = y;
+        _overlayPosition = position;
     }
 
     /// <summary>
@@ -275,12 +278,14 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
             _overlay.ApplyParts(_overlayParts);
         }
 
-        // A configured position wins over the caret. Both halves have to be set for it to mean anything, which
-        // is why one alone is not honoured rather than being paired with a caret coordinate - a half-fixed
-        // overlay that moves in one axis only reads as a bug rather than as a setting.
-        var anchor = _overlayX is { } fixedX && _overlayY is { } fixedY
-            ? new OverlayAnchor(fixedX, fixedY, OverlayPlacement.BelowPoint)
-            : ForegroundWindowInfo.GetPreferredOverlayAnchor();
+        // Both halves have to be set for a pinned position to mean anything, which is why one alone is not
+        // honoured rather than being paired with a caret coordinate - a half-fixed overlay that moves in one axis
+        // only reads as a bug rather than as a setting. The chooser degrades to Automatic when it arrives null.
+        var pinned = _overlayX is { } fixedX && _overlayY is { } fixedY
+            ? (fixedX, fixedY)
+            : ((int X, int Y)?)null;
+
+        var anchor = ForegroundWindowInfo.GetPreferredOverlayAnchor(_overlayPosition, pinned);
 
         _overlay.SetImagePayload(model.Kind == ClipKind.Image ? TryLoadImageBytes(model) : null);
 

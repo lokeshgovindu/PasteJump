@@ -275,7 +275,7 @@ public partial class App : Application
         _pasteHost.SetJoinSeparator(_settings.ClipJoinSeparator);
         _pasteHost.SetOverlayParts(_settings.OverlayParts);
         _pasteHost.SetDeletedFlash(_settings.OverlayDeletedFlashMs);
-        _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
+        _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY, _settings.OverlayPosition);
         _pasteHost.SetKeyHint(
             _settings.ShowOverlayKeyHint,
             TriggerKey.Normalise(_settings.PasteModeTriggerKey),
@@ -1502,7 +1502,7 @@ public partial class App : Application
         _pasteHost.SetJoinSeparator(_settings.ClipJoinSeparator);
         _pasteHost.SetOverlayParts(_settings.OverlayParts);
         _pasteHost.SetDeletedFlash(_settings.OverlayDeletedFlashMs);
-        _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY);
+        _pasteHost.SetOverlayAnchor(_settings.OverlayX, _settings.OverlayY, _settings.OverlayPosition);
         _pasteHost.SetKeyHint(
             _settings.ShowOverlayKeyHint,
             TriggerKey.Normalise(_settings.PasteModeTriggerKey),

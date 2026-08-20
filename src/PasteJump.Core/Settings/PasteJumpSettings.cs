@@ -230,7 +230,14 @@ public sealed class PasteJumpSettings
     public string PasteModeKeys { get; set; } = PasteMode.PasteKeyMap.Default.ToSettingsString();
 
     /// <summary>
-    /// Fixed overlay position in physical pixels. Null means "follow the caret, else the cursor".
+    /// Where the paste overlay is put on screen. See <see cref="Settings.OverlayPosition"/> for the options and
+    /// why the second choice is a matter of taste rather than of correctness.
+    /// </summary>
+    public OverlayPosition OverlayPosition { get; set; } = OverlayPosition.Automatic;
+
+    /// <summary>
+    /// Fixed overlay position in physical pixels, used when <see cref="OverlayPosition"/> is
+    /// <see cref="Settings.OverlayPosition.FixedPoint"/>.
     /// <para>
     /// Both halves must be set for either to apply: half a position would move the overlay in one axis and
     /// track the caret in the other, which reads as a bug rather than as a setting. <see cref="Normalise"/>

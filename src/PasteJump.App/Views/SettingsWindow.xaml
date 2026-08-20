@@ -844,6 +844,17 @@
                         <Grid Style="{StaticResource SettingRow}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="260" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Where the Overlay Appears" />
+                            <ComboBox x:Name="OverlayPositionCombo" Grid.Column="1" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource SettingHelp}"
+                                   Text="The overlay follows the text caret when the application tells Windows where it is. Most modern ones do not — every browser, Electron, Visual Studio, Windows Terminal — and this chooses what happens then. Automatic centres it on the window you are pasting into, which can never be on another monitor; the pointer is the alternative, and is wherever you last left it. Whatever you choose, the overlay steps aside from anything Windows draws above it, such as the Start menu, because no position on top of one can be seen." />
+
+                        <Grid Style="{StaticResource SettingRow}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="82" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="82" />
@@ -854,7 +865,7 @@
                             <TextBox x:Name="OverlayYBox" Grid.Column="3" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
-                                   Text="Leave both empty — the default — to have the overlay appear beside the text caret, or beside the pointer where an application does not report one. Fill in both to pin it to one place on screen instead, in physical pixels from the top-left of the primary monitor. One without the other is not accepted: it would track the caret in one axis and not the other." />
+                                   Text="Only used when the setting above is “At a fixed position”. In physical pixels from the top-left of the primary monitor. Both halves are required: one without the other would track the caret in one axis and not the other, so a half-filled position is refused rather than half-honoured — and if it is left empty, the overlay falls back to Automatic rather than pinning itself to the corner of the screen." />
 
                         </StackPanel>
                         </Border>

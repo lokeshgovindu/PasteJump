@@ -66,6 +66,19 @@ public partial class SettingsWindow : Window
         (TrayClickAction.Nothing, "Do nothing"),
     ];
 
+    /// <summary>
+    /// Where the paste overlay goes. Worded as answers to "where should it appear", so the list reads without the
+    /// label above it, and ordered with the two caret-first choices together at the top.
+    /// </summary>
+    private static readonly (OverlayPosition Position, string Label)[] OverlayPositionChoices =
+    [
+        (OverlayPosition.Automatic, "Automatically (recommended)"),
+        (OverlayPosition.CaretOrMouse, "At the text caret, or the pointer"),
+        (OverlayPosition.MousePointer, "At the mouse pointer"),
+        (OverlayPosition.WindowCentre, "Centred on the window"),
+        (OverlayPosition.FixedPoint, "At a fixed position"),
+    ];
+
     /// <summary>Density options, labelled as Outlook and Explorer label them.</summary>
     private static readonly (GridDensity Density, string Label)[] DensityChoices =
     [
@@ -368,6 +381,11 @@ public partial class SettingsWindow : Window
             TrayLeftClickCombo.Items.Add(choice.Label);
         }
 
+        foreach (var choice in OverlayPositionChoices)
+        {
+            OverlayPositionCombo.Items.Add(choice.Label);
+        }
+
         foreach (var choice in DensityChoices)
         {
             DensityCombo.Items.Add(choice.Label);
@@ -502,6 +520,9 @@ public partial class SettingsWindow : Window
 
         // Empty rather than "0" for "not set". Zero is a legal screen coordinate, so using it as the sentinel
         // would make the top-left corner unreachable.
+        OverlayPositionCombo.SelectedItem = OverlayPositionChoices
+            .First(c => c.Position == source.OverlayPosition).Label;
+
         OverlayXBox.Text = source.OverlayX?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
         OverlayYBox.Text = source.OverlayY?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
 
@@ -2060,6 +2081,7 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.OverlayPreviewChars)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayFontFamily)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayFontSize)] = "Appearance",
+        [nameof(PasteJumpSettings.OverlayPosition)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayX)] = "Appearance",
         [nameof(PasteJumpSettings.OverlayY)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayKeyHint)] = "Appearance",
@@ -2520,6 +2542,11 @@ public partial class SettingsWindow : Window
         // position set by hand in PasteJump.json was silently discarded by opening this dialog and clicking OK.
         settings.OverlayX = overlayX;
         settings.OverlayY = overlayY;
+
+        var overlayPositionLabel = OverlayPositionCombo.SelectedItem as string;
+        settings.OverlayPosition = OverlayPositionChoices
+            .FirstOrDefault(c => string.Equals(c.Label, overlayPositionLabel, StringComparison.Ordinal))
+            .Position;
 
         var trayLabel = TrayLeftClickCombo.SelectedItem as string;
         settings.TrayLeftClick = TrayLeftClickChoices

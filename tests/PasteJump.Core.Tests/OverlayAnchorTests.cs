@@ -1,4 +1,5 @@
 using PasteJump.Core.PasteMode;
+using PasteJump.Core.Settings;
 using Xunit;
 
 namespace PasteJump.Core.Tests;
@@ -9,6 +10,127 @@ namespace PasteJump.Core.Tests;
 /// </summary>
 public class OverlayAnchorTests
 {
+    // ------------------------------------------------------------- the OverlayPosition setting
+
+    private static readonly (int X, int Y) Caret = (400, 300);
+    private static readonly (int Left, int Top, int Right, int Bottom) Window = (0, 0, 1920, 1080);
+    private static readonly (int X, int Y) Mouse = (1500, 900);
+
+    [Fact]
+    public void Automatic_prefers_the_caret_then_the_window()
+    {
+        Assert.Equal(
+            new OverlayAnchor(400, 300, OverlayPlacement.BelowPoint),
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.Automatic));
+
+        Assert.Equal(
+            new OverlayAnchor(960, 540, OverlayPlacement.CentredOn),
+            OverlayAnchorChooser.Choose(null, Window, Mouse, false, OverlayPosition.Automatic));
+    }
+
+    /// <summary>PasteJump's behaviour before 2026-08-19, kept as a choice rather than deleted.</summary>
+    [Fact]
+    public void CaretOrMouse_prefers_the_caret_then_the_pointer()
+    {
+        Assert.Equal(
+            new OverlayAnchor(400, 300, OverlayPlacement.BelowPoint),
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.CaretOrMouse));
+
+        Assert.Equal(
+            new OverlayAnchor(1500, 900, OverlayPlacement.BelowPoint),
+            OverlayAnchorChooser.Choose(null, Window, Mouse, false, OverlayPosition.CaretOrMouse));
+    }
+
+    /// <summary>The one option that overrides the caret as well as the fallback.</summary>
+    [Fact]
+    public void MousePointer_ignores_the_caret_entirely()
+    {
+        Assert.Equal(
+            new OverlayAnchor(1500, 900, OverlayPlacement.BelowPoint),
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.MousePointer));
+    }
+
+    [Fact]
+    public void WindowCentre_ignores_the_caret_and_centres()
+    {
+        Assert.Equal(
+            new OverlayAnchor(960, 540, OverlayPlacement.CentredOn),
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.WindowCentre));
+    }
+
+    [Fact]
+    public void FixedPoint_wins_over_everything_including_a_caret()
+    {
+        Assert.Equal(
+            new OverlayAnchor(50, 60, OverlayPlacement.BelowPoint),
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.FixedPoint, (50, 60)));
+    }
+
+    /// <summary>
+    /// Half a fixed position is a mistake, not an instruction. Degrades to Automatic rather than pinning the
+    /// overlay to the corner of the primary monitor, which is not a useful guess at what was meant.
+    /// </summary>
+    [Fact]
+    public void FixedPoint_with_no_coordinates_degrades_to_automatic()
+    {
+        Assert.Equal(
+            new OverlayAnchor(400, 300, OverlayPlacement.BelowPoint),
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.FixedPoint));
+    }
+
+    /// <summary>
+    /// Not negotiable by preference, because it is not a preference: no position on top of a window Windows draws
+    /// above ours can be seen, so every mode steps aside from one. Only a pinned position overrides it, since that
+    /// is somebody stating exactly where they want it.
+    /// <para>
+    /// Caretless, which is the real situation - the Start menu exposes none. A caret deliberately still wins for
+    /// the two caret modes, because an ordinary always-on-top window can be drawn over and the caret is a better
+    /// signal than any fallback; <c>A_caret_still_wins_over_a_topmost_window</c> guards that.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(OverlayPosition.Automatic)]
+    [InlineData(OverlayPosition.CaretOrMouse)]
+    [InlineData(OverlayPosition.MousePointer)]
+    [InlineData(OverlayPosition.WindowCentre)]
+    public void Every_mode_steps_aside_from_a_topmost_window(OverlayPosition preference)
+    {
+        var anchor = OverlayAnchorChooser.Choose(null, Window, Mouse, true, preference);
+
+        Assert.Equal(OverlayPlacement.OutsideWindow, anchor.Placement);
+        Assert.NotNull(anchor.Avoid);
+    }
+
+    [Fact]
+    public void A_pinned_position_is_honoured_even_over_a_topmost_window()
+    {
+        var anchor = OverlayAnchorChooser.Choose(Caret, Window, Mouse, true, OverlayPosition.FixedPoint, (7, 9));
+
+        Assert.Equal(new OverlayAnchor(7, 9, OverlayPlacement.BelowPoint), anchor);
+    }
+
+    /// <summary>Automatic is the zero value, so a file written before this setting existed reads as it behaved.</summary>
+    [Fact]
+    public void Automatic_is_the_default_and_the_zero_value()
+    {
+        Assert.Equal(OverlayPosition.Automatic, default(OverlayPosition));
+        Assert.Equal(OverlayPosition.Automatic, new PasteJumpSettings().OverlayPosition);
+    }
+
+    /// <summary>Nothing may fall through to an unplaced overlay, whatever the mode and however little is known.</summary>
+    [Theory]
+    [InlineData(OverlayPosition.Automatic)]
+    [InlineData(OverlayPosition.CaretOrMouse)]
+    [InlineData(OverlayPosition.MousePointer)]
+    [InlineData(OverlayPosition.WindowCentre)]
+    [InlineData(OverlayPosition.FixedPoint)]
+    public void Every_mode_still_places_the_overlay_when_nothing_is_known(OverlayPosition preference)
+    {
+        var anchor = OverlayAnchorChooser.Choose(null, null, Mouse, false, preference);
+
+        Assert.Equal(new OverlayAnchor(1500, 900, OverlayPlacement.BelowPoint), anchor);
+    }
+
     [Fact]
     public void A_caret_wins_over_the_window_and_the_mouse()
     {

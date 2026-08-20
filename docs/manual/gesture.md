@@ -174,6 +174,8 @@ Note that this does not divide neatly into old and new: **ConEmu exposes a caret
 >
 > **The Start menu is a third case.** Windows draws it above every ordinary window, PasteJump's overlay included, so there is no position on top of it that you could see. The overlay steps aside to a corner of the screen instead. The same applies to anything else Windows keeps above other windows, and to an application you have pinned always-on-top — PasteJump would rather sit beside a window you deliberately pinned than cover it.
 
+**All of that is the default, and you can choose differently.** [Settings, Appearance, Where the Overlay Appears](settings.md) offers five answers: automatically as described above; at the caret with the *pointer* as the fallback, which is what PasteJump did before; always at the pointer; always centred on the window; or pinned to a fixed position of your own. Only the pinned one overrides the Start menu rule, on the grounds that somebody who names a spot has said what they want.
+
 ## What the overlay shows
 
 A text clip states its size the way a picture does: lines and characters on the left, bytes on the right.
