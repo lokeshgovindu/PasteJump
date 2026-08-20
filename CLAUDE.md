@@ -71,38 +71,11 @@ is a different chord and a few applications bind it elsewhere.
 
 ### Asked for, not yet built
 
-**The clip's timestamp on the paste overlay, right-hand side (asked 2026-08-20, to finish 2026-08-21).** The facts
-row under the preview currently carries the clip's own details on the left — lines and characters for text, a
-resolution for an image, a size for a file — and the timestamp goes at the **right of that same row, for every
-kind**. Nothing is being replaced; this is an addition to a row that already exists.
+**`TASKS.md` is the list, and it is the only place task detail lives.** Pending work with the notes needed to
+start it cold, and what has been finished, both newest first. It is not repeated here: two copies of a task
+list disagree within a day, and the one that gets read is whichever the reader opened first.
 
-What is already known, so tomorrow starts at the code rather than in a search:
-
-- **The value exists but does not reach the overlay.** `Clip.CreatedUtc` is a `DateTimeOffset`;
-  `PasteOverlayModel` carries no timestamp at all, so it needs a field and one line where the controller builds
-  the model (`PasteModeController.cs:869`). Nullable, because the smoke harness and the tests construct frames
-  by hand and a `required` member would break every one of them.
-- **The one open question is whether it gets a switch.** Every other cosmetic part of the overlay has one — twelve
-  of them, and `OverlayPartsTests` asserts the count precisely so that adding a thirteenth forces the question
-  "is this cosmetic?" to be answered out loud. A timestamp is cosmetic by that rule, so the default answer is yes:
-  `ShowOverlayTimestamp`. "Always" in the request reads as *for every clip kind, always on the right* rather than
-  *not configurable*, but confirm before deciding — shipping it unswitchable is the one choice that cannot be
-  undone quietly.
-- **A switch is five places, not one.** `PasteJumpSettings` (beside `ShowOverlayTextDetails`, ~line 437), the
-  computed `OverlayParts` view (~line 473), `ShowValues`, `TryBuild`, a control on the Overlay tab, and the
-  Advanced tab's hand-written *Where* mapping. `VerifyEverySettingHasAControl` in the UI smoke harness fails the
-  run if any of them is missed, which is what makes forgetting one loud instead of silent.
-- **The row collapses when both halves are off, and that logic has to change.** `Render` hides the whole facts row
-  when details and size are both switched off; with a timestamp on the right it must survive that case, or
-  switching text details off would take the timestamp with it.
-- **Format is a real decision and the overlay is only 439px wide.** The history window uses `2026-08-14 09:42`,
-  and its column widths were *measured* rather than guessed — 112px truncated exactly that string, so reuse the
-  finding rather than repeating it. Relative time ("3m ago") is tempting and is the wrong default here: the
-  gesture is for choosing between clips copied minutes apart, where "3m ago" and "4m ago" are harder to compare
-  than two clock times. Local time, not UTC.
-- **Then the manual and the shots.** The overlay frames in `docs/help/images` come from the UI smoke harness, so
-  the sequence is: change the XAML, run the harness with `--shot`, `tools/update-help-images.ps1`, edit
-  `docs/help/gesture.html`, regenerate `docs/manual` (CI runs `--check` and fails on stale output).
+Open right now: **the clip's timestamp on the right of the paste overlay's facts row** (asked 2026-08-20).
 
 Explicitly **rejected** in the Ditto/CopyQ feature review, so they do not need revisiting: LAN peer-to-peer sync (fights the
 single-writer SQLite model — two machines on one folder corrupt the store), scripting and plugins, cloud accounts,
@@ -2092,5 +2065,5 @@ The settings dialog has **Apply** as well as OK, so a timing value can be nudged
 without reopening it. Apply moves the dialog's baseline: `_baseline` in `SettingsWindow` is deliberately
 not readonly, because after an Apply the applied values *are* what is in force.
 
-Read `PLAN.md` for the full design, the state-machine spec, and the two corrections made during
-implementation. `README.md` is the user-facing description.
+`TASKS.md` is what is open and what is done. Read `PLAN.md` for the full design, the state-machine
+spec, and the two corrections made during implementation. `README.md` is the user-facing description.
