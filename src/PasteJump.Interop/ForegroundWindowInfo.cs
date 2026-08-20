@@ -75,6 +75,7 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
 
         (int X, int Y)? caret = null;
         (int Left, int Top, int Right, int Bottom)? window = null;
+        var topmost = false;
 
         if (hwnd != IntPtr.Zero)
         {
@@ -106,10 +107,16 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
             if (!NativeMethods.IsIconic(hwnd) && NativeMethods.GetWindowRect(hwnd, out var rect))
             {
                 window = (rect.Left, rect.Top, rect.Right, rect.Bottom);
+
+                // Whether we can rely on being drawn above it. The Start menu is WS_EX_TOPMOST and Windows puts
+                // it in a band above ordinary topmost windows, so centring the overlay on it renders it
+                // invisible - see OverlayPlacementSolver.
+                topmost = (NativeMethods.GetWindowLong(hwnd, NativeConstants.GWL_EXSTYLE)
+                    & NativeConstants.WS_EX_TOPMOST) != 0;
             }
         }
 
-        return OverlayAnchorChooser.Choose(caret, window, GetCursorPosition());
+        return OverlayAnchorChooser.Choose(caret, window, GetCursorPosition(), topmost);
     }
 
     /// <summary>

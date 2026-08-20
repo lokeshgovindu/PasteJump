@@ -543,6 +543,23 @@ public partial class OverlayWindow : Window
         var width = ActualWidth > 0 ? ActualWidth : 360;
         var height = ActualHeight > 0 ? ActualHeight : 140;
 
+        // Beside a window we cannot draw above. Solved in Core against the work area, then returned already
+        // clamped - so it skips the edge handling below, which exists for the point-anchored cases and would
+        // happily push the overlay back onto the very window it was told to avoid.
+        if (anchor.Placement == OverlayPlacement.OutsideWindow && anchor.Avoid is { } avoid)
+        {
+            var (besideLeft, besideTop) = OverlayPlacementSolver.Beside(
+                new ScreenBox(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom),
+                new ScreenBox(avoid.Left / scale, avoid.Top / scale, avoid.Right / scale, avoid.Bottom / scale),
+                width,
+                height);
+
+            Left = WindowInterop.SnapToDevicePixel(besideLeft, scale);
+            Top = WindowInterop.SnapToDevicePixel(besideTop, scale);
+
+            return;
+        }
+
         var centred = anchor.Placement == OverlayPlacement.CentredOn;
 
         var desiredLeft = centred ? (anchor.X / scale) - (width / 2) : (anchor.X / scale) + 4;

@@ -200,4 +200,10 @@ internal static class NativeConstants
 
     // ---- process access
     public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+    // ---- window styles
+    // Read off the window being pasted into, to decide whether the overlay may be drawn on top of it. Measured
+    // values: the Start menu is 0x00200008 (topmost set), an Edge window 0x00200100 (not).
+    public const int GWL_EXSTYLE = -20;
+    public const int WS_EX_TOPMOST = 0x00000008;
 }

@@ -14,10 +14,25 @@ public enum OverlayPlacement
     /// in the lower half of that window rather than in the middle of it.
     /// </summary>
     CentredOn,
+
+    /// <summary>
+    /// Beside <see cref="OverlayAnchor.Avoid"/>, never on top of it. For a window that is itself topmost, which
+    /// we cannot rely on being able to draw above - the Start menu being the case that proved it.
+    /// <see cref="OverlayPlacementSolver"/> picks the side.
+    /// </summary>
+    OutsideWindow,
 }
 
 /// <summary>Where to put the overlay, in physical screen pixels, and how to sit against that point.</summary>
-public readonly record struct OverlayAnchor(int X, int Y, OverlayPlacement Placement);
+/// <param name="Avoid">
+/// Set only for <see cref="OverlayPlacement.OutsideWindow"/>: the window the overlay must stay clear of. The
+/// point is that window's centre, so a caller that ignores this still puts the overlay somewhere sensible.
+/// </param>
+public readonly record struct OverlayAnchor(
+    int X,
+    int Y,
+    OverlayPlacement Placement,
+    ScreenBox? Avoid = null);
 
 /// <summary>
 /// Decides where the overlay goes from the three things Windows can tell us: the caret, the window being pasted
@@ -56,10 +71,17 @@ public static class OverlayAnchorChooser
     /// that window is always on the monitor the user is looking at. The mouse can be anywhere - on another
     /// monitor, over the taskbar, or parked where a click happened minutes ago.
     /// </remarks>
+    /// <param name="foregroundIsTopmost">
+    /// Whether the window being pasted into has <c>WS_EX_TOPMOST</c>. When it does, the overlay is placed beside
+    /// it rather than on it: Windows draws the Start menu above ordinary topmost windows, so centring on such a
+    /// window can leave the overlay perfectly rendered and completely invisible. See
+    /// <see cref="OverlayPlacementSolver"/> for the measurement that established this.
+    /// </param>
     public static OverlayAnchor Choose(
         (int X, int Y)? caret,
         (int Left, int Top, int Right, int Bottom)? foregroundWindow,
-        (int X, int Y) cursor)
+        (int X, int Y) cursor,
+        bool foregroundIsTopmost = false)
     {
         if (caret is { } point)
         {
@@ -70,10 +92,16 @@ public static class OverlayAnchorChooser
         // anything that has told Windows it occupies nothing.
         if (foregroundWindow is { } window && window.Right > window.Left && window.Bottom > window.Top)
         {
-            return new OverlayAnchor(
-                window.Left + ((window.Right - window.Left) / 2),
-                window.Top + ((window.Bottom - window.Top) / 2),
-                OverlayPlacement.CentredOn);
+            var centreX = window.Left + ((window.Right - window.Left) / 2);
+            var centreY = window.Top + ((window.Bottom - window.Top) / 2);
+
+            return foregroundIsTopmost
+                ? new OverlayAnchor(
+                    centreX,
+                    centreY,
+                    OverlayPlacement.OutsideWindow,
+                    new ScreenBox(window.Left, window.Top, window.Right, window.Bottom))
+                : new OverlayAnchor(centreX, centreY, OverlayPlacement.CentredOn);
         }
 
         return new OverlayAnchor(cursor.X, cursor.Y, OverlayPlacement.BelowPoint);
