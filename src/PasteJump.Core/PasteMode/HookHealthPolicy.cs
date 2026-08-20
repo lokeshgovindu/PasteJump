@@ -50,15 +50,17 @@ public static class HookHealthPolicy
     public const double DefaultDeafnessMs = 500;
 
     /// <summary>
-    /// How long a session may go without a single keystroke before the hook is reinstalled as a precaution.
+    /// Slack for the fact that the watchdog only samples the keyboard every so often, so it always believes Ctrl
+    /// went down slightly later than it did.
     /// </summary>
     /// <remarks>
-    /// Only reinstalls; deliberately does <b>not</b> abandon the session. Silence during a gesture is ordinary -
-    /// the user is reading the overlay - so ending it on that basis alone would throw away a paste somebody was
-    /// still thinking about. Reinstalling costs nothing and, if we had gone deaf, is what lets the Ctrl release
-    /// reach us and commit the paste normally.
+    /// Load-bearing, and its absence was a false positive rather than a rounding error. The first version compared
+    /// the silence against a fixed threshold, which fires on a perfectly healthy hook: hold Ctrl for a second
+    /// while reading the overlay and no further key events arrive, so the silence grows past any fixed number even
+    /// though the Ctrl-down was received. The question has to be <i>relative</i> - has anything been heard since
+    /// Ctrl went down - and this covers the quarter second by which the sampler is always late.
     /// </remarks>
-    public const double DefaultStuckSessionMs = 1500;
+    public const double DefaultObservationMarginMs = 300;
 
     /// <param name="gestureEnabled">
     /// False when the user has switched PasteJump off from the tray. Nothing is ever reinstalled then: an
@@ -78,7 +80,7 @@ public static class HookHealthPolicy
         double msSinceLastHookEvent,
         double msCtrlHeldFor,
         double deafnessMs = DefaultDeafnessMs,
-        double stuckSessionMs = DefaultStuckSessionMs)
+        double observationMarginMs = DefaultObservationMarginMs)
     {
         if (!gestureEnabled)
         {
@@ -98,19 +100,25 @@ public static class HookHealthPolicy
             return HookHealthDecision.Nothing;
         }
 
+        // Nothing is concluded from silence during an open session, and that is deliberate rather than a gap.
+        // Silence there is ordinary - somebody holding Ctrl while they read the overlay sends no further keys - so
+        // there is no evidence to act on. If we HAVE gone deaf mid-gesture, the rule above catches it the moment
+        // the user gives up and lets go of Ctrl, which needs no hook at all to notice.
         if (sessionActive)
         {
-            return msSinceLastHookEvent >= stuckSessionMs
-                ? new HookHealthDecision(ReinstallHook: true, AbandonStuckSession: false)
-                : HookHealthDecision.Nothing;
+            return HookHealthDecision.Nothing;
         }
 
-        // Ctrl has been down a while and we have heard nothing at all in that time - so we missed its key-down,
-        // which is the one event we can be certain was delivered to somebody. Both conditions are needed: the
-        // silence alone is just an idle machine.
+        // Ctrl has been down a while and nothing has been heard for LONGER than it has been down - so we missed
+        // its key-down, which is the one event we can be certain was delivered to somebody. Relative, not a fixed
+        // threshold: an innocent long hold produces no further events either, and comparing against a constant
+        // reports that as deafness. See DefaultObservationMarginMs.
+        var heardNothingSinceCtrlWentDown =
+            msSinceLastHookEvent >= msCtrlHeldFor + observationMarginMs;
+
         var deaf = ctrlHeld
             && msCtrlHeldFor >= deafnessMs
-            && msSinceLastHookEvent >= deafnessMs;
+            && heardNothingSinceCtrlWentDown;
 
         return deaf
             ? new HookHealthDecision(ReinstallHook: true, AbandonStuckSession: false)

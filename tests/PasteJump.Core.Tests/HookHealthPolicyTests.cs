@@ -37,10 +37,28 @@ public class HookHealthPolicyTests
     [Fact]
     public void CtrlHeldWithNothingHeardMeansWeAreDeaf()
     {
-        var decision = Decide(ctrlHeld: true, msCtrlHeldFor: 600, msSinceLastHookEvent: 600);
+        // Nothing heard for a minute, and Ctrl has been down for over half a second of it: the Ctrl-down never
+        // reached us.
+        var decision = Decide(ctrlHeld: true, msCtrlHeldFor: 600, msSinceLastHookEvent: 60_000);
 
         Assert.True(decision.ReinstallHook);
         Assert.False(decision.AbandonStuckSession);
+    }
+
+    /// <summary>
+    /// The false positive the first version shipped with, caught within a minute of deploying it. Holding Ctrl
+    /// while reading the overlay sends no further key events, so the silence grows past any fixed threshold on a
+    /// perfectly healthy hook - which reported a recovery, and told the user so, for nothing.
+    /// </summary>
+    [Theory]
+    [InlineData(600)]
+    [InlineData(1_500)]
+    [InlineData(10_000)]
+    [InlineData(120_000)]
+    public void AnInnocentLongCtrlHoldIsNeverMistakenForDeafness(double heldFor)
+    {
+        // The Ctrl-down WAS received, so the silence dates from it - never appreciably older than the hold.
+        Assert.False(Decide(ctrlHeld: true, msCtrlHeldFor: heldFor, msSinceLastHookEvent: heldFor + 250).AnythingToDo);
     }
 
     /// <summary>
@@ -79,22 +97,18 @@ public class HookHealthPolicyTests
     }
 
     /// <summary>
-    /// Reinstalled but NOT abandoned. Silence during a gesture is ordinary - somebody reading the overlay - so
-    /// ending the session on that basis would throw away a paste they were still thinking about.
+    /// Nothing is concluded from silence during an open session, however long. Somebody holding Ctrl while they
+    /// read the overlay sends no further keys, so there is no evidence to act on - and acting anyway is what
+    /// announced a phantom recovery to the user. Deafness mid-gesture is caught the moment they let go of Ctrl,
+    /// which needs no hook to notice.
     /// </summary>
-    [Fact]
-    public void ALongSilenceDuringASessionReinstallsWithoutEndingIt()
+    [Theory]
+    [InlineData(300)]
+    [InlineData(2_000)]
+    [InlineData(60_000)]
+    public void SilenceDuringAnOpenSessionIsNeverEvidence(double silence)
     {
-        var decision = Decide(sessionActive: true, ctrlHeld: true, msSinceLastHookEvent: 2_000);
-
-        Assert.True(decision.ReinstallHook);
-        Assert.False(decision.AbandonStuckSession);
-    }
-
-    [Fact]
-    public void AShortPauseDuringASessionIsLeftAlone()
-    {
-        Assert.False(Decide(sessionActive: true, ctrlHeld: true, msSinceLastHookEvent: 300).AnythingToDo);
+        Assert.False(Decide(sessionActive: true, ctrlHeld: true, msSinceLastHookEvent: silence).AnythingToDo);
     }
 
     /// <summary>
