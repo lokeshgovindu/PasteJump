@@ -150,6 +150,35 @@ included. Four things to know before trusting a run:
   for PasteJump's own overlay, cancelling with Escape so nothing is pasted - but injected input can be refused
   outright, so a run with no successes says the spike could not type, not that PasteJump refused. The report says so
   itself.
+- **Its witness is a keyboard HOOK, and the window it replaced proved nothing.** Recording the keys a window
+  receives is the obvious instrument and is wrong: a WPF window sees keys only while focused, and focusing a window
+  this process owns is what the foreground lock refuses - so it reported "keys reaching it: NONE" while sitting
+  behind Edge. A `WH_KEYBOARD_LL` hook sees every key whatever has focus, and with it the answer is unambiguous:
+  **not one injected key reaches the input stream from a process the Task Scheduler service started.** Presence is
+  conclusive, absence is not quite - a hook earlier in the chain can suppress an event first.
+
+**Two log files are the instruments that actually crack "the overlay does not appear in application X", and both
+ship.** `logs\gesture.log` (`GestureTraceLog`) is what the hook received and what the recognizer did with it;
+`logs\capture.log` carries one `overlay:` line per gesture with the inputs the position was chosen from *and* the
+overlay's real HWND rectangle. Three things worth keeping:
+
+- **The gesture trace was written, left on a diagnostic branch, and not deployed - and that cost a day.** The one
+  build that did carry it had already answered the Edge report hours earlier, in one line:
+  `key=TRIGGER(0x56) down ... fg=msedge.exe sessionBefore=False -> recognizer HANDLED it (swallowed).
+  sessionNow=True`. An instrument that answers a recurring question belongs in the product, not in a branch
+  somebody has to remember to deploy.
+- **What the two logs together proved about Edge, and it is the opposite of the obvious diagnosis.** The gesture
+  opens in Edge, swallows the trigger, steps when it is tapped again, commits on the Ctrl release - and *pastes*:
+  `Ctrl up ... fg=msedge.exe` at 08:09:49.624 is followed 131 ms later by `read ... from=msedge.exe` and
+  `skipped: this is our own write, put there in order to paste`. Hook, session, stepping, commit, clipboard write
+  and injected keystroke all work in Edge. **Only the visible overlay is missing**, which rules out the
+  recognizer, the trigger, the hook and the paste in one reading and is not deducible from any of them
+  separately.
+- **Log the INPUTS, not just the answer.** `drawn at (2112,474)` is produced equally by a right answer and by a
+  right answer to a wrong question, so the line carries `fg=`, the foreground rectangle, its extended style,
+  `iconic=` and `caret=` as well. The overlay's own half is read from its HWND - `GetWindowRect`, the real
+  ex-style, `IsWindowVisible` - never from `Window.Left` or `Window.IsVisible`, which are what WPF asked for and
+  WPF's own bookkeeping rather than evidence about the screen. A disagreement between the two *is* the finding.
 
 **`Core` must never reference WPF or Win32, and must never need a message loop.** Win32 access is
 expressed as interfaces in `Core/Abstractions` and implemented in `Interop`. This is the whole reason
