@@ -126,8 +126,30 @@ src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
 tests/PasteJump.Core.Tests      949 tests.
 tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
+tests/PasteJump.OverlaySpike    Is the overlay VISIBLE in every running application? Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
 ```
+
+**`tests/PasteJump.OverlaySpike` is the instrument that settled "I cannot see the overlay", and it is kept because
+the question will be asked again.** It focuses every window on the machine in turn, places the real overlay through
+the real placement code in each of the five positions, and then **photographs that rectangle off the screen and
+compares it against the overlay's own rendering** - which is the only honest witness, since a z-order walk lies and
+the window's own `Left`/`Top` say nothing about what the compositor put in front. Its first run answered in ninety
+seconds what a day of argument could not: every placement visible in every application, all three Edge windows
+included. Four things to know before trusting a run:
+
+- **Launch it from a scheduled task**, never a shell: focusing another application's window needs foreground rights
+  a background process does not have, and the first run reported "no foreground rights" for 14 of 20 windows.
+- **`SetForegroundWindow` alone only works for the process that already owns the foreground**, so it attaches to the
+  foreground thread first - the same `AttachThreadInput` pair `WindowInterop.BringToFrontAndFocus` uses. Without it
+  the sweep focuses one window and is refused for every one after.
+- **The visibility threshold is measured, not chosen.** A plainly visible overlay matched 89% of sampled pixels
+  (antialiased preview text over an arbitrary backdrop, plus DWM's rounding and shadow), so the bar is 60%; the
+  first run used 90% and called every visible overlay hidden.
+- **Its gesture pass is inconclusive unless something opened.** It drives a real Ctrl+V per application and watches
+  for PasteJump's own overlay, cancelling with Escape so nothing is pasted - but injected input can be refused
+  outright, so a run with no successes says the spike could not type, not that PasteJump refused. The report says so
+  itself.
 
 **`Core` must never reference WPF or Win32, and must never need a message loop.** Win32 access is
 expressed as interfaces in `Core/Abstractions` and implemented in `Interop`. This is the whole reason

@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Overlay placement spike. Not shipped, and not a test in the xUnit sense.
+
+    It answers the one question unit tests cannot: for every application actually running on this machine, does
+    PasteJump's overlay end up somewhere a person can SEE? It focuses each window in turn, places the REAL overlay
+    through the REAL placement code in each of the five positions, then photographs that rectangle off the screen
+    and compares it against the overlay's own rendering.
+
+    Written after a day in which "I cannot see the overlay in Edge" resisted every other instrument: the placement
+    rules were provably correct, the unit tests passed, a z-order walk lied, and driving the gesture from a shell
+    was refused. The first run of this settled it in ninety seconds - every placement visible in every application,
+    Edge included.
+
+    Run it from a scheduled task, never from a shell: focusing another application's window needs foreground rights
+    a background process does not have.
+
+      schtasks /Create /TN PJSpike /TR "<exe> <outdir>" /SC ONCE /ST 23:59 /IT /F
+      schtasks /Run /TN PJSpike  &&  schtasks /Delete /TN PJSpike /F
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>PasteJump.OverlaySpike</AssemblyName>
+    <RootNamespace>PasteJump.OverlaySpike</RootNamespace>
+    <StartupObject>PasteJump.OverlaySpike.Program</StartupObject>
+
+    <!-- PasteJump.App is a self-contained win-x64 executable, and NETSDK1151 forbids a non-self-contained
+         executable referencing one. Match it rather than fight it - the same note the UI smoke harness carries. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PasteJump.App\PasteJump.App.csproj" />
+  </ItemGroup>
+
+</Project>
