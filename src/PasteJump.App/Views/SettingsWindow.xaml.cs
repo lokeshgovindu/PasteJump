@@ -997,6 +997,30 @@ public partial class SettingsWindow : Window
         }
     }
 
+    /// <summary>
+    /// Drives the Show Me button for the UI smoke harness and reports where the overlay landed.
+    /// </summary>
+    /// <remarks>
+    /// The harness is the only thing that can cover this button: it needs a real dialog, a real overlay window and
+    /// a layout pass, and its failure mode is silent - a handler that threw, or a preview that appeared off-screen,
+    /// would look exactly like a button nobody had pressed. Returns the rectangle so the check can assert on it
+    /// rather than merely on not having thrown.
+    /// </remarks>
+    internal (bool Visible, double Left, double Top, double Width, double Height) PreviewOverlayForSmokeTest(
+        PopupPosition position)
+    {
+        OverlayPositionCombo.SelectedItem = OverlayPositionChoices
+            .First(c => c.Position == position).Label;
+
+        OnPreviewOverlayClicked(this, new RoutedEventArgs());
+
+        var overlay = _previewOverlay;
+
+        return overlay is null
+            ? (false, 0, 0, 0, 0)
+            : (overlay.IsVisible, overlay.Left, overlay.Top, overlay.ActualWidth, overlay.ActualHeight);
+    }
+
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
     {
         var empty = SearchBox.Text.Length == 0;

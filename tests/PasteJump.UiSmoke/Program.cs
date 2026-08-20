@@ -423,6 +423,7 @@ internal static class Program
                         Drain();
 
                         VerifySearchIndex((SettingsWindow)window);
+                        VerifyOverlayPreviewButton((SettingsWindow)window);
                     });
                 // The dialog with a query in the search box. Its own case because the clear cross and the match
                 // count only exist once there is text, so the empty dialog above proves nothing about either.
@@ -900,6 +901,50 @@ internal static class Program
             else
             {
                 Console.WriteLine($"  overlay placement: {what} at ({overlay.Left:F0},{overlay.Top:F0})");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The Show Me button, which exists so a user can find their own overlay - so it had better appear.
+    /// </summary>
+    /// <remarks>
+    /// Its failure mode is silent: a handler that threw, or a preview that appeared off every screen, looks
+    /// exactly like a button nobody pressed. Checked for two positions with opposite geometry, so a preview that
+    /// ignored the setting entirely would still be caught.
+    /// </remarks>
+    private static void VerifyOverlayPreviewButton(SettingsWindow window)
+    {
+        foreach (var position in new[] { PopupPosition.MousePointer, PopupPosition.BottomRight })
+        {
+            var (visible, left, top, width, height) = window.PreviewOverlayForSmokeTest(position);
+
+            if (!visible || width <= 0 || height <= 0)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  Show Me ({position}) produced no visible overlay");
+                continue;
+            }
+
+            // On some screen, not merely at some coordinates: a preview nobody can see is the bug this button
+            // exists to prevent. The virtual screen spans every monitor, and is in the same device-independent
+            // units the window reports - which is why it is asked here rather than converting anything.
+            var screenLeft = SystemParameters.VirtualScreenLeft;
+            var screenTop = SystemParameters.VirtualScreenTop;
+            var screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
+            var screenBottom = screenTop + SystemParameters.VirtualScreenHeight;
+
+            var onAScreen = left + width > screenLeft && left < screenRight
+                && top + height > screenTop && top < screenBottom;
+
+            if (!onAScreen)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  Show Me ({position}) put the overlay off-screen at ({left:F0},{top:F0})");
+            }
+            else
+            {
+                Console.WriteLine($"  Show Me: {position} at ({left:F0},{top:F0}) {width:F0}x{height:F0}");
             }
         }
     }

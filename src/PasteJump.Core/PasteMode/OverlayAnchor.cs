@@ -147,17 +147,6 @@ public static class OverlayAnchorChooser
             return new OverlayAnchor(point.X, point.Y, OverlayPlacement.BelowPoint);
         }
 
-        // Otherwise, applies whatever the preference: it is not a preference but the difference between being seen
-        // and not. No position on top of the Start menu can be seen, so every remaining mode steps aside from one.
-        if (foregroundIsTopmost && window is { } avoid)
-        {
-            return new OverlayAnchor(
-                avoid.Left + ((avoid.Right - avoid.Left) / 2),
-                avoid.Top + ((avoid.Bottom - avoid.Top) / 2),
-                OverlayPlacement.OutsideWindow,
-                new ScreenBox(avoid.Left, avoid.Top, avoid.Right, avoid.Bottom));
-        }
-
         if (preference == PopupPosition.MousePointer)
         {
             return new OverlayAnchor(cursor.X, cursor.Y, OverlayPlacement.BelowPoint);
@@ -172,10 +161,23 @@ public static class OverlayAnchorChooser
         // already discarded above: a window mid-creation, or anything that has told Windows it occupies nothing.
         if (window is { } target)
         {
-            return new OverlayAnchor(
-                target.Left + ((target.Right - target.Left) / 2),
-                target.Top + ((target.Bottom - target.Top) / 2),
-                OverlayPlacement.CentredOn);
+            var centreX = target.Left + ((target.Right - target.Left) / 2);
+            var centreY = target.Top + ((target.Bottom - target.Top) / 2);
+
+            // The step-aside guards ONLY this path, and that narrowing was a correction. It applies to the two
+            // window-centred modes because being centred on a window we cannot draw above is precisely what leaves
+            // the overlay invisible - the Start menu case. It deliberately does NOT override the pointer, a corner
+            // or a pinned point: those are positions the user named, none of them is inside the window by
+            // construction, and an ordinary always-on-top window can be drawn over perfectly well. An earlier
+            // version applied it to every mode, and the smoke harness caught the result - asking for "at the mouse
+            // pointer" silently produced a corner whenever any topmost window happened to be in front.
+            return foregroundIsTopmost
+                ? new OverlayAnchor(
+                    centreX,
+                    centreY,
+                    OverlayPlacement.OutsideWindow,
+                    new ScreenBox(target.Left, target.Top, target.Right, target.Bottom))
+                : new OverlayAnchor(centreX, centreY, OverlayPlacement.CentredOn);
         }
 
         // Nothing else is known - no caret, no usable window. The pointer is always somewhere.

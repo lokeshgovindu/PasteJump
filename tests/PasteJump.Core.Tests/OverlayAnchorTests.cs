@@ -79,26 +79,41 @@ public class OverlayAnchorTests
     }
 
     /// <summary>
-    /// Not negotiable by preference, because it is not a preference: no position on top of a window Windows draws
-    /// above ours can be seen, so every mode steps aside from one. Only a pinned position overrides it, since that
-    /// is somebody stating exactly where they want it.
+    /// The window-centred modes step aside, because being centred on a window Windows draws above ours is exactly
+    /// what leaves the overlay invisible - the Start menu case.
     /// <para>
-    /// Caretless, which is the real situation - the Start menu exposes none. A caret deliberately still wins for
-    /// the two caret modes, because an ordinary always-on-top window can be drawn over and the caret is a better
+    /// Caretless, which is the real situation: the Start menu exposes none. A caret deliberately still wins for
+    /// the caret modes, because an ordinary always-on-top window can be drawn over and the caret is a better
     /// signal than any fallback; <c>A_caret_still_wins_over_a_topmost_window</c> guards that.
     /// </para>
     /// </summary>
     [Theory]
     [InlineData(PopupPosition.Automatic)]
-    [InlineData(PopupPosition.CaretOrMouse)]
-    [InlineData(PopupPosition.MousePointer)]
     [InlineData(PopupPosition.WindowCentre)]
-    public void Every_mode_steps_aside_from_a_topmost_window(PopupPosition preference)
+    public void The_window_centred_modes_step_aside_from_a_topmost_window(PopupPosition preference)
     {
         var anchor = OverlayAnchorChooser.Choose(null, Window, Mouse, true, preference);
 
         Assert.Equal(OverlayPlacement.OutsideWindow, anchor.Placement);
         Assert.NotNull(anchor.Avoid);
+    }
+
+    /// <summary>
+    /// A position the user named is honoured even over a topmost window, and this is a correction. The rule used to
+    /// apply to every mode, and the smoke harness caught what that meant: choosing "at the mouse pointer" silently
+    /// produced a corner whenever any topmost window happened to be in front. None of these positions is inside
+    /// the window by construction, and an ordinary always-on-top window can be drawn over perfectly well - only
+    /// the shell's own surfaces outrank us, and those are what the window-centred modes are protected from.
+    /// </summary>
+    [Theory]
+    [InlineData(PopupPosition.MousePointer)]
+    [InlineData(PopupPosition.BottomRight)]
+    [InlineData(PopupPosition.CaretOrMouse)]  // with no caret this is the pointer, also a named position
+    public void A_position_the_user_named_is_not_overridden_by_a_topmost_window(PopupPosition preference)
+    {
+        var anchor = OverlayAnchorChooser.Choose(null, Window, Mouse, true, preference);
+
+        Assert.NotEqual(OverlayPlacement.OutsideWindow, anchor.Placement);
     }
 
     [Fact]
@@ -158,7 +173,6 @@ public class OverlayAnchorTests
     /// <summary>Nothing may fall through to an unplaced overlay, whatever the mode and however little is known.</summary>
     [Theory]
     [InlineData(PopupPosition.Automatic)]
-    [InlineData(PopupPosition.CaretOrMouse)]
     [InlineData(PopupPosition.MousePointer)]
     [InlineData(PopupPosition.WindowCentre)]
     [InlineData(PopupPosition.FixedPoint)]
