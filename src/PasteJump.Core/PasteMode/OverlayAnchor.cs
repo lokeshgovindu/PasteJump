@@ -23,6 +23,17 @@ public enum OverlayPlacement
     /// <see cref="OverlayPlacementSolver"/> picks the side.
     /// </summary>
     OutsideWindow,
+
+    /// <summary>
+    /// The bottom-right corner of the work area containing the anchor point. The point itself is only a hint as
+    /// to <i>which monitor</i> - it is not where the window goes.
+    /// </summary>
+    /// <remarks>
+    /// Resolved by the caller rather than here because a work area is a Win32 question, and Core deliberately
+    /// knows nothing about monitors. The hint is the window being worked in when there is one, so the corner is
+    /// the corner of the screen the user is actually looking at rather than of the primary display.
+    /// </remarks>
+    WorkAreaBottomRight,
 }
 
 /// <summary>Where to put the overlay, in physical screen pixels, and how to sit against that point.</summary>
@@ -80,22 +91,22 @@ public static class OverlayAnchorChooser
     /// <see cref="OverlayPlacementSolver"/> for the measurement that established this.
     /// </param>
     /// <param name="preference">
-    /// What the user asked for. <see cref="OverlayPosition.Automatic"/> is the caret-then-window behaviour the
+    /// What the user asked for. <see cref="PopupPosition.Automatic"/> is the caret-then-window behaviour the
     /// rest of this method describes; the others override the fallback, and one overrides the caret as well.
     /// </param>
     /// <param name="fixedPoint">
-    /// The pinned position, for <see cref="OverlayPosition.FixedPoint"/>. Null when either coordinate is unset,
-    /// which degrades to <see cref="OverlayPosition.Automatic"/> rather than anchoring to (0,0).
+    /// The pinned position, for <see cref="PopupPosition.FixedPoint"/>. Null when either coordinate is unset,
+    /// which degrades to <see cref="PopupPosition.Automatic"/> rather than anchoring to (0,0).
     /// </param>
     public static OverlayAnchor Choose(
         (int X, int Y)? caret,
         (int Left, int Top, int Right, int Bottom)? foregroundWindow,
         (int X, int Y) cursor,
         bool foregroundIsTopmost = false,
-        OverlayPosition preference = OverlayPosition.Automatic,
+        PopupPosition preference = PopupPosition.Automatic,
         (int X, int Y)? fixedPoint = null)
     {
-        if (preference == OverlayPosition.FixedPoint)
+        if (preference == PopupPosition.FixedPoint)
         {
             // Honoured absolutely, including over a window Windows draws above ours. Somebody who pins the overlay
             // to a spot has said where they want it, and second-guessing that leaves no way to say "there, always".
@@ -106,19 +117,32 @@ public static class OverlayAnchorChooser
 
             // Degraded to Automatic outright rather than falling through, which would land on the window centre
             // and quietly make "fixed position, unset" mean something different from every other unset setting.
-            preference = OverlayPosition.Automatic;
+            preference = PopupPosition.Automatic;
         }
 
         var window = foregroundWindow is { } rect && rect.Right > rect.Left && rect.Bottom > rect.Top
             ? rect
             : ((int Left, int Top, int Right, int Bottom)?)null;
 
+        // Honoured like a pinned position, and for the same reason: naming a corner is saying where you want it.
+        // The point carried is only a hint as to which monitor - the window being worked in when there is one, so
+        // the corner is on the screen the user is looking at rather than always on the primary display.
+        if (preference == PopupPosition.BottomRight)
+        {
+            var hint = window is { } monitorHint
+                ? (monitorHint.Left + ((monitorHint.Right - monitorHint.Left) / 2),
+                   monitorHint.Top + ((monitorHint.Bottom - monitorHint.Top) / 2))
+                : cursor;
+
+            return new OverlayAnchor(hint.Item1, hint.Item2, OverlayPlacement.WorkAreaBottomRight);
+        }
+
         // The caret is checked BEFORE the topmost rule, and that order matters. An always-on-top editor does have
         // a caret, and the overlay can normally be drawn above an ordinary topmost window - it is only the shell's
         // own surfaces that outrank us. Stepping aside there would move the overlay away from the one signal that
         // is better than any fallback. The Start menu, which is what the topmost rule exists for, exposes no caret
         // anyway, so nothing is lost.
-        if (preference is (OverlayPosition.Automatic or OverlayPosition.CaretOrMouse) && caret is { } point)
+        if (preference is (PopupPosition.Automatic or PopupPosition.CaretOrMouse) && caret is { } point)
         {
             return new OverlayAnchor(point.X, point.Y, OverlayPlacement.BelowPoint);
         }
@@ -134,12 +158,12 @@ public static class OverlayAnchorChooser
                 new ScreenBox(avoid.Left, avoid.Top, avoid.Right, avoid.Bottom));
         }
 
-        if (preference == OverlayPosition.MousePointer)
+        if (preference == PopupPosition.MousePointer)
         {
             return new OverlayAnchor(cursor.X, cursor.Y, OverlayPlacement.BelowPoint);
         }
 
-        if (preference == OverlayPosition.CaretOrMouse)
+        if (preference == PopupPosition.CaretOrMouse)
         {
             return new OverlayAnchor(cursor.X, cursor.Y, OverlayPlacement.BelowPoint);
         }

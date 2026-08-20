@@ -32,7 +32,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
     private int? _overlayX;
     private int? _overlayY;
-    private OverlayPosition _overlayPosition = OverlayPosition.Automatic;
+    private PopupPosition _overlayPosition = PopupPosition.Automatic;
 
     private bool _showKeyHint = true;
     private char _triggerKey = 'V';
@@ -90,7 +90,7 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     /// value taken from one display still lands correctly on a mixed-DPI desktop.
     /// </para>
     /// </summary>
-    public void SetOverlayAnchor(int? x, int? y, OverlayPosition position = OverlayPosition.Automatic)
+    public void SetOverlayAnchor(int? x, int? y, PopupPosition position = PopupPosition.Automatic)
     {
         _overlayX = x;
         _overlayY = y;

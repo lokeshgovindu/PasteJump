@@ -264,7 +264,8 @@ application tells Windows where it is. Most modern ones do not &mdash; see
 <b>Automatically</b> centres it on the window being pasted into, which can never be on another monitor;
 <b>At the text caret, or the pointer</b> is what PasteJump did before, and puts it wherever the mouse was last
 left; <b>At the mouse pointer</b> uses the pointer even when there is a caret; <b>Centred on the window</b>
-ignores the caret entirely; and <b>At a fixed position</b> pins it to the coordinates below. Whatever you
+ignores the caret entirely; <b>In the bottom-right corner</b> puts it where Windows puts its own notifications,
+on the monitor you are working on; and <b>At a fixed position</b> pins it to the coordinates below. Whatever you
 choose, the overlay steps aside from anything Windows draws above it, such as the Start menu &mdash; there is
 no position on top of one that could be seen.</td></tr>
 <tr><td class="name">Fixed Position (x, y)</td><td>Only used when the setting above is
@@ -281,6 +282,11 @@ it is in your fingers.</td></tr>
 recorded, with its duration below &mdash; 1 to 10000 milliseconds, defaulting to 500. That is long enough to
 read the clip count and gone before it is in the way; raise it if you want to read the preview. It
 never takes focus, and it is suppressed while the paste overlay is open.</td></tr>
+<tr><td class="name">Where It Appears</td><td>The same choices as <b>Where the Overlay Appears</b> above,
+because it is the same mechanism. The pointer is the default here and a sound one: a copy is often made with
+the mouse &mdash; select, then <code>Ctrl</code>+<code>C</code> &mdash; so the pointer is where you were
+looking. Choose one of the others if you copy from the keyboard, where the pointer may be anywhere, including
+on another screen. A fixed position uses the same coordinates as the overlay's.</td></tr>
 <tr><td class="name">Beep</td><td>A short tone on each capture, with its pitch and length. Useful when the
 notification is off, or when the copy happened on a monitor you were not looking at.</td></tr>
 </table>

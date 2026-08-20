@@ -16,7 +16,7 @@ namespace PasteJump.Core.Settings;
 /// as the behaviour it already had rather than as whichever member happened to be declared first.
 /// </para>
 /// </remarks>
-public enum OverlayPosition
+public enum PopupPosition
 {
     /// <summary>
     /// Beside the text caret when the application exposes one, otherwise centred on the window being pasted into.
@@ -43,6 +43,17 @@ public enum OverlayPosition
 
     /// <summary>Always centred on the window being pasted into, ignoring the caret.</summary>
     WindowCentre,
+
+    /// <summary>
+    /// The bottom-right of the work area, on the monitor being worked on - where Windows puts its own
+    /// notifications, and therefore where people already look for one.
+    /// </summary>
+    /// <remarks>
+    /// Offered for the copy notification above all, which is the case that most resembles a system notification.
+    /// It is offered for the overlay too, because there is no reason to forbid it and somebody who wants their
+    /// clipboard picker to stay in one predictable corner should be able to say so.
+    /// </remarks>
+    BottomRight,
 
     /// <summary>
     /// At the fixed screen position given by <c>OverlayX</c> and <c>OverlayY</c>.

@@ -999,6 +999,17 @@
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Between 1 and 10000 milliseconds. 500 is long enough to read the clip count and gone before it is in the way; raise it if you want to read the preview." />
 
+                        <Grid Style="{StaticResource SettingRow}" Margin="23,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="260" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Where It Appears" />
+                            <ComboBox x:Name="CopyNotificationPositionCombo" Grid.Column="1" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="The same choices as the paste overlay, above in Paste Overlay — it is the same mechanism. The pointer is the default here, and a sound default: a copy is often made with the mouse, so the pointer is where you were looking. Choose one of the others if you copy from the keyboard, where the pointer may be anywhere, including on another screen. A fixed position uses the same coordinates as the overlay's." />
+
                         <CheckBox x:Name="BeepOnCopyCheck" Content="Beep" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Margin="23,3,0,4"

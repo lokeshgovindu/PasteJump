@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 997 in Debug (`dotnet test`) - 944 in Core.Tests, 53 in Interop.Tests; **995 in Release**, see below |
+| Tests | 1000 in Debug (`dotnet test`) - 947 in Core.Tests, 53 in Interop.Tests; **998 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -123,7 +123,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      944 tests.
+tests/PasteJump.Core.Tests      947 tests.
 tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -662,7 +662,7 @@ that immediately caught two real bugs. Expect to do the same again.
   dialog and pressing OK), or no control at all (JSON-only). Values are generated per property, so a new setting is
   covered the moment it is added; only the few that cannot take arbitrary text are special-cased, and getting one of
   those wrong shows up as a false failure — `DefaultFormatterId` is `plain`, not `plaintext`, which the check caught.
-  **62 settings, 0 lost.** Advanced stays read-only, deliberately: one place to edit each setting is what stops two
+  **63 settings, 0 lost.** Advanced stays read-only, deliberately: one place to edit each setting is what stops two
   editors disagreeing. **Composite settings are broken out into child rows** - the 14 paste-mode key bindings, each
   per-application delay, each excluded program - because one row reading `back=C;newest=A;search=F;pin=P;join=J;…` in
   a narrow column does not answer "what are my keys". Children carry `CanReset = false`: resetting one would mean
@@ -737,6 +737,20 @@ that immediately caught two real bugs. Expect to do the same again.
 - **The overlay must never take focus.** `WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW`
   applied in code, not just the XAML flags. Focus theft sends the user's paste into our overlay.
   Search input therefore arrives through the hook, not a focused text box.
+- **The copy notification shares the overlay's placement mechanism (`CopyNotificationPosition`, 2026-08-20), and
+  its default deliberately differs.** Asked as "can we use the same mechanism while copying?" - and the same
+  invisibility does apply, because a keyboard-driven copy leaves the pointer wherever it was. Three decisions:
+  - **It is a SEPARATE setting, not the overlay's.** The two events have different natural anchors: a copy is
+    often made with the mouse - select, then Ctrl+C - so the pointer genuinely is where the user was looking,
+    which is the reasoning already recorded for `GetCursorPosition`. Sharing one setting would force one answer
+    onto both.
+  - **The copy toast still defaults to `MousePointer`**, so nothing moves for anyone who never opens the setting.
+    Reversing a documented decision silently would be worse than leaving the choice unmade.
+  - **`AnchoredPlacement` is where the arithmetic lives now**, used by both windows. The toast previously had its
+    own cursor-relative placement with its own edge clamping, which is exactly the duplication that drifts the
+    first time either is fixed. `PopupPosition` is the enum's name for the same reason - it stopped being
+    overlay-specific the moment the toast used it, and it gained `BottomRight`, which only makes sense once a
+    notification is a client.
 - **Where the overlay goes is a setting now (`OverlayPosition`, 2026-08-20), and the shape of the choice matters.**
   Asked for as "one setting where to display the paste overlay" once the placement work had landed. Five options:
   `Automatic` (caret, else the window being pasted into), `CaretOrMouse` (the pre-2026-08-19 behaviour, kept as a
@@ -1149,7 +1163,7 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   - **`OverlayDeletedFlashMs` is Advanced-only, by request - which means `TryBuild` must CARRY it.** That method
     starts from `new PasteJumpSettings()` and writes each field from its control, so a setting with no control
     anywhere silently reverts to its default on every OK. `VerifyEverySettingHasAControl` is what catches that (it
-    round-trips every property: 62 checked, 0 lost). Any future tab-less setting needs the same one-line copy.
+    round-trips every property: 63 checked, 0 lost). Any future tab-less setting needs the same one-line copy.
   - **So `_pasteSuppressedByDelete` is independent of `CommitMode`**, which keeps `X` entirely the user's: the mode
     only ever shows what they chose. Moving the cursor (`ChoosingAgain`: step, jump, digit, search, kind filter)
     lifts the suppression, so "delete this, paste that" still works in one gesture.
@@ -1820,8 +1834,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   which is precisely why Pause and Disable were reported as being the same command.
 - **An off state's toggle is bold in the tray menu (2026-08-15), and the menu is the one place that must not use
   the disabled-beats-paused precedence.** Asked for, and the reason it is needed is that the menu is opened by
-dotnet test                                         # 997 tests (Debug)
-dotnet test -c Release                              # 995 - what CI runs, and it is not the same set
+dotnet test                                         # 1000 tests (Debug)
+dotnet test -c Release                              # 998 - what CI runs, and it is not the same set
   the way out of it. **Both are bold when both apply** — a paused-then-disabled PasteJump genuinely has two things
   to switch back on, and picking one would hide the other, unlike `ApplyTrayIcon` and `BuildTrayTooltip` which have
   to choose a single answer. Note the signal is now shared with About, which is `Emphasised` by request; if a third
@@ -1849,8 +1863,8 @@ dotnet test -c Release                              # 995 - what CI runs, and it
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 997 tests (Debug)
-dotnet test -c Release                              # 995 - what CI runs, and it is not the same set
+dotnet test                                         # 1000 tests (Debug)
+dotnet test -c Release                              # 998 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

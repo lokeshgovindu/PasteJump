@@ -4,6 +4,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using PasteJump.App.Services;
+using PasteJump.Core.PasteMode;
 
 namespace PasteJump.App.Views;
 
@@ -82,6 +83,19 @@ public partial class ToastWindow : Window
         => Notify(headline, detail, duration, placement, detailIsProse: false);
 
     /// <summary>
+    /// As above, but placed by an <see cref="OverlayAnchor"/> - the same mechanism the paste overlay uses, so the
+    /// copy notification can honour the same choice of position.
+    /// </summary>
+    /// <remarks>
+    /// The two windows share <see cref="AnchoredPlacement"/> rather than each doing the arithmetic, which is the
+    /// point of routing the toast through an anchor at all: this one used to be hard-wired beside the mouse
+    /// pointer, with its own edge clamping, and would have drifted from the overlay the first time either was
+    /// fixed.
+    /// </remarks>
+    public void Notify(string headline, string? detail, TimeSpan duration, OverlayAnchor anchor)
+        => Notify(headline, detail, duration, ToastPlacement.NearCursor, detailIsProse: false, anchor);
+
+    /// <summary>
     /// As above, with control over how the detail line is set.
     /// <para>
     /// <paramref name="detailIsProse"/> switches it from Consolas to the UI font. The monospace default is
@@ -94,7 +108,8 @@ public partial class ToastWindow : Window
         string? detail,
         TimeSpan duration,
         ToastPlacement placement,
-        bool detailIsProse)
+        bool detailIsProse,
+        OverlayAnchor? anchor = null)
     {
         // Set on every call, not just when prose is asked for: this window is reused for every notification,
         // so a font left behind by the previous one would follow the next clip preview.
@@ -140,7 +155,12 @@ public partial class ToastWindow : Window
         // and clamping against a stale size puts the window partly off-screen.
         UpdateLayout();
 
-        if (placement == ToastPlacement.BottomRight)
+        if (anchor is { } placeAt)
+        {
+            // The user's chosen position, resolved by the same helper the overlay uses.
+            AnchoredPlacement.Apply(this, placeAt, fallbackWidth: 260, fallbackHeight: 60);
+        }
+        else if (placement == ToastPlacement.BottomRight)
         {
             PositionInBottomCorner();
         }

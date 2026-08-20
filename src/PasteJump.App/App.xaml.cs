@@ -725,7 +725,24 @@ public partial class App : Application
         Toast().Notify(
             total == 1 ? "Copied - 1 clip" : $"Copied - {total} clips",
             ToastDetail(clip),
-            TimeSpan.FromMilliseconds(_settings.CopyNotificationMs));
+            TimeSpan.FromMilliseconds(_settings.CopyNotificationMs),
+            CopyNotificationAnchor());
+    }
+
+    /// <summary>
+    /// Where the copy notification goes, resolved the same way the overlay's position is.
+    /// </summary>
+    /// <remarks>
+    /// Read at the moment of the copy rather than cached, for the reason the paste settle delay is: the caret, the
+    /// window in front and the pointer are all different by the next copy, and that is the whole point of asking.
+    /// </remarks>
+    private OverlayAnchor CopyNotificationAnchor()
+    {
+        var pinned = _settings.OverlayX is { } x && _settings.OverlayY is { } y
+            ? (x, y)
+            : ((int X, int Y)?)null;
+
+        return ForegroundWindowInfo.GetPreferredOverlayAnchor(_settings.CopyNotificationPosition, pinned);
     }
 
     /// <summary>
@@ -817,7 +834,8 @@ public partial class App : Application
         Toast().Notify(
             total == 1 ? "Copied - 1 clip" : $"Copied - {total} clips",
             "Same as the last copy, so not added again",
-            TimeSpan.FromMilliseconds(_settings.CopyNotificationMs));
+            TimeSpan.FromMilliseconds(_settings.CopyNotificationMs),
+            CopyNotificationAnchor());
     }
 
     private void OnTransientMessage(string message)

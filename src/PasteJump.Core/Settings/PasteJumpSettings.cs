@@ -230,14 +230,26 @@ public sealed class PasteJumpSettings
     public string PasteModeKeys { get; set; } = PasteMode.PasteKeyMap.Default.ToSettingsString();
 
     /// <summary>
-    /// Where the paste overlay is put on screen. See <see cref="Settings.OverlayPosition"/> for the options and
+    /// Where the paste overlay is put on screen. See <see cref="Settings.PopupPosition"/> for the options and
     /// why the second choice is a matter of taste rather than of correctness.
     /// </summary>
-    public OverlayPosition OverlayPosition { get; set; } = OverlayPosition.Automatic;
+    public PopupPosition OverlayPosition { get; set; } = PopupPosition.Automatic;
 
     /// <summary>
-    /// Fixed overlay position in physical pixels, used when <see cref="OverlayPosition"/> is
-    /// <see cref="Settings.OverlayPosition.FixedPoint"/>.
+    /// Where the copy notification is put on screen, using the same mechanism as <see cref="OverlayPosition"/>.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to the mouse pointer, which is what it has always done and is defensible in its own right: a copy
+    /// is often made with the mouse - select, then Ctrl+C - so the pointer genuinely is where the user is looking,
+    /// and Clipjump anchored its equivalent tooltip there too. Kept as a separate setting from the overlay for
+    /// that reason, rather than sharing one. The same invisibility does apply to a keyboard-driven copy, which is
+    /// why the choice now exists at all.
+    /// </remarks>
+    public PopupPosition CopyNotificationPosition { get; set; } = PopupPosition.MousePointer;
+
+    /// <summary>
+    /// Fixed overlay position in physical pixels, used when <see cref="PopupPosition"/> is
+    /// <see cref="Settings.PopupPosition.FixedPoint"/>.
     /// <para>
     /// Both halves must be set for either to apply: half a position would move the overlay in one axis and
     /// track the caret in the other, which reads as a bug rather than as a setting. <see cref="Normalise"/>

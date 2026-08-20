@@ -535,57 +535,7 @@ public partial class OverlayWindow : Window
     /// </para>
     /// </summary>
     private void Position(OverlayAnchor anchor)
-    {
-        var scale = WindowInterop.GetScaleForPoint(anchor.X, anchor.Y);
-
-        var bounds = WindowInterop.GetWorkAreaForPoint(anchor.X, anchor.Y, scale);
-
-        var width = ActualWidth > 0 ? ActualWidth : 360;
-        var height = ActualHeight > 0 ? ActualHeight : 140;
-
-        // Beside a window we cannot draw above. Solved in Core against the work area, then returned already
-        // clamped - so it skips the edge handling below, which exists for the point-anchored cases and would
-        // happily push the overlay back onto the very window it was told to avoid.
-        if (anchor.Placement == OverlayPlacement.OutsideWindow && anchor.Avoid is { } avoid)
-        {
-            var (besideLeft, besideTop) = OverlayPlacementSolver.Beside(
-                new ScreenBox(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom),
-                new ScreenBox(avoid.Left / scale, avoid.Top / scale, avoid.Right / scale, avoid.Bottom / scale),
-                width,
-                height);
-
-            Left = WindowInterop.SnapToDevicePixel(besideLeft, scale);
-            Top = WindowInterop.SnapToDevicePixel(besideTop, scale);
-
-            return;
-        }
-
-        var centred = anchor.Placement == OverlayPlacement.CentredOn;
-
-        var desiredLeft = centred ? (anchor.X / scale) - (width / 2) : (anchor.X / scale) + 4;
-        var desiredTop = centred ? (anchor.Y / scale) - (height / 2) : (anchor.Y / scale) + 20;
-
-        if (desiredLeft + width > bounds.Right)
-        {
-            desiredLeft = bounds.Right - width - 4;
-        }
-
-        if (desiredTop + height > bounds.Bottom)
-        {
-            // Flip above the caret rather than clamping to the bottom edge, so the overlay does
-            // not cover the line the user is typing on. Nothing to avoid when centred on a window, where
-            // flipping would move the overlay a whole window-height away from where it was asked to be.
-            desiredTop = centred
-                ? bounds.Bottom - height - 4
-                : (anchor.Y / scale) - height - 6;
-        }
-
-        // Snapped to whole device pixels. Everything above divides physical pixels by the scale factor, so
-        // at 150% the result routinely lands on a half pixel and WPF renders the whole window - text
-        // included - visibly soft.
-        Left = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Left, desiredLeft), scale);
-        Top = WindowInterop.SnapToDevicePixel(Math.Max(bounds.Top, desiredTop), scale);
-    }
+        => AnchoredPlacement.Apply(this, anchor, fallbackWidth: 360, fallbackHeight: 140);
 
     /// <summary>
     /// The largest <c>FontSize</c> any text in the overlay actually draws at. UI smoke harness only.

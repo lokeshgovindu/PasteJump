@@ -174,7 +174,9 @@ Note that this does not divide neatly into old and new: **ConEmu exposes a caret
 >
 > **The Start menu is a third case.** Windows draws it above every ordinary window, PasteJump's overlay included, so there is no position on top of it that you could see. The overlay steps aside to a corner of the screen instead. The same applies to anything else Windows keeps above other windows, and to an application you have pinned always-on-top — PasteJump would rather sit beside a window you deliberately pinned than cover it.
 
-**All of that is the default, and you can choose differently.** [Settings, Appearance, Where the Overlay Appears](settings.md) offers five answers: automatically as described above; at the caret with the *pointer* as the fallback, which is what PasteJump did before; always at the pointer; always centred on the window; or pinned to a fixed position of your own. Only the pinned one overrides the Start menu rule, on the grounds that somebody who names a spot has said what they want.
+**All of that is the default, and you can choose differently.** [Settings, Appearance, Where the Overlay Appears](settings.md) offers six answers: automatically as described above; at the caret with the *pointer* as the fallback, which is what PasteJump did before; always at the pointer; always centred on the window; in the bottom-right corner, where Windows puts its own notifications; or pinned to a fixed position of your own. Only the pinned position and the corner override the Start menu rule, on the grounds that somebody who names a place has said what they want.
+
+**The copy notification uses the same mechanism**, chosen separately under [Settings, Appearance, Show a Brief Notification](settings.md). It stays at the mouse pointer by default, which is a sound default in its own right — a copy is often made with the mouse, so the pointer is where you were looking — but the same problem applies to a copy made from the keyboard, and now the same answers do too.
 
 ## What the overlay shows
 

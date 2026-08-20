@@ -21,11 +21,11 @@ public class OverlayAnchorTests
     {
         Assert.Equal(
             new OverlayAnchor(400, 300, OverlayPlacement.BelowPoint),
-            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.Automatic));
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, PopupPosition.Automatic));
 
         Assert.Equal(
             new OverlayAnchor(960, 540, OverlayPlacement.CentredOn),
-            OverlayAnchorChooser.Choose(null, Window, Mouse, false, OverlayPosition.Automatic));
+            OverlayAnchorChooser.Choose(null, Window, Mouse, false, PopupPosition.Automatic));
     }
 
     /// <summary>PasteJump's behaviour before 2026-08-19, kept as a choice rather than deleted.</summary>
@@ -34,11 +34,11 @@ public class OverlayAnchorTests
     {
         Assert.Equal(
             new OverlayAnchor(400, 300, OverlayPlacement.BelowPoint),
-            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.CaretOrMouse));
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, PopupPosition.CaretOrMouse));
 
         Assert.Equal(
             new OverlayAnchor(1500, 900, OverlayPlacement.BelowPoint),
-            OverlayAnchorChooser.Choose(null, Window, Mouse, false, OverlayPosition.CaretOrMouse));
+            OverlayAnchorChooser.Choose(null, Window, Mouse, false, PopupPosition.CaretOrMouse));
     }
 
     /// <summary>The one option that overrides the caret as well as the fallback.</summary>
@@ -47,7 +47,7 @@ public class OverlayAnchorTests
     {
         Assert.Equal(
             new OverlayAnchor(1500, 900, OverlayPlacement.BelowPoint),
-            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.MousePointer));
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, PopupPosition.MousePointer));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class OverlayAnchorTests
     {
         Assert.Equal(
             new OverlayAnchor(960, 540, OverlayPlacement.CentredOn),
-            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.WindowCentre));
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, PopupPosition.WindowCentre));
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class OverlayAnchorTests
     {
         Assert.Equal(
             new OverlayAnchor(50, 60, OverlayPlacement.BelowPoint),
-            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.FixedPoint, (50, 60)));
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, PopupPosition.FixedPoint, (50, 60)));
     }
 
     /// <summary>
@@ -75,7 +75,7 @@ public class OverlayAnchorTests
     {
         Assert.Equal(
             new OverlayAnchor(400, 300, OverlayPlacement.BelowPoint),
-            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, OverlayPosition.FixedPoint));
+            OverlayAnchorChooser.Choose(Caret, Window, Mouse, false, PopupPosition.FixedPoint));
     }
 
     /// <summary>
@@ -89,11 +89,11 @@ public class OverlayAnchorTests
     /// </para>
     /// </summary>
     [Theory]
-    [InlineData(OverlayPosition.Automatic)]
-    [InlineData(OverlayPosition.CaretOrMouse)]
-    [InlineData(OverlayPosition.MousePointer)]
-    [InlineData(OverlayPosition.WindowCentre)]
-    public void Every_mode_steps_aside_from_a_topmost_window(OverlayPosition preference)
+    [InlineData(PopupPosition.Automatic)]
+    [InlineData(PopupPosition.CaretOrMouse)]
+    [InlineData(PopupPosition.MousePointer)]
+    [InlineData(PopupPosition.WindowCentre)]
+    public void Every_mode_steps_aside_from_a_topmost_window(PopupPosition preference)
     {
         var anchor = OverlayAnchorChooser.Choose(null, Window, Mouse, true, preference);
 
@@ -104,27 +104,65 @@ public class OverlayAnchorTests
     [Fact]
     public void A_pinned_position_is_honoured_even_over_a_topmost_window()
     {
-        var anchor = OverlayAnchorChooser.Choose(Caret, Window, Mouse, true, OverlayPosition.FixedPoint, (7, 9));
+        var anchor = OverlayAnchorChooser.Choose(Caret, Window, Mouse, true, PopupPosition.FixedPoint, (7, 9));
 
         Assert.Equal(new OverlayAnchor(7, 9, OverlayPlacement.BelowPoint), anchor);
+    }
+
+    /// <summary>
+    /// The corner is honoured like a pinned position, and carries only a monitor hint - the window being worked
+    /// in, so the corner is on the screen the user is looking at rather than always the primary display.
+    /// </summary>
+    [Fact]
+    public void BottomRight_returns_a_corner_placement_hinted_at_the_right_monitor()
+    {
+        var onSecondMonitor = (1920, 0, 3840, 1080);
+
+        var anchor = OverlayAnchorChooser.Choose(Caret, onSecondMonitor, Mouse, false, PopupPosition.BottomRight);
+
+        Assert.Equal(OverlayPlacement.WorkAreaBottomRight, anchor.Placement);
+        Assert.InRange(anchor.X, 1920, 3840);
+    }
+
+    [Fact]
+    public void BottomRight_falls_back_to_the_pointer_as_its_monitor_hint()
+    {
+        var anchor = OverlayAnchorChooser.Choose(null, null, Mouse, false, PopupPosition.BottomRight);
+
+        Assert.Equal(OverlayPlacement.WorkAreaBottomRight, anchor.Placement);
+        Assert.Equal(Mouse.X, anchor.X);
+    }
+
+    /// <summary>
+    /// The copy notification keeps the mouse as its default, unlike the overlay. A copy is often made with the
+    /// mouse - select, then Ctrl+C - so the pointer genuinely is where the user was looking, and that documented
+    /// decision is not reversed by adding the choice.
+    /// </summary>
+    [Fact]
+    public void The_copy_notification_still_defaults_to_the_pointer()
+    {
+        var settings = new PasteJumpSettings();
+
+        Assert.Equal(PopupPosition.MousePointer, settings.CopyNotificationPosition);
+        Assert.Equal(PopupPosition.Automatic, settings.OverlayPosition);
     }
 
     /// <summary>Automatic is the zero value, so a file written before this setting existed reads as it behaved.</summary>
     [Fact]
     public void Automatic_is_the_default_and_the_zero_value()
     {
-        Assert.Equal(OverlayPosition.Automatic, default(OverlayPosition));
-        Assert.Equal(OverlayPosition.Automatic, new PasteJumpSettings().OverlayPosition);
+        Assert.Equal(PopupPosition.Automatic, default(PopupPosition));
+        Assert.Equal(PopupPosition.Automatic, new PasteJumpSettings().OverlayPosition);
     }
 
     /// <summary>Nothing may fall through to an unplaced overlay, whatever the mode and however little is known.</summary>
     [Theory]
-    [InlineData(OverlayPosition.Automatic)]
-    [InlineData(OverlayPosition.CaretOrMouse)]
-    [InlineData(OverlayPosition.MousePointer)]
-    [InlineData(OverlayPosition.WindowCentre)]
-    [InlineData(OverlayPosition.FixedPoint)]
-    public void Every_mode_still_places_the_overlay_when_nothing_is_known(OverlayPosition preference)
+    [InlineData(PopupPosition.Automatic)]
+    [InlineData(PopupPosition.CaretOrMouse)]
+    [InlineData(PopupPosition.MousePointer)]
+    [InlineData(PopupPosition.WindowCentre)]
+    [InlineData(PopupPosition.FixedPoint)]
+    public void Every_mode_still_places_the_overlay_when_nothing_is_known(PopupPosition preference)
     {
         var anchor = OverlayAnchorChooser.Choose(null, null, Mouse, false, preference);
 

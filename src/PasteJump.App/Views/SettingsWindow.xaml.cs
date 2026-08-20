@@ -70,14 +70,22 @@ public partial class SettingsWindow : Window
     /// Where the paste overlay goes. Worded as answers to "where should it appear", so the list reads without the
     /// label above it, and ordered with the two caret-first choices together at the top.
     /// </summary>
-    private static readonly (OverlayPosition Position, string Label)[] OverlayPositionChoices =
+    private static readonly (PopupPosition Position, string Label)[] OverlayPositionChoices =
     [
-        (OverlayPosition.Automatic, "Automatically (recommended)"),
-        (OverlayPosition.CaretOrMouse, "At the text caret, or the pointer"),
-        (OverlayPosition.MousePointer, "At the mouse pointer"),
-        (OverlayPosition.WindowCentre, "Centred on the window"),
-        (OverlayPosition.FixedPoint, "At a fixed position"),
+        (PopupPosition.Automatic, "Automatically (recommended)"),
+        (PopupPosition.CaretOrMouse, "At the text caret, or the pointer"),
+        (PopupPosition.MousePointer, "At the mouse pointer"),
+        (PopupPosition.WindowCentre, "Centred on the window"),
+        (PopupPosition.BottomRight, "In the bottom-right corner"),
+        (PopupPosition.FixedPoint, "At a fixed position"),
     ];
+
+    /// <summary>
+    /// Where the copy notification goes. The same list as the overlay's, deliberately - it is the same mechanism,
+    /// and offering a different set would imply a difference that does not exist. Only the default differs.
+    /// </summary>
+    private static readonly (PopupPosition Position, string Label)[] CopyNotificationPositionChoices =
+        OverlayPositionChoices;
 
     /// <summary>Density options, labelled as Outlook and Explorer label them.</summary>
     private static readonly (GridDensity Density, string Label)[] DensityChoices =
@@ -386,6 +394,11 @@ public partial class SettingsWindow : Window
             OverlayPositionCombo.Items.Add(choice.Label);
         }
 
+        foreach (var choice in CopyNotificationPositionChoices)
+        {
+            CopyNotificationPositionCombo.Items.Add(choice.Label);
+        }
+
         foreach (var choice in DensityChoices)
         {
             DensityCombo.Items.Add(choice.Label);
@@ -522,6 +535,9 @@ public partial class SettingsWindow : Window
         // would make the top-left corner unreachable.
         OverlayPositionCombo.SelectedItem = OverlayPositionChoices
             .First(c => c.Position == source.OverlayPosition).Label;
+
+        CopyNotificationPositionCombo.SelectedItem = CopyNotificationPositionChoices
+            .First(c => c.Position == source.CopyNotificationPosition).Label;
 
         OverlayXBox.Text = source.OverlayX?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
         OverlayYBox.Text = source.OverlayY?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
@@ -2098,6 +2114,7 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.ShowOverlayPinned)] = "Appearance",
         [nameof(PasteJumpSettings.ShowCopyNotification)] = "Appearance",
         [nameof(PasteJumpSettings.CopyNotificationMs)] = "Appearance",
+        [nameof(PasteJumpSettings.CopyNotificationPosition)] = "Appearance",
         [nameof(PasteJumpSettings.BeepOnCopy)] = "Appearance",
         [nameof(PasteJumpSettings.BeepFrequencyHz)] = "Appearance",
         [nameof(PasteJumpSettings.BeepDurationMs)] = "Appearance",
@@ -2546,6 +2563,11 @@ public partial class SettingsWindow : Window
         var overlayPositionLabel = OverlayPositionCombo.SelectedItem as string;
         settings.OverlayPosition = OverlayPositionChoices
             .FirstOrDefault(c => string.Equals(c.Label, overlayPositionLabel, StringComparison.Ordinal))
+            .Position;
+
+        var copyPositionLabel = CopyNotificationPositionCombo.SelectedItem as string;
+        settings.CopyNotificationPosition = CopyNotificationPositionChoices
+            .FirstOrDefault(c => string.Equals(c.Label, copyPositionLabel, StringComparison.Ordinal))
             .Position;
 
         var trayLabel = TrayLeftClickCombo.SelectedItem as string;

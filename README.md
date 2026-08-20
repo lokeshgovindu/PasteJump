@@ -278,7 +278,7 @@ screen.
 could be seen; the overlay steps aside to a corner. The same goes for any window you have pinned always-on-top —
 PasteJump would rather sit beside it than cover it.
 
-All of that is the default. **Settings → Appearance → Where the Overlay Appears** offers five answers:
+All of that is the default. **Settings → Appearance → Where the Overlay Appears** offers six answers:
 
 | Choice | Where the overlay goes |
 |---|---|
@@ -286,9 +286,16 @@ All of that is the default. **Settings → Appearance → Where the Overlay Appe
 | At the text caret, or the pointer | Beside the caret; else at the pointer — what PasteJump did before |
 | At the mouse pointer | Always at the pointer, caret or not |
 | Centred on the window | Always centred on the target window |
+| In the bottom-right corner | Where Windows puts its own notifications, on the monitor you are working on |
 | At a fixed position | Pinned to `OverlayX`/`OverlayY`; falls back to Automatic if either is empty |
 
-Only the pinned choice overrides the Start menu rule, on the grounds that naming a spot is saying what you want.
+Only the pinned choice and the corner override the Start menu rule, on the grounds that naming a place is saying
+what you want.
+
+**The copy notification uses the same mechanism**, under *Settings → Appearance → Show a Brief Notification →
+Where It Appears*. Its default stays **at the mouse pointer**, which is what it has always done and is defensible
+on its own: a copy is often made with the mouse — select, then Ctrl+C — so the pointer is where you were looking.
+Change it if you copy from the keyboard, where the pointer may be on another screen entirely.
 
 ---
 

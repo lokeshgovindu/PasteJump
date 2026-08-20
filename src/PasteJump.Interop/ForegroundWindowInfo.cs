@@ -70,10 +70,10 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
     /// minutes ago. <see cref="OverlayAnchorChooser"/> owns the order and the reasoning.
     /// </para>
     /// </summary>
-    /// <param name="preference">What the user asked for. See <see cref="OverlayPosition"/>.</param>
+    /// <param name="preference">What the user asked for. See <see cref="PopupPosition"/>.</param>
     /// <param name="fixedPoint">The pinned position, when both coordinates are set. Null degrades to Automatic.</param>
     public static OverlayAnchor GetPreferredOverlayAnchor(
-        OverlayPosition preference = OverlayPosition.Automatic,
+        PopupPosition preference = PopupPosition.Automatic,
         (int X, int Y)? fixedPoint = null)
     {
         var hwnd = NativeMethods.GetForegroundWindow();
