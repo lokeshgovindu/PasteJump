@@ -845,9 +845,21 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="260" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Where the Overlay Appears" />
                             <ComboBox x:Name="OverlayPositionCombo" Grid.Column="1" />
+                            <!--
+                                A real overlay, at the position currently selected, for two seconds. This exists
+                                because "I cannot see the overlay" cannot be answered by argument: whether it
+                                lands somewhere you are looking depends on your monitors, your window layout and
+                                which applications report a caret, none of which anybody can reason about for you.
+                                One click shows you, and the combo beside it lets you move it until it is right.
+                            -->
+                            <Button x:Name="OverlayPreviewButton" Grid.Column="2" Content="Show _Me"
+                                    Margin="8,0,0,0" Padding="12,0" MinWidth="0"
+                                    ToolTip="Show the overlay now, where this setting puts it"
+                                    Click="OnPreviewOverlayClicked" />
                         </Grid>
                         <TextBlock Style="{StaticResource SettingHelp}"
                                    Text="The overlay follows the text caret when the application tells Windows where it is. Most modern ones do not — every browser, Electron, Visual Studio, Windows Terminal — and this chooses what happens then. Automatic centres it on the window you are pasting into, which can never be on another monitor; the pointer is the alternative, and is wherever you last left it. Whatever you choose, the overlay steps aside from anything Windows draws above it, such as the Start menu, because no position on top of one can be seen." />

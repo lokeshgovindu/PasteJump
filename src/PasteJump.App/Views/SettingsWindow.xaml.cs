@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using PasteJump.App.Services;
@@ -904,6 +905,96 @@ public partial class SettingsWindow : Window
     {
         AdvancedFilterBox.Clear();
         AdvancedFilterBox.Focus();
+    }
+
+    private OverlayWindow? _previewOverlay;
+    private DispatcherTimer? _previewTimer;
+
+    /// <summary>
+    /// Shows a real overlay, at the position the combo currently says, for two seconds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The answer to a class of report that argument cannot settle. "I cannot see the paste overlay" was raised
+    /// three times in one day with three different causes, and every round went on establishing where the thing
+    /// had actually gone - a question that depends on the user's monitors, their window layout and which of their
+    /// applications report a caret to Windows. None of that is knowable from outside their machine, and all of it
+    /// is obvious the moment they can see the overlay and move it.
+    /// </para>
+    /// <para>
+    /// A real <see cref="OverlayWindow"/> through the real placement code, not a mock-up: a preview that agreed
+    /// with a diagram rather than with the application would be worse than none. It reads the pending values
+    /// rather than the saved ones, so the effect of a choice is visible before OK - the same principle as the
+    /// live theme preview.
+    /// </para>
+    /// <para>
+    /// It centres on <i>this</i> window when the choice is window-relative, because this is the window in front.
+    /// That is honest rather than misleading: it demonstrates the rule, and the label says "show me" rather than
+    /// promising where a future paste will land.
+    /// </para>
+    /// </remarks>
+    private void OnPreviewOverlayClicked(object sender, RoutedEventArgs e)
+    {
+        var position = OverlayPositionChoices
+            .FirstOrDefault(c => string.Equals(c.Label, OverlayPositionCombo.SelectedItem as string, StringComparison.Ordinal))
+            .Position;
+
+        var pinned = TryParseOptionalCoordinate(OverlayXBox.Text, out var x)
+            && TryParseOptionalCoordinate(OverlayYBox.Text, out var y)
+            && x is { } px && y is { } py
+                ? (px, py)
+                : ((int X, int Y)?)null;
+
+        _previewOverlay ??= new OverlayWindow();
+
+        // The pending font and preview size, so the preview looks like what a gesture would draw rather than like
+        // the defaults.
+        _previewOverlay.ApplyFont(
+            OverlayFontFamilyCombo.SelectedItem as string,
+            int.TryParse(OverlayFontSizeBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var size)
+                ? size
+                : 12);
+
+        _previewOverlay.ApplyKeyHint(ShowKeyHintCheck.IsChecked == true, triggerKey: 'V');
+
+        var anchor = PasteJump.Interop.ForegroundWindowInfo.GetPreferredOverlayAnchor(position, pinned);
+
+        if (!_previewOverlay.IsVisible)
+        {
+            _previewOverlay.Show();
+        }
+
+        _previewOverlay.Render(
+            new PasteOverlayModel
+            {
+                Position = 1,
+                Total = 1,
+                Kind = Core.Model.ClipKind.Text,
+                PreviewText = "This is where the overlay appears.",
+                Pinned = false,
+                FormatterName = "Original",
+                CommitMode = PasteCommitMode.Paste,
+                IsSearching = false,
+                MatchCount = 1,
+                PopOnPaste = false,
+                IsEmpty = false,
+            },
+            anchor);
+
+        // Restarted rather than stacked, so clicking twice does not leave a timer that hides the second preview
+        // early - the same reasoning as the DELETED chip's generation counter.
+        _previewTimer ??= new DispatcherTimer(DispatcherPriority.Normal, Dispatcher);
+        _previewTimer.Stop();
+        _previewTimer.Interval = TimeSpan.FromSeconds(2);
+        _previewTimer.Tick -= HidePreview;
+        _previewTimer.Tick += HidePreview;
+        _previewTimer.Start();
+
+        void HidePreview(object? _, EventArgs __)
+        {
+            _previewTimer?.Stop();
+            _previewOverlay?.Hide();
+        }
     }
 
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
