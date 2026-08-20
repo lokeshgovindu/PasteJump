@@ -24,13 +24,20 @@ public sealed class SelfWriteGuard
     private readonly TimeSpan _ttl;
     private readonly int _maxEntries;
     private readonly Dictionary<string, DateTimeOffset> _recent = new(StringComparer.Ordinal);
+
+    /// <summary>Hashes <see cref="IsOwnWrite"/> has already claimed, so a second notification for one paste is
+    /// still recognisable. See <see cref="IsEchoOfOwnWrite"/>.</summary>
+    private readonly Dictionary<string, DateTimeOffset> _consumed = new(StringComparer.Ordinal);
+
+    private readonly TimeSpan _echoWindow;
     private readonly Lock _gate = new();
 
-    public SelfWriteGuard(IClock? clock = null, TimeSpan? ttl = null, int maxEntries = 32)
+    public SelfWriteGuard(IClock? clock = null, TimeSpan? ttl = null, int maxEntries = 32, TimeSpan? echoWindow = null)
     {
         _clock = clock ?? SystemClock.Instance;
         _ttl = ttl ?? TimeSpan.FromSeconds(5);
         _maxEntries = maxEntries;
+        _echoWindow = echoWindow ?? TimeSpan.FromSeconds(1);
     }
 
     /// <summary>Call immediately before writing these bytes to the clipboard.</summary>
@@ -76,6 +83,49 @@ public sealed class SelfWriteGuard
             }
 
             _recent.Remove(contentHash);
+            _consumed[contentHash] = _clock.UtcNow;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// True if this hash was <em>already</em> recognised as our own write a moment ago - a second notification
+    /// for one paste, rather than anything the user did. Does not consume, because an application can publish
+    /// more than twice.
+    /// </summary>
+    /// <remarks>
+    /// Exists because <see cref="IsOwnWrite"/> consumes its entry, and one paste does not reliably produce one
+    /// notification: an OLE writer publishes in two steps, and some applications republish the clipboard well
+    /// after the settle window closes. The second read then carried bytes we no longer recognised, fell through
+    /// to the consecutive-duplicate branch, and that branch deliberately announces itself - so <b>every paste
+    /// into such an application ended with a "Same as the last copy" toast</b>. Reported 2026-08-20 as "after
+    /// paste, I am getting copied overlay also".
+    /// <para>
+    /// Deliberately shorter-lived than the TTL on <see cref="IsOwnWrite"/>: this covers the echo of one paste,
+    /// not the round trip. A user who genuinely re-copies the same text is entitled to their acknowledgement,
+    /// and the longer this window, the more of those it eats.
+    /// </para>
+    /// </remarks>
+    public bool IsEchoOfOwnWrite(string contentHash)
+    {
+        if (string.IsNullOrEmpty(contentHash))
+        {
+            return false;
+        }
+
+        lock (_gate)
+        {
+            if (!_consumed.TryGetValue(contentHash, out var when))
+            {
+                return false;
+            }
+
+            if (_clock.UtcNow - when > _echoWindow)
+            {
+                _consumed.Remove(contentHash);
+                return false;
+            }
+
             return true;
         }
     }
@@ -85,6 +135,7 @@ public sealed class SelfWriteGuard
         lock (_gate)
         {
             _recent.Clear();
+            _consumed.Clear();
         }
     }
 
@@ -103,6 +154,16 @@ public sealed class SelfWriteGuard
             {
                 _recent.Remove(key);
             }
+        }
+
+        var staleEchoes = _consumed
+            .Where(kv => now - kv.Value > _echoWindow)
+            .Select(static kv => kv.Key)
+            .ToList();
+
+        foreach (var key in staleEchoes)
+        {
+            _consumed.Remove(key);
         }
 
         // Hard ceiling so a pathological write loop cannot grow this without bound.

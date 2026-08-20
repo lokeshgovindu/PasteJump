@@ -403,6 +403,36 @@ public sealed class CaptureServiceTests : IDisposable
         Assert.Equal(1, capture.SelfWriteSkipCount);
     }
 
+    /// <summary>
+    /// The bug reported as "after paste, I am getting copied overlay also". One paste is not one notification:
+    /// an application that republishes the clipboard after the settle window closes produces a second read of
+    /// the same bytes. <c>IsOwnWrite</c> consumes its entry, so that second read used to fall through to the
+    /// consecutive-duplicate branch - which deliberately announces itself - and every paste into such an
+    /// application ended with a "Same as the last copy" toast.
+    /// </summary>
+    [Fact]
+    public void ASecondNotificationForOnePasteIsSilent()
+    {
+        var snapshot = FakeClipboardAccess.TextSnapshot("pasted by us");
+        _clipboard.EnqueueRead(snapshot);
+        _clipboard.EnqueueRead(snapshot);
+        _selfWrites.NoteWrite(snapshot.ContentHash);
+
+        var notices = 0;
+        var capture = Build();
+        capture.CaptureObserved += () => notices++;
+        capture.Prime();
+
+        SignalChange(capture);   // the paste's own write
+        SignalChange(capture);   // the application publishing it again, after the settle window
+
+        Assert.Equal(0, _store.Count);
+        Assert.Equal(1, capture.SelfWriteSkipCount);
+        Assert.Equal(1, capture.SelfWriteEchoSkipCount);
+        Assert.Equal(0, notices);
+    }
+
+
     [Fact]
     public void MonitoringDisabled_ReadsNothingAtAll()
     {

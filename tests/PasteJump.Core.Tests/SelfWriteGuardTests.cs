@@ -27,6 +27,69 @@ public class SelfWriteGuardTests
         Assert.True(guard.IsOwnWrite("abc123"));
     }
 
+    /// <summary>
+    /// A second notification for one paste is still recognisable after <c>IsOwnWrite</c> has consumed its entry.
+    /// Without this, an application that republishes the clipboard after the settle window closed produced a read
+    /// that looked like a fresh copy of identical text - and the consecutive-duplicate branch announces itself, so
+    /// every paste into such an application ended with a "Same as the last copy" toast.
+    /// </summary>
+    [Fact]
+    public void RecognisesASecondNotificationForTheSameWrite()
+    {
+        var guard = new SelfWriteGuard();
+
+        guard.NoteWrite("abc123");
+
+        Assert.True(guard.IsOwnWrite("abc123"));
+        Assert.False(guard.IsOwnWrite("abc123"), "the entry is consumed, which is what made the echo invisible");
+        Assert.True(guard.IsEchoOfOwnWrite("abc123"));
+    }
+
+    /// <summary>Does not consume, because an application may publish more than twice.</summary>
+    [Fact]
+    public void AnEchoStaysRecognisableForMoreThanOneNotification()
+    {
+        var guard = new SelfWriteGuard();
+
+        guard.NoteWrite("abc123");
+        Assert.True(guard.IsOwnWrite("abc123"));
+
+        Assert.True(guard.IsEchoOfOwnWrite("abc123"));
+        Assert.True(guard.IsEchoOfOwnWrite("abc123"));
+        Assert.True(guard.IsEchoOfOwnWrite("abc123"));
+    }
+
+    /// <summary>
+    /// The reason the echo window is short. A copy the user really made of text they had just pasted is still
+    /// theirs to be told about, and the content is identical by definition - so only time can tell the two apart.
+    /// </summary>
+    [Fact]
+    public void AGenuineRecopyAfterTheEchoWindowIsNotTreatedAsAnEcho()
+    {
+        var clock = new MutableClock();
+        var guard = new SelfWriteGuard(clock, echoWindow: TimeSpan.FromMilliseconds(200));
+
+        guard.NoteWrite("abc123");
+        Assert.True(guard.IsOwnWrite("abc123"));
+        Assert.True(guard.IsEchoOfOwnWrite("abc123"));
+
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+
+        Assert.False(guard.IsEchoOfOwnWrite("abc123"));
+    }
+
+    /// <summary>An echo is never claimed for content we never wrote.</summary>
+    [Fact]
+    public void SomethingWeNeverWroteIsNotAnEcho()
+    {
+        var guard = new SelfWriteGuard();
+
+        guard.NoteWrite("abc123");
+        Assert.True(guard.IsOwnWrite("abc123"));
+
+        Assert.False(guard.IsEchoOfOwnWrite("something else entirely"));
+    }
+
     [Fact]
     public void DoesNotClaimAnUnrelatedWrite()
     {

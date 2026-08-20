@@ -96,6 +96,13 @@ public sealed class CaptureService
     /// <summary>Notifications recognised as our own writes and skipped.</summary>
     public int SelfWriteSkipCount { get; private set; }
 
+    /// <summary>
+    /// Second and later notifications for one of our own writes, skipped without announcing anything. Worth
+    /// counting separately: a non-zero value here is the signature of an application that republishes the
+    /// clipboard after the settle window, which is exactly the case that used to toast after every paste.
+    /// </summary>
+    public int SelfWriteEchoSkipCount { get; private set; }
+
     /// <summary>Read attempts that could not open the clipboard, including retries.</summary>
     public int ReadFailureCount { get; private set; }
 
@@ -310,6 +317,18 @@ public sealed class CaptureService
         {
             SelfWriteSkipCount++;
             _trace?.Invoke("skipped: this is our own write, put there in order to paste");
+            return;
+        }
+
+        // The SECOND notification for one paste. IsOwnWrite above consumes its entry, so an application that
+        // publishes again after the settle window has closed produced a read we no longer recognised - which then
+        // matched the consecutive-duplicate branch below, and that branch announces itself. Every paste into such
+        // an application therefore ended with a "Same as the last copy" toast. Silent here, deliberately: the
+        // paste was never a copy, so there is nothing to acknowledge.
+        if (_selfWrites.IsEchoOfOwnWrite(snapshot.ContentHash))
+        {
+            SelfWriteEchoSkipCount++;
+            _trace?.Invoke("skipped: a second notification for the paste we just made - no clip, no notice");
             return;
         }
 
