@@ -93,6 +93,16 @@ public partial class App : Application
     private CaptureService _capture = null!;
     private CaptureTraceLog _captureTrace = null!;
     private GestureTraceLog _gestureTrace = null!;
+
+    private IntPtr _lastForegroundHwnd;
+
+    private long _lastForegroundSince;
+
+    private string _lastForegroundName = "(none)";
+
+    private long _keysHeard;
+
+    private long _keysHeardAtForegroundChange;
     private long _otherKeysSeen;
 
     private ThemeManager _theme = null!;
@@ -553,8 +563,52 @@ public partial class App : Application
         watchdog.Start();
     }
 
+    /// <summary>
+    /// Records a change of foreground window, with how many keys the hook heard while the previous one held it.
+    /// </summary>
+    /// <remarks>
+    /// Driven from the watchdog timer rather than from key events, and that is the entire point. "The overlay does
+    /// not appear in application X" has two very different causes that the key lines alone cannot separate: the
+    /// application was never in the foreground when the keys were pressed, or it was and <b>the hook heard
+    /// nothing</b> - which is what a hook earlier in the chain suppressing our chord looks like, and is not our
+    /// bug. A line written only when a key arrives cannot distinguish them, because the silent case produces no
+    /// key to write it from.
+    /// <para>
+    /// <c>GetForegroundWindow</c> is a bare user32 call and is compared by handle; the process name is resolved
+    /// only when the handle changes, because that opens a process handle and this runs four times a second.
+    /// </para>
+    /// </remarks>
+    private void NoteForegroundChange()
+    {
+        var hwnd = ForegroundWindowInfo.GetForegroundWindowHandle();
+
+        if (hwnd == _lastForegroundHwnd)
+        {
+            return;
+        }
+
+        var heldFor = _lastForegroundHwnd == IntPtr.Zero
+            ? TimeSpan.Zero
+            : Stopwatch.GetElapsedTime(_lastForegroundSince);
+
+        var keysHeard = _keysHeard - _keysHeardAtForegroundChange;
+
+        _gestureTrace.Note(
+            $"focus: {ForegroundWindowInfo.DescribeForegroundForTrace()}"
+            + (_lastForegroundHwnd == IntPtr.Zero
+                ? string.Empty
+                : $" | previous={_lastForegroundName} held it {heldFor.TotalSeconds:F1}s, hook heard {keysHeard} key(s)"));
+
+        _lastForegroundHwnd = hwnd;
+        _lastForegroundSince = Stopwatch.GetTimestamp();
+        _lastForegroundName = ForegroundWindowInfo.GetForegroundProcessNameForTrace();
+        _keysHeardAtForegroundChange = _keysHeard;
+    }
+
     private void CheckHookHealth()
     {
+        NoteForegroundChange();
+
         var ctrlHeld = VirtualKeyTranslator.IsCtrlDown();
 
         // Tracked here rather than from key events on purpose: the whole question is what happens when key events
@@ -674,6 +728,11 @@ public partial class App : Application
     private bool OnKeyEvent(KeyboardHookEvent e)
     {
         NoteHookEvent();
+
+        // Counted for the focus lines, which report how many keys the hook heard while each window held the
+        // foreground. A count is all that is kept: the keys themselves are never identified unless they are the
+        // trigger or a modifier.
+        _keysHeard++;
 
         // Our own synthesised keystrokes. Without this check, sending Ctrl+V to paste would
         // immediately re-enter paste mode and never stop.

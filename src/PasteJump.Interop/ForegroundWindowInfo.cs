@@ -136,6 +136,12 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
         => NativeMethods.GetCursorPos(out var cursor) ? (cursor.X, cursor.Y) : (0, 0);
 
     /// <summary>
+    /// The foreground window handle, or zero. A bare user32 call, cheap enough to compare on a timer tick - which
+    /// is what the trace does, resolving the far more expensive process name only when this changes.
+    /// </summary>
+    public static IntPtr GetForegroundWindowHandle() => NativeMethods.GetForegroundWindow();
+
+    /// <summary>
     /// The three inputs the overlay's position is chosen from, as one line for the trace: the foreground window's
     /// rectangle, its extended style, and whether it exposed a caret.
     /// </summary>
