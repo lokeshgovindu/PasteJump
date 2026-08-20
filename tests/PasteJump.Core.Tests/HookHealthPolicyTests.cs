@@ -163,4 +163,79 @@ public class HookHealthPolicyTests
         Assert.True(decision.ReinstallHook);
         Assert.False(decision.AbandonStuckSession);
     }
+
+    /// <summary>
+    /// The false positive this rule shipped with, in the shape the log caught it: a paste-mode session commits on
+    /// the Ctrl release, and 192 ms later the session is briefly still open with Ctrl already up.
+    /// </summary>
+    /// <remarks>
+    /// Measured on a real machine, three times in seventeen seconds, each right after a paste that had in fact
+    /// succeeded - <c>key=Ctrl up ... sessionBefore=True</c> at 20:37:39.654 then
+    /// <c>watchdog: reinstalled=True abandonedStuckSession=True</c> at 20:37:39.846. Committing has to be
+    /// asynchronous, because the Ctrl release arrives in the hook callback and that may never block: the clipboard
+    /// write and the keystroke are queued onto the dispatcher with the settle delay between them. A watchdog
+    /// sampling four times a second is bound to land inside that window.
+    /// </remarks>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(192)]   // the interval actually observed
+    [InlineData(400)]
+    [InlineData(749)]
+    public void A_session_still_finishing_its_commit_is_not_stranded(double msCtrlUpFor)
+    {
+        var decision = HookHealthPolicy.Decide(
+            gestureEnabled: true,
+            hookInstalled: true,
+            sessionActive: true,
+            ctrlHeld: false,
+            msSinceLastHookEvent: 10,
+            msCtrlHeldFor: 0,
+            msCtrlUpFor: msCtrlUpFor);
+
+        Assert.False(decision.AbandonStuckSession);
+        Assert.False(decision.ReinstallHook);
+    }
+
+    /// <summary>
+    /// And the genuine case still fires, which is what stops the grace period being a way of quietly disabling the
+    /// rule. The measured real recovery took 1.2 s from the Ctrl release to the overlay coming down.
+    /// </summary>
+    [Theory]
+    [InlineData(750)]
+    [InlineData(1200)]
+    [InlineData(5000)]
+    public void A_session_whose_Ctrl_release_never_arrived_is_still_abandoned(double msCtrlUpFor)
+    {
+        var decision = HookHealthPolicy.Decide(
+            gestureEnabled: true,
+            hookInstalled: true,
+            sessionActive: true,
+            ctrlHeld: false,
+            msSinceLastHookEvent: 4000,
+            msCtrlHeldFor: 0,
+            msCtrlUpFor: msCtrlUpFor);
+
+        Assert.True(decision.AbandonStuckSession);
+        Assert.True(decision.ReinstallHook);
+    }
+
+    /// <summary>
+    /// The grace applies to the stranded rule only. Switching PasteJump off from the tray still overrides
+    /// everything, and a session that is genuinely stuck is still repaired regardless of what the hook claims
+    /// about being installed.
+    /// </summary>
+    [Fact]
+    public void The_grace_does_not_reach_the_disabled_rule()
+    {
+        var decision = HookHealthPolicy.Decide(
+            gestureEnabled: false,
+            hookInstalled: false,
+            sessionActive: true,
+            ctrlHeld: false,
+            msSinceLastHookEvent: 9000,
+            msCtrlHeldFor: 0,
+            msCtrlUpFor: 9000);
+
+        Assert.False(decision.AnythingToDo);
+    }
 }

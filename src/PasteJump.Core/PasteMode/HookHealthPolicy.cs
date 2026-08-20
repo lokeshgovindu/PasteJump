@@ -62,6 +62,29 @@ public static class HookHealthPolicy
     /// </remarks>
     public const double DefaultObservationMarginMs = 300;
 
+    /// <summary>
+    /// How long a session may remain open after Ctrl has gone up before it counts as stranded.
+    /// </summary>
+    /// <remarks>
+    /// Not belt-and-braces: without it this rule fires after every ordinary paste, and it was caught in the log
+    /// doing exactly that - <c>key=Ctrl up ... sessionBefore=True</c> at 20:37:39.654 followed by
+    /// <c>watchdog: reinstalled=True abandonedStuckSession=True</c> 192 ms later, three times in seventeen
+    /// seconds, each one right after a paste that had in fact succeeded.
+    /// <para>
+    /// The reason is that committing is <b>asynchronous and must be</b>: the Ctrl release arrives in the hook
+    /// callback, which may not block, so the clipboard write and the paste keystroke are queued onto the
+    /// dispatcher and separated by the paste settle delay. For that window the session is legitimately still open
+    /// while Ctrl is legitimately already up - the exact shape this rule was written to catch. A watchdog
+    /// sampling four times a second cannot avoid landing inside it.
+    /// </para>
+    /// <para>
+    /// 750 ms is comfortably longer than a commit (a settle delay is tens of milliseconds, and the largest
+    /// per-application value anyone has needed is a few hundred) and comfortably shorter than a person noticing:
+    /// the genuine stranded case measured 1.2 s from Ctrl release to the overlay coming down, and still does.
+    /// </para>
+    /// </remarks>
+    public const double DefaultCommitGraceMs = 750;
+
     /// <param name="gestureEnabled">
     /// False when the user has switched PasteJump off from the tray. Nothing is ever reinstalled then: an
     /// uninstalled hook is the <i>point</i> of that state, and resurrecting it would hand Ctrl+V back to an
@@ -72,6 +95,10 @@ public static class HookHealthPolicy
     /// <param name="ctrlHeld">Whether Ctrl is physically down, read live from the keyboard.</param>
     /// <param name="msSinceLastHookEvent">Milliseconds since the hook last called us.</param>
     /// <param name="msCtrlHeldFor">Milliseconds Ctrl has been continuously down, or 0 when it is up.</param>
+    /// <param name="msCtrlUpFor">
+    /// Milliseconds Ctrl has been continuously up, or 0 while it is held. A session is only stranded once this
+    /// exceeds <see cref="DefaultCommitGraceMs"/> - see that remark for why a commit needs the grace.
+    /// </param>
     public static HookHealthDecision Decide(
         bool gestureEnabled,
         bool hookInstalled,
@@ -79,8 +106,10 @@ public static class HookHealthPolicy
         bool ctrlHeld,
         double msSinceLastHookEvent,
         double msCtrlHeldFor,
+        double msCtrlUpFor = double.PositiveInfinity,
         double deafnessMs = DefaultDeafnessMs,
-        double observationMarginMs = DefaultObservationMarginMs)
+        double observationMarginMs = DefaultObservationMarginMs,
+        double commitGraceMs = DefaultCommitGraceMs)
     {
         if (!gestureEnabled)
         {
@@ -90,7 +119,7 @@ public static class HookHealthPolicy
         // A session open while Ctrl is physically up can only be one whose Ctrl release never arrived. Abandoned
         // rather than committed, for the reason the recogniser gives in the same situation: releasing Ctrl is what
         // asks for a paste, and this is precisely the case where we do not know that the user did.
-        if (sessionActive && !ctrlHeld)
+        if (sessionActive && !ctrlHeld && msCtrlUpFor >= commitGraceMs)
         {
             // Reinstalled whatever IsInstalled claims. A session stranded like this is near-proof that the hook is
             // dead - a live one would have delivered the Ctrl release - and the flag is exactly what cannot be

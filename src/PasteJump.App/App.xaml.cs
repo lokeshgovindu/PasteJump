@@ -64,6 +64,8 @@ public partial class App : Application
 
     private long _lastHookEventAt = Stopwatch.GetTimestamp();
     private long? _ctrlDownSince;
+
+    private long? _ctrlUpSince;
     private bool _announcedHookRecovery;
     private GlobalHotkey _historyHotkey = null!;
     private TrayIcon _trayIcon = null!;
@@ -616,10 +618,12 @@ public partial class App : Application
         if (ctrlHeld)
         {
             _ctrlDownSince ??= Stopwatch.GetTimestamp();
+            _ctrlUpSince = null;
         }
         else
         {
             _ctrlDownSince = null;
+            _ctrlUpSince ??= Stopwatch.GetTimestamp();
         }
 
         var decision = HookHealthPolicy.Decide(
@@ -630,6 +634,13 @@ public partial class App : Application
             msSinceLastHookEvent: Stopwatch.GetElapsedTime(_lastHookEventAt).TotalMilliseconds,
             msCtrlHeldFor: _ctrlDownSince is { } since
                 ? Stopwatch.GetElapsedTime(since).TotalMilliseconds
+                : 0,
+
+            // Zero while Ctrl is held. Not "infinity when unknown": at start-up, with no session open, the
+            // stranded rule cannot fire anyway, and claiming Ctrl had been up for ever would make the first
+            // tick after a commit the very false positive this exists to stop.
+            msCtrlUpFor: _ctrlUpSince is { } up
+                ? Stopwatch.GetElapsedTime(up).TotalMilliseconds
                 : 0);
 
         if (!decision.AnythingToDo)
