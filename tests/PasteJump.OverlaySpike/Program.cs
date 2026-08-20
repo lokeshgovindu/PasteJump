@@ -47,6 +47,12 @@ internal static class Program
         var outDir = args.Length > 0 ? args[0] : Path.Combine(Path.GetTempPath(), "overlay-spike");
         Directory.CreateDirectory(outDir);
 
+        // Second argument narrows the sweep to one application, because "test Edge only" is the question that
+        // actually gets asked: a full sweep is twenty windows and ninety seconds, and buries the one application
+        // under investigation in the middle of the report. Matched as a case-insensitive substring of the process
+        // name, so "edge" finds msedge and "note" finds Notepad.
+        var only = args.Length > 1 && args[1].Length > 0 ? args[1] : null;
+
         var report = new StringBuilder();
         void Say(string line)
         {
@@ -78,11 +84,26 @@ internal static class Program
             PopupPosition.BottomRight,
         };
 
-        var targets = Windows()
+        var allWindows = Windows()
             .Where(w => w.Handle != new WindowInteropHelper(overlay).Handle)
             .ToList();
 
-        Say($"{targets.Count} candidate windows");
+        var targets = only is null
+            ? allWindows
+            : allWindows.Where(w => w.Process.Contains(only, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        Say(only is null
+            ? $"{targets.Count} candidate windows"
+            : $"{targets.Count} of {allWindows.Count} candidate windows match \"{only}\"");
+
+        // Named rather than left as a bare zero, because "0 candidate windows" reads as the spike being broken
+        // when it usually means the filter was spelt for a window title instead of a process name.
+        if (targets.Count == 0)
+        {
+            Say("   nothing matched. Processes with a visible window: "
+                + string.Join(", ", allWindows.Select(w => w.Process).Distinct().Order()));
+        }
+
         Say("");
 
         var invisible = 0;
@@ -139,6 +160,59 @@ internal static class Program
         var opened = 0;
         var refused = 0;
 
+        // A control, and the gesture pass is worth nothing without one. This window belongs to this process, so
+        // focusing it cannot fail for want of foreground rights - which makes it the one case that separates
+        // "PasteJump refused the keystroke" from "the spike could not type at all". The first run of this pass
+        // reported three failures and no successes, and that reads as damning about PasteJump when it was a
+        // statement about the spike. Deliberately holds no text box: even a session that somehow committed has
+        // nowhere to paste.
+        var control = new Window
+        {
+            Title = "spike control window",
+            Width = 560,
+            Height = 200,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Content = new System.Windows.Controls.TextBlock
+            {
+                Text = "Control case for the gesture pass. Ctrl is held and the trigger tapped here first, "
+                    + "so a failure over a real application can be told apart from a spike that cannot inject.",
+                Margin = new Thickness(24),
+                TextWrapping = TextWrapping.Wrap,
+            },
+        };
+
+        // The witness is a keyboard HOOK, not the window, and that correction is worth keeping. The window was the
+        // obvious instrument and it is the wrong one: a WPF window receives keys only while it is focused, and
+        // focusing a window this process owns is exactly what the foreground lock refuses - the first run reported
+        // "keys reaching it: NONE" purely because the control never came to the front, which proves nothing at all.
+        // A WH_KEYBOARD_LL hook sees every key on the machine whatever has focus, which is the whole point of the
+        // API and the reason PasteJump uses it. So:
+        //
+        //   our hook sees nothing  -> this process cannot inject. The run says NOTHING about PasteJump.
+        //   our hook sees the keys -> injection works, and an overlay that never appeared is a real finding.
+        var arrived = new List<string>();
+        var witness = InstallWitnessHook(arrived);
+
+        control.Show();
+        Wait(200);
+
+        var controlHandle = new WindowInteropHelper(control).Handle;
+        var controlFocused = Focus(controlHandle, out var focusFailure);
+        Wait(200);
+
+        var controlWhere = string.Empty;
+        var controlOpened = DriveGesture(out controlWhere);
+        var sawKeys = arrived.Count > 0;
+
+        Say($"   {"(this spike's own window)",-22} "
+            + (controlOpened ? "gesture OPENED  " + controlWhere : "gesture did NOT open")
+            + $"  [focused={controlFocused}"
+            + (controlFocused ? string.Empty : " (" + focusFailure + ")")
+            + $", our own hook saw: {(sawKeys ? string.Join(" ", arrived) : "NOTHING")}]");
+
+        control.Close();
+        Wait(150);
+
         foreach (var target in targets)
         {
             if (!Focus(target.Handle))
@@ -163,16 +237,38 @@ internal static class Program
         Say("");
         Say($"gesture opened in {opened} application(s), did not open in {refused}");
 
-        // Said plainly, because the first run of this pass reported three failures and no successes, and that
-        // reads as a damning result about PasteJump when it is a statement about the spike. Injected input can be
-        // refused outright - by the session, by the desktop, by whatever else holds a hook - and with no control
-        // case in the same run there is nothing to compare a failure against.
-        if (opened == 0 && refused > 0)
+        // The verdict is read off the CONTROL, not off the count of failures. Injected input can be refused
+        // outright - by the session, by the desktop, by another hook earlier in the chain - and a run where
+        // nothing opened anywhere says only that this process could not type.
+        Say("");
+
+        if (controlOpened && refused > 0)
         {
-            Say("");
-            Say("  INCONCLUSIVE: nothing opened anywhere, which usually means this process could not inject");
-            Say("  keystrokes at all rather than that PasteJump refused them. A run is only meaningful when at");
-            Say("  least one application DID open the gesture, so treat that as the control.");
+            Say($"  MEANINGFUL: the control opened, so injection works and the hook is alive. The {refused}");
+            Say("  application(s) above that did not open the gesture are therefore a real finding.");
+        }
+        else if (controlOpened)
+        {
+            Say("  The gesture opened everywhere it was tried, the control included.");
+        }
+        else if (!sawKeys)
+        {
+            Say("  INCONCLUSIVE: this spike's OWN keyboard hook saw none of the keys it injected, so nothing was");
+            Say("  injected at all and NOTHING above is a statement about PasteJump. On this machine a process");
+            Say("  started by the Task Scheduler service is refused input injection, so run the spike as");
+            Say("  yourself - double-click the exe - whenever the gesture half is the half you want answered.");
+        }
+        else
+        {
+            Say($"  PasteJump did NOT REACT: injection works (our own hook saw {string.Join(" ", arrived)}) and no");
+            Say("  overlay appeared in any application above. PasteJump is not running, is disabled, or has lost");
+            Say("  its keyboard hook - none of which the placement half can tell you, since that draws the");
+            Say("  overlay itself rather than asking PasteJump to.");
+        }
+
+        if (witness != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(witness);
         }
 
         File.WriteAllText(Path.Combine(outDir, "spike-report.txt"), report.ToString());
@@ -254,6 +350,56 @@ internal static class Program
 
         return found;
     }
+
+    /// <summary>
+    /// Installs this spike's own low-level keyboard hook, recording every key it sees.
+    /// </summary>
+    /// <remarks>
+    /// It exists to answer one question - did our SendInput actually reach the input stream - and it answers it
+    /// without needing focus, which is what the window it replaced could not do. Presence is conclusive and
+    /// absence is not quite: a hook earlier in the chain can suppress an event before it reaches ours, so "we saw
+    /// the keys" proves injection works while "we saw nothing" means only that nothing arrived HERE. In practice
+    /// nothing suppresses a key nobody has claimed, and PasteJump only ever suppresses the trigger.
+    /// <para>
+    /// The delegate is held in a static field deliberately: the CLR would otherwise collect it while Windows still
+    /// holds the pointer, and the process would die inside the first callback.
+    /// </para>
+    /// </remarks>
+    private static IntPtr InstallWitnessHook(List<string> seen)
+    {
+        _witnessCallback = (code, wParam, lParam) =>
+        {
+            if (code >= 0 && (wParam == 0x100 || wParam == 0x104))
+            {
+                var virtualKey = Marshal.ReadInt32(lParam);
+
+                seen.Add(virtualKey switch
+                {
+                    0x11 or 0xA2 or 0xA3 => "Ctrl",
+                    0x56 => "V",
+                    0x1B => "Esc",
+                    _ => $"vk{virtualKey:X2}",
+                });
+            }
+
+            return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
+        };
+
+        return SetWindowsHookEx(13, _witnessCallback, IntPtr.Zero, 0);
+    }
+
+    private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
+
+    private static HookProc? _witnessCallback;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int idHook, HookProc callback, IntPtr module, uint threadId);
+
+    [DllImport("user32.dll")]
+    private static extern bool UnhookWindowsHookEx(IntPtr hook);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
 
     private static void Send(ushort virtualKey, bool up)
     {
@@ -443,8 +589,26 @@ internal static class Program
     /// Detached in a finally: two input queues left attached share keyboard state indefinitely, in both processes.
     /// </para>
     /// </remarks>
-    private static bool Focus(IntPtr window)
+    private static bool Focus(IntPtr window) => Focus(window, out _);
+
+    /// <summary>
+    /// Brings a window to the front, reporting what held the foreground when it could not.
+    /// </summary>
+    /// <remarks>
+    /// The reason is returned rather than merely logged because "no foreground rights" is the wrong conclusion
+    /// most of the time: naming the window that actually held the foreground is what separates the foreground
+    /// lock from a handle that was never realised, and a run of this spike is expensive to repeat.
+    /// </remarks>
+    private static bool Focus(IntPtr window, out string failure)
     {
+        failure = string.Empty;
+
+        if (window == IntPtr.Zero)
+        {
+            failure = "no window handle";
+            return false;
+        }
+
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var foreground = GetForegroundWindow();
@@ -479,6 +643,11 @@ internal static class Program
             }
         }
 
+        var held = GetForegroundWindow();
+        failure = held == IntPtr.Zero
+            ? "nothing holds the foreground - no interactive input desktop"
+            : $"the foreground is held by {ProcessOf(held)} 0x{held:X}";
+
         return false;
     }
 
@@ -489,6 +658,20 @@ internal static class Program
     {
         Source = new Uri($"pack://application:,,,/PasteJump;component/{relative}", UriKind.Absolute),
     };
+
+    private static string ProcessOf(IntPtr window)
+    {
+        GetWindowThreadProcessId(window, out var pid);
+
+        try
+        {
+            return System.Diagnostics.Process.GetProcessById((int)pid).ProcessName;
+        }
+        catch (ArgumentException)
+        {
+            return "an exited process";
+        }
+    }
 
     private static List<(IntPtr Handle, string Process, string Title, (int L, int T, int R, int B) Rect, uint ExStyle)> Windows()
     {

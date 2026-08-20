@@ -92,6 +92,8 @@ public partial class App : Application
     private PasteJumpPasteHost _pasteHost = null!;
     private CaptureService _capture = null!;
     private CaptureTraceLog _captureTrace = null!;
+    private GestureTraceLog _gestureTrace = null!;
+    private long _otherKeysSeen;
 
     private ThemeManager _theme = null!;
 
@@ -293,6 +295,10 @@ public partial class App : Application
         // Beside the database, so it follows a custom data folder rather than living wherever the exe is.
         _captureTrace = new CaptureTraceLog(_paths.ClipsDirectory);
         _captureTrace.Write($"---- PasteJump {AppVersion.Current} started, settle={_settings.ClipboardSettleMs}ms ----");
+
+        _gestureTrace = new GestureTraceLog(_paths.ClipsDirectory);
+        _gestureTrace.Note(
+            $"---- PasteJump {AppVersion.Current} started, trigger={_settings.PasteModeTriggerKey} ----");
 
         _capture = new CaptureService(
             _clipboard,
@@ -630,6 +636,41 @@ public partial class App : Application
         _lastHookEventAt = Stopwatch.GetTimestamp();
     }
 
+    /// <summary>Names the trigger and the modifiers for the gesture trace; nothing else, ever.</summary>
+    private string DescribeKeyForTrace(int virtualKey)
+    {
+        if (virtualKey == _triggerVirtualKey)
+        {
+            return $"TRIGGER(0x{virtualKey:X2})";
+        }
+
+        return virtualKey switch
+        {
+            0x10 or 0xA0 or 0xA1 => "Shift",
+            0x11 or 0xA2 or 0xA3 => "Ctrl",
+            0x12 or 0xA4 or 0xA5 => "Alt",
+            0x5B or 0x5C => "Win",
+            _ => "modifier",
+        };
+    }
+
+    /// <summary>
+    /// The foreground process name, which is the whole point of the exercise - "the overlay does not appear in
+    /// THIS application" is unanswerable without it - and the reason it is only asked for named keys: it opens a
+    /// process handle, which is far too much work to do on every keystroke machine-wide inside a hook callback.
+    /// </summary>
+    private static string ForegroundNameForTrace()
+    {
+        try
+        {
+            return new ForegroundWindowInfo().GetForegroundProcessName() ?? "(none)";
+        }
+        catch (Exception ex)
+        {
+            return "(failed: " + ex.GetType().Name + ")";
+        }
+    }
+
     private bool OnKeyEvent(KeyboardHookEvent e)
     {
         NoteHookEvent();
@@ -659,9 +700,38 @@ public partial class App : Application
 
         var key = VirtualKeyTranslator.ToGestureKey(e.VirtualKey, _triggerVirtualKey, _keyMap);
 
+        // Named keys are the trigger and the modifiers; everything else is counted, never identified, so this
+        // cannot reconstruct what was typed. See GestureTraceLog for why that is structural rather than a promise.
+        var isNamed = e.VirtualKey == _triggerVirtualKey || VirtualKeyTranslator.IsModifier(e.VirtualKey);
+
+        if (isNamed)
+        {
+            var wasActive = _recognizer.IsSessionActive;
+
+            _gestureTrace.Note(
+                $"key={DescribeKeyForTrace(e.VirtualKey)} {(e.IsKeyDown ? "down" : "up  ")} " +
+                $"gesture={key} live[ctrl={(_recognizer.CtrlHeld ? 1 : 0)} alt={(_recognizer.AltHeld ? 1 : 0)} " +
+                $"win={(_recognizer.WinHeld ? 1 : 0)} shift={(_recognizer.ShiftHeld ? 1 : 0)}] " +
+                $"sessionBefore={wasActive} fg={ForegroundNameForTrace()} otherKeysSoFar={_otherKeysSeen}");
+        }
+        else if (e.IsKeyDown)
+        {
+            _otherKeysSeen++;
+        }
+
         if (key != GestureKey.None && _recognizer.Handle(key, e.IsKeyDown))
         {
+            if (isNamed)
+            {
+                _gestureTrace.Note($"   -> recognizer HANDLED it (swallowed). sessionNow={_recognizer.IsSessionActive}");
+            }
+
             return true;
+        }
+
+        if (isNamed)
+        {
+            _gestureTrace.Note($"   -> recognizer declined. sessionNow={_recognizer.IsSessionActive}");
         }
 
         // Only ask the layout for a character when a session is actually open. Calling
