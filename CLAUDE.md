@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 949 in Debug (`dotnet test`) - 896 in Core.Tests, 53 in Interop.Tests; **947 in Release**, see below |
+| Tests | 958 in Debug (`dotnet test`) - 906 in Core.Tests, 53 in Interop.Tests; **956 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -123,7 +123,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      896 tests.
+tests/PasteJump.Core.Tests      906 tests.
 tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -743,6 +743,30 @@ that immediately caught two real bugs. Expect to do the same again.
   - **`ClientToScreen`'s return value is checked, and that was already right.** Edge reports an `hwndCaret`
     that names an already-destroyed window once its text field has gone; the call fails and the caret is
     discarded rather than becoming (0,0), which would anchor the overlay to the corner of the primary monitor.
+- **Windows draws the Start menu ABOVE our topmost overlay, and two instruments lie about it (fixed
+  2026-08-20).** Reported as the same symptom as the Edge one - "in start menu also not able to see the pastejump
+  overlay" - but it is a different cause and centring on the window makes it *worse*, not better. The Start menu
+  is `WS_EX_TOPMOST` (ex-style `0x00200008`, against an Edge window's `0x00200100`) and Windows puts it in a band
+  above ordinary topmost windows, so there is no position *within* that window where the overlay can be seen.
+  `OverlayPlacementSolver` puts it in a work-area corner instead, triggered by `WS_EX_TOPMOST` on the foreground
+  window rather than by a list of shell process names - that is the property that actually matters, and it needs
+  no maintenance as Windows renames its surfaces.
+  - **A z-order walk says the overlay is on top when it is not.** With the Start menu open the overlay reported
+    `(173,534)-(685,639)` and walking `GetWindow` from the front found nothing above it overlapping - yet cropping
+    a screenshot to *exactly* that rectangle showed the Start menu. Window enumeration order is not the
+    compositor's band order. **A screenshot is the only honest witness for "is it visible".**
+  - **`GetWindowRect` understates the Start menu by 256px.** It reported 858 wide while a pixel scan of the same
+    screenshot found the panel reaching x=1127. The first attempt placed the overlay 8px past the reported edge
+    and left a third of it covered - which *looked* like a fix in the numbers and failed in the picture. Hence a
+    corner, which is still right when the rectangle is that wrong.
+  - **Verified on one build, all three paths, by rectangle and by screenshot**: the Run dialog (real caret) put
+    the overlay at `(123,827)`, beside the caret and flipped above because it was near the screen bottom; Edge
+    (no caret, not topmost) centred it at `(960,516.5)` against a window centre of `(960,516)`, with the mouse
+    parked at `(60,1000)` and ignored; the Start menu (no caret, topmost) sent it to `(1473,8)`.
+  - **An always-on-top application we could in fact have covered is now placed beside instead.** A safe
+    degradation - still visible, still predictable - and arguably better manners than covering a window someone
+    deliberately pinned. If that is ever reported as wrong, the fix is a narrower trigger, not abandoning the
+    corner.
 - **A clipboard holding only OLE bookkeeping is not a clip.** `OleSetClipboard` announces the data object
   before `OleFlushClipboard` renders anything, so a read landing between the two sees `DataObject` — eight
   bytes of OLE state and none of what was copied. Stored, that became a `[binary]` 8-byte clip from the
