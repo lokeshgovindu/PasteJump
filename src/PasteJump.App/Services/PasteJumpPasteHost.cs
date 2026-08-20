@@ -27,6 +27,17 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
     private OverlayWindow? _overlay;
 
+    /// <summary>
+    /// The overlay window this host is really using, for the overlay spike to photograph.
+    /// </summary>
+    /// <remarks>
+    /// Internal, and it exists because the spike used to render its OWN OverlayWindow - which proved the
+    /// placement code and nothing about this class, where the window is created lazily, configured from five
+    /// separate settings and shown on a path of its own. Null until the first gesture, which is itself worth
+    /// being able to observe.
+    /// </remarks>
+    internal OverlayWindow? OverlayForSpike => _overlay;
+
     private int _previewMaxWidth = 600;
     private int _previewMaxHeight = 400;
 

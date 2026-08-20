@@ -7,7 +7,12 @@ using System.Windows.Media.Imaging;
 using System.Windows.Interop;
 using Application = System.Windows.Application;
 using Window = System.Windows.Window;
+using PasteJump.App.Services;
 using PasteJump.App.Views;
+using PasteJump.Core;
+using PasteJump.Core.Abstractions;
+using PasteJump.Core.Capture;
+using PasteJump.Core.Storage;
 using PasteJump.Core.Model;
 using PasteJump.Core.PasteMode;
 using PasteJump.Core.Settings;
@@ -154,6 +159,8 @@ internal static class Program
             ? "EVERY placement was visible in every application."
             : $"{invisible} placement(s) were NOT visible - see the hidden-*.png files in {outDir}");
 
+        invisible += ThroughTheRealHost(targets, outDir, Say);
+
         // Second half: does PasteJump's OWN gesture open in each application? Placement being right says nothing
         // about that, and it is the half a unit test cannot reach - it needs the real hook, in the real running
         // application, with a real keystroke. Escape cancels each session, so nothing is pasted into anybody's
@@ -225,6 +232,11 @@ internal static class Program
                 continue;
             }
 
+            // Cleared per application, because the witness has to answer "did the keys reach the input stream
+            // WHILE THIS WINDOW HAD FOCUS" rather than "at some point during the run". Reported once for the
+            // whole pass, it could not tell a suppressed chord from an injection that never happened.
+            arrived.Clear();
+
             var sawIt = DriveGesture(out var where);
 
             if (sawIt)
@@ -236,7 +248,8 @@ internal static class Program
                 refused++;
             }
 
-            Say($"   {target.Process,-22} {(sawIt ? "gesture OPENED  " + where : "gesture did NOT open")}");
+            Say($"   {target.Process,-22} {(sawIt ? "gesture OPENED  " + where : "gesture did NOT open")}"
+                + $"  [our own hook saw: {(arrived.Count > 0 ? string.Join(" ", arrived) : "NOTHING")}]");
         }
 
         Say("");
@@ -281,6 +294,131 @@ internal static class Program
 
         overlay.Close();
         return invisible == 0 ? 0 : 2;
+    }
+
+    /// <summary>
+    /// Repeats the sweep through <see cref="PasteJumpPasteHost"/> - the class the application really uses - with
+    /// the settings the application is really running.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked as "how is it working in the spike?", which is the right question and exposed a hole in this spike:
+    /// the pass above calls <c>OverlayWindow.Render</c> directly, so <b>everything the host does was untested</b> -
+    /// creating the window lazily on the first gesture, applying the font, the preview size, the key hint and the
+    /// parts, loading an image payload, and deciding when to call <c>Show</c>. A pass that skips the host cannot
+    /// answer a question about the host.
+    /// </para>
+    /// <para>
+    /// It also loads <c>PasteJump.json</c> from wherever the application keeps it, rather than using defaults.
+    /// Reproducing a report means reproducing the configuration: a preview size, an overlay font, a fixed position
+    /// or a switched-off part can each change what is drawn, and none of them is visible in a defaulted run.
+    /// </para>
+    /// <para>
+    /// The clipboard and the paste sender are deliberately inert. This pass exists to draw the overlay, and it must
+    /// not write to the clipboard or inject a keystroke into whatever window the sweep has just focused.
+    /// </para>
+    /// </remarks>
+    private static int ThroughTheRealHost(
+        List<(IntPtr Handle, string Process, string Title, (int L, int T, int R, int B) Rect, uint ExStyle)> targets,
+        string outDir,
+        Action<string> Say)
+    {
+        Say(string.Empty);
+        Say("== the same sweep, but through the REAL PasteJumpPasteHost and the REAL settings");
+
+        var paths = AppPaths.Resolve();
+        var settings = new SettingsStore(paths).Load();
+
+        Say($"   settings from {paths.SettingsDirectory}: position={settings.OverlayPosition} "
+            + $"fixed=({settings.OverlayX?.ToString() ?? "unset"},{settings.OverlayY?.ToString() ?? "unset"}) "
+            + $"font=\"{settings.OverlayFontFamily}\" {settings.OverlayFontSize}pt "
+            + $"preview={settings.OverlayPreviewMaxWidth}x{settings.OverlayPreviewMaxHeight} "
+            + $"keyHint={settings.ShowOverlayKeyHint}");
+
+        using var store = new ClipStore(paths);
+
+        var host = new PasteJumpPasteHost(
+            store,
+            new InertClipboard(),
+            new InertPasteSender(),
+            new SelfWriteGuard(),
+            System.Windows.Threading.Dispatcher.CurrentDispatcher,
+            () => new OverlayWindow(),
+            trace: line => Say("   " + line));
+
+        // Exactly the calls App.Compose makes, in the same order. A setting applied there and forgotten here
+        // would make this pass a different application from the one being investigated.
+        host.SetPreviewSize(settings.OverlayPreviewMaxWidth, settings.OverlayPreviewMaxHeight);
+        host.SetOverlayFont(settings.OverlayFontFamily, settings.OverlayFontSize);
+        host.SetJoinSeparator(settings.ClipJoinSeparator);
+        host.SetOverlayParts(settings.OverlayParts);
+        host.SetDeletedFlash(settings.OverlayDeletedFlashMs);
+        host.SetOverlayAnchor(settings.OverlayX, settings.OverlayY, settings.OverlayPosition);
+        host.SetKeyHint(
+            settings.ShowOverlayKeyHint,
+            TriggerKey.Normalise(settings.PasteModeTriggerKey),
+            PasteKeyMap.Parse(settings.PasteModeKeys));
+
+        var hidden = 0;
+
+        foreach (var target in targets)
+        {
+            if (!Focus(target.Handle, out var failure))
+            {
+                Say($"   {target.Process,-14} SKIPPED: {failure}");
+                continue;
+            }
+
+            host.ShowOverlay(Frame(target.Process, settings.OverlayPosition));
+            Wait(250);
+
+            var overlay = host.OverlayForSpike;
+
+            if (overlay is null)
+            {
+                Say($"   {target.Process,-14} the host created NO overlay window at all");
+                hidden++;
+                continue;
+            }
+
+            var seen = OverlayIsOnScreen(overlay, out var matched, out var sampled);
+
+            if (!seen)
+            {
+                hidden++;
+                Capture(overlay, Path.Combine(outDir, $"host-hidden-{target.Process}.png"));
+            }
+
+            Say($"   {target.Process,-14} {(seen ? "visible" : "HIDDEN ")} ({matched}/{sampled})"
+                + $"  {WindowInterop.DescribeWindowForTrace(overlay)}");
+
+            // Hidden between applications, so each one exercises the same first-gesture path the application takes
+            // rather than reusing a window that is already up.
+            host.HideOverlay();
+            Wait(120);
+        }
+
+        Say(hidden == 0
+            ? "   the real host drew a visible overlay over every application"
+            : $"   the real host produced {hidden} INVISIBLE overlay(s) - see host-hidden-*.png");
+
+        return hidden;
+    }
+
+    /// <summary>Reads nothing and writes nothing. The overlay pass must not touch the real clipboard.</summary>
+    private sealed class InertClipboard : IClipboardAccess
+    {
+        public uint SequenceNumber => 0;
+
+        public ClipboardSnapshot? TryRead() => null;
+
+        public bool TryWrite(IReadOnlyList<ClipPayload> payloads) => false;
+    }
+
+    /// <summary>Never injects. The sweep has just focused somebody's window; a paste there would be unforgivable.</summary>
+    private sealed class InertPasteSender : IPasteSender
+    {
+        public bool SendPaste(PasteKeystroke keystroke) => false;
     }
 
     /// <summary>

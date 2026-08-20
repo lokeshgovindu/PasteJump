@@ -135,17 +135,30 @@ public sealed class LowLevelKeyboardHook : IDisposable
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode != NativeConstants.HC_ACTION)
+        // Reading the structure is the only thing that has to happen here; deciding what it MEANS lives in
+        // KeyboardHookDecoder, which is pure and therefore testable - installing a real hook needs a message loop
+        // and a live keyboard, so every decision left in this method is a decision nothing can check.
+        KeyboardHookEvent? decoded;
+
+        try
         {
+            var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+
+            decoded = KeyboardHookDecoder.Decode(
+                nCode,
+                (int)wParam,
+                (int)info.vkCode,
+                info.flags,
+                info.dwExtraInfo,
+                NativeConstants.PasteJumpInputSignature);
+        }
+        catch (Exception)
+        {
+            HandlerFaultCount++;
             return NativeMethods.CallNextHookEx(_hook, nCode, wParam, lParam);
         }
 
-        var message = (int)wParam;
-
-        var isKeyDown = message is NativeConstants.WM_KEYDOWN or NativeConstants.WM_SYSKEYDOWN;
-        var isKeyUp = message is NativeConstants.WM_KEYUP or NativeConstants.WM_SYSKEYUP;
-
-        if (!isKeyDown && !isKeyUp)
+        if (decoded is not { } keyEvent)
         {
             return NativeMethods.CallNextHookEx(_hook, nCode, wParam, lParam);
         }
@@ -154,13 +167,9 @@ public sealed class LowLevelKeyboardHook : IDisposable
 
         try
         {
-            var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
-            var injected = (info.flags & NativeConstants.LLKHF_INJECTED) != 0;
-            var ownInjection = injected && info.dwExtraInfo == NativeConstants.PasteJumpInputSignature;
-
             var start = Stopwatch.GetTimestamp();
 
-            swallow = _handler(new KeyboardHookEvent((int)info.vkCode, isKeyDown, injected, ownInjection));
+            swallow = _handler(keyEvent);
 
             var elapsed = Stopwatch.GetElapsedTime(start);
 

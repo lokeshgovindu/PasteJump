@@ -61,6 +61,7 @@
   -->
   <ItemGroup>
     <InternalsVisibleTo Include="PasteJump.UiSmoke" />
+    <InternalsVisibleTo Include="PasteJump.OverlaySpike" />
   </ItemGroup>
 
   <ItemGroup>
