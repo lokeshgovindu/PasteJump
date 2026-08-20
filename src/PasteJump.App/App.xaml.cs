@@ -66,6 +66,8 @@ public partial class App : Application
     private long? _ctrlDownSince;
 
     private long? _ctrlUpSince;
+
+    private readonly KeyRepeatFilter _traceRepeats = new();
     private bool _announcedHookRecovery;
     private GlobalHotkey _historyHotkey = null!;
     private TrayIcon _trayIcon = null!;
@@ -661,6 +663,10 @@ public partial class App : Application
             try
             {
                 _keyboardHook.Reinstall();
+
+                // Every event in the gap the reinstall closes was lost, so a key held across it must not
+                // have its next press read as auto-repeat and swallowed from the trace.
+                _traceRepeats.Reset();
             }
             catch (InvalidOperationException ex)
             {
@@ -774,7 +780,14 @@ public partial class App : Application
         // cannot reconstruct what was typed. See GestureTraceLog for why that is structural rather than a promise.
         var isNamed = e.VirtualKey == _triggerVirtualKey || VirtualKeyTranslator.IsModifier(e.VirtualKey);
 
-        if (isNamed)
+        // Windows auto-repeats a held key, so holding Ctrl to read the overlay wrote a line every ~30 ms - two,
+        // counting the verdict beneath it - and buried the events that matter. The first press is written and the
+        // release carries how many repeats were swallowed. Note this collapses the LOG only: the recognizer below
+        // still receives every event, because a repeated trigger key genuinely steps to another clip.
+        var repeats = 0;
+        var writeTrace = isNamed && _traceRepeats.ShouldWrite(e.VirtualKey, e.IsKeyDown, out repeats);
+
+        if (writeTrace)
         {
             var wasActive = _recognizer.IsSessionActive;
 
@@ -782,16 +795,17 @@ public partial class App : Application
                 $"key={DescribeKeyForTrace(e.VirtualKey)} {(e.IsKeyDown ? "down" : "up  ")} " +
                 $"gesture={key} live[ctrl={(_recognizer.CtrlHeld ? 1 : 0)} alt={(_recognizer.AltHeld ? 1 : 0)} " +
                 $"win={(_recognizer.WinHeld ? 1 : 0)} shift={(_recognizer.ShiftHeld ? 1 : 0)}] " +
-                $"sessionBefore={wasActive} fg={ForegroundNameForTrace()} otherKeysSoFar={_otherKeysSeen}");
+                $"sessionBefore={wasActive} fg={ForegroundNameForTrace()} otherKeysSoFar={_otherKeysSeen}"
+                + (repeats > 0 ? $" heldFor={repeats} repeat(s)" : string.Empty));
         }
-        else if (e.IsKeyDown)
+        else if (!isNamed && e.IsKeyDown)
         {
             _otherKeysSeen++;
         }
 
         if (key != GestureKey.None && _recognizer.Handle(key, e.IsKeyDown))
         {
-            if (isNamed)
+            if (writeTrace)
             {
                 _gestureTrace.Note($"   -> recognizer HANDLED it (swallowed). sessionNow={_recognizer.IsSessionActive}");
             }
@@ -799,7 +813,7 @@ public partial class App : Application
             return true;
         }
 
-        if (isNamed)
+        if (writeTrace)
         {
             _gestureTrace.Note($"   -> recognizer declined. sessionNow={_recognizer.IsSessionActive}");
         }
