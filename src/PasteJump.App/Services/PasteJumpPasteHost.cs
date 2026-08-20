@@ -34,6 +34,14 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
     private int? _overlayY;
     private PopupPosition _overlayPosition = PopupPosition.Automatic;
 
+    /// <summary>
+    /// Diagnostics, one line per gesture. "I cannot see the overlay" has now been reported three times with three
+    /// different causes - the mouse fallback, a window Windows draws above ours, and once because it was working
+    /// and the pointer was elsewhere - and each time the first hour went on establishing where the thing actually
+    /// went. That is a question the application can answer about itself in one line, so it does.
+    /// </summary>
+    private readonly Action<string>? _trace;
+
     private bool _showKeyHint = true;
     private char _triggerKey = 'V';
 
@@ -136,12 +144,14 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
         IPasteSender sender,
         SelfWriteGuard selfWrites,
         Dispatcher dispatcher,
-        Func<OverlayWindow> overlayFactory)
+        Func<OverlayWindow> overlayFactory,
+        Action<string>? trace = null)
     {
         _store = store;
         _clipboard = clipboard;
         _dispatcher = dispatcher;
         _overlayFactory = overlayFactory;
+        _trace = trace;
 
         // The scheduler is a one-shot DispatcherTimer rather than a sleep: this code is reached from
         // the keyboard hook callback, which must never block.
@@ -289,12 +299,25 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
         _overlay.SetImagePayload(model.Kind == ClipKind.Image ? TryLoadImageBytes(model) : null);
 
-        if (!_overlay.IsVisible)
+        // Logged as the session opens rather than on every tap of the trigger key: one line per gesture is a
+        // record, one per keystroke is noise that pushes the useful lines out of the file.
+        var opening = !_overlay.IsVisible;
+
+        if (opening)
         {
             _overlay.Show();
         }
 
         _overlay.Render(model, anchor);
+
+        if (opening)
+        {
+            _trace?.Invoke(
+                $"overlay: preference={_overlayPosition} anchor=({anchor.X},{anchor.Y}) "
+                + $"placement={anchor.Placement} avoid={anchor.Avoid?.ToString() ?? "none"} "
+                + $"-> drawn at ({_overlay.Left:F0},{_overlay.Top:F0}) {_overlay.ActualWidth:F0}x{_overlay.ActualHeight:F0} "
+                + $"in {ForegroundWindowInfo.GetForegroundProcessNameForTrace()}");
+        }
     }
 
     public void HideOverlay()

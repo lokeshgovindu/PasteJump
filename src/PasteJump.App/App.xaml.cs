@@ -258,7 +258,8 @@ public partial class App : Application
             new InputSender(),
             _selfWrites,
             Dispatcher,
-            () => new OverlayWindow());
+            () => new OverlayWindow(),
+            trace: message => _captureTrace.Write(message));
 
         _pasteHost.TagEditorRequested += OnTagEditorRequested;
         _pasteHost.ClipEditorRequested += OnClipEditorRequested;

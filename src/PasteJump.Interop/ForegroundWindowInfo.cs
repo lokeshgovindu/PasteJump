@@ -135,6 +135,22 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
     public static (int X, int Y) GetCursorPosition()
         => NativeMethods.GetCursorPos(out var cursor) ? (cursor.X, cursor.Y) : (0, 0);
 
+    /// <summary>
+    /// The foreground process name for a diagnostic line, never throwing and never null. Static because the
+    /// overlay host has no <see cref="IForegroundWindowInfo"/> of its own and does not need one for this.
+    /// </summary>
+    public static string GetForegroundProcessNameForTrace()
+    {
+        try
+        {
+            return new ForegroundWindowInfo().GetForegroundProcessName() ?? "(no foreground window)";
+        }
+        catch (Exception ex)
+        {
+            return "(failed: " + ex.GetType().Name + ")";
+        }
+    }
+
     /// <summary>Effective DPI of the monitor containing a physical point. 96 means unscaled.</summary>
     public static uint GetDpiForPoint(int x, int y)
     {
