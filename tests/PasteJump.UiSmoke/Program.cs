@@ -702,6 +702,7 @@ internal static class Program
         // running this twice would only assert the same thing again. The palette check does both themes itself.
         Console.WriteLine();
         VerifyPaletteContract();
+        VerifyOverlayPlacement();
         VerifyTrayIcons();
         VerifyTrayMenu(app);
         VerifyEverySettingHasAControl(new FormatterRegistry());
@@ -830,6 +831,79 @@ internal static class Program
     /// searchable settings of its own by design - everything on it is reachable through the tab that owns it.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Where the overlay window actually ends up, in pixels, for each placement.
+    /// </summary>
+    /// <remarks>
+    /// The one thing nothing else can check. "I cannot see the overlay" has been reported three times, and each
+    /// cause was a different answer to "where did it go" - the Core tests prove which anchor is <i>chosen</i>, and
+    /// a screenshot cannot tell a correctly placed overlay from a misplaced one without knowing where to look.
+    /// This drives the real window through the real placement code and reads back <c>Left</c> and <c>Top</c>.
+    /// <para>
+    /// Verified by neutering the centring arm of <c>AnchoredPlacement</c>: this fails.
+    /// </para>
+    /// </remarks>
+    private static void VerifyOverlayPlacement()
+    {
+        var overlay = new OverlayWindow();
+        var frame = TextFrame();
+
+        // A point on the primary monitor, away from every edge, so nothing here depends on clamping.
+        const int x = 700;
+        const int y = 500;
+
+        var scale = WindowInterop.GetScaleForPoint(x, y);
+
+        overlay.Show();
+
+        Check("beside a point", new OverlayAnchor(x, y, OverlayPlacement.BelowPoint), expectCentred: false);
+        Check("centred on a window", new OverlayAnchor(x, y, OverlayPlacement.CentredOn), expectCentred: true);
+
+        var corner = new OverlayAnchor(x, y, OverlayPlacement.WorkAreaBottomRight);
+        overlay.Render(frame, corner);
+
+        var work = WindowInterop.GetWorkAreaForPoint(x, y, scale);
+
+        if (overlay.Left + overlay.ActualWidth > work.Right || overlay.Top + overlay.ActualHeight > work.Bottom
+            || overlay.Left < work.Right / 2)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  bottom-right placement put the overlay at "
+                + $"({overlay.Left:F0},{overlay.Top:F0}) in a work area ending at ({work.Right:F0},{work.Bottom:F0})");
+        }
+        else
+        {
+            Console.WriteLine($"  overlay placement: corner at ({overlay.Left:F0},{overlay.Top:F0})");
+        }
+
+        overlay.Close();
+
+        void Check(string what, OverlayAnchor anchor, bool expectCentred)
+        {
+            overlay.Render(frame, anchor);
+
+            var expectedLeft = expectCentred
+                ? (x / scale) - (overlay.ActualWidth / 2)
+                : (x / scale) + 4;
+
+            var expectedTop = expectCentred
+                ? (y / scale) - (overlay.ActualHeight / 2)
+                : (y / scale) + 20;
+
+            // A pixel of tolerance: the real code snaps to whole device pixels, which is the point of it.
+            if (Math.Abs(overlay.Left - expectedLeft) > 1 || Math.Abs(overlay.Top - expectedTop) > 1)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  {what}: expected ({expectedLeft:F0},{expectedTop:F0}), "
+                    + $"got ({overlay.Left:F0},{overlay.Top:F0})");
+            }
+            else
+            {
+                Console.WriteLine($"  overlay placement: {what} at ({overlay.Left:F0},{overlay.Top:F0})");
+            }
+        }
+    }
+
     private static void VerifySearchIndex(SettingsWindow window)
     {
         var index = window.SearchIndexForSmokeTest();
