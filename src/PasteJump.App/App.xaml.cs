@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Threading;
 using PasteJump.App.Services;
 using PasteJump.App.Views;
 using PasteJump.Core;
@@ -52,6 +54,17 @@ public partial class App : Application
     private ClipboardMonitor _clipboardMonitor = null!;
     private Win32ClipboardAccess _clipboard = null!;
     private LowLevelKeyboardHook _keyboardHook = null!;
+
+    /// <summary>
+    /// Whether the user has switched the gesture off from the tray. Distinct from whether the hook is installed:
+    /// Windows can drop the hook on its own, and the watchdog must be able to tell "gone by accident" from "gone
+    /// because you asked".
+    /// </summary>
+    private bool _gestureDisabled;
+
+    private long _lastHookEventAt = Stopwatch.GetTimestamp();
+    private long? _ctrlDownSince;
+    private bool _announcedHookRecovery;
     private GlobalHotkey _historyHotkey = null!;
     private TrayIcon _trayIcon = null!;
 
@@ -322,6 +335,9 @@ public partial class App : Application
         _keyboardHook = new LowLevelKeyboardHook(OnKeyEvent);
         _keyboardHook.Install();
 
+        // After the hook, so its first tick cannot see a hook that does not exist yet and conclude we are deaf.
+        StartHookWatchdog();
+
         _historyHotkey = new GlobalHotkey(_messageWindow);
         _historyHotkey.Pressed += ShowHistory;
         ApplyHistoryHotkey(announceFailure: true);
@@ -502,8 +518,121 @@ public partial class App : Application
     /// returns, so it does translation and state-machine work only - every side effect is queued
     /// onto the dispatcher by <see cref="PasteJumpPasteHost"/>.
     /// </summary>
+    /// <summary>
+    /// Watches for Windows having silently dropped the keyboard hook, and puts it back.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reported 2026-08-20: at 100% CPU, a paste into the Run dialog left the overlay stuck, and from then on
+    /// Ctrl+V pasted straight through with no overlay. That is what a discarded hook looks like from outside -
+    /// Windows drops a hook whose callback exceeded <c>LowLevelHooksTimeout</c> and notifies nobody - and the only
+    /// recovery was restarting the application.
+    /// </para>
+    /// <para>
+    /// A quarter of a second, which is far more often than the failure happens and far cheaper than it sounds:
+    /// each tick is one <c>GetAsyncKeyState</c> and some arithmetic, and it does nothing at all unless the
+    /// evidence says something is wrong. The decision itself lives in <see cref="HookHealthPolicy"/> so the
+    /// thresholds are testable; this only gathers the inputs and carries out the verdict.
+    /// </para>
+    /// </remarks>
+    private void StartHookWatchdog()
+    {
+        var watchdog = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(250),
+        };
+
+        watchdog.Tick += (_, _) => CheckHookHealth();
+        watchdog.Start();
+    }
+
+    private void CheckHookHealth()
+    {
+        var ctrlHeld = VirtualKeyTranslator.IsCtrlDown();
+
+        // Tracked here rather than from key events on purpose: the whole question is what happens when key events
+        // stop arriving, so the only usable clock is one that does not depend on them.
+        if (ctrlHeld)
+        {
+            _ctrlDownSince ??= Stopwatch.GetTimestamp();
+        }
+        else
+        {
+            _ctrlDownSince = null;
+        }
+
+        var decision = HookHealthPolicy.Decide(
+            gestureEnabled: !_gestureDisabled,
+            hookInstalled: _keyboardHook.IsInstalled,
+            sessionActive: _recognizer.IsSessionActive,
+            ctrlHeld: ctrlHeld,
+            msSinceLastHookEvent: Stopwatch.GetElapsedTime(_lastHookEventAt).TotalMilliseconds,
+            msCtrlHeldFor: _ctrlDownSince is { } since
+                ? Stopwatch.GetElapsedTime(since).TotalMilliseconds
+                : 0);
+
+        if (!decision.AnythingToDo)
+        {
+            return;
+        }
+
+        if (decision.AbandonStuckSession)
+        {
+            // Reset rather than a bare Abort: it also clears the tracked modifier flags, which a session stranded
+            // by missing key events is guaranteed to have left wrong. Restores the clipboard and takes the overlay
+            // down, which is the visible half of the recovery.
+            _recognizer.Reset();
+        }
+
+        if (decision.ReinstallHook)
+        {
+            try
+            {
+                _keyboardHook.Reinstall();
+            }
+            catch (InvalidOperationException ex)
+            {
+                // SetWindowsHookEx refused. Nothing useful to do about it here, and throwing from a timer tick
+                // would take the application down over a diagnosis that may itself have been wrong.
+                _captureTrace.Write($"keyboard hook could not be reinstalled: {ex.Message}");
+                return;
+            }
+        }
+
+        NoteHookEvent();
+
+        _captureTrace.Write(
+            $"keyboard hook watchdog: reinstalled={decision.ReinstallHook} "
+            + $"abandonedStuckSession={decision.AbandonStuckSession} "
+            + $"(reinstalls so far {_keyboardHook.ReinstallCount})");
+
+        // Said once per run, not once per recovery. Under sustained load this can fire repeatedly, and a toast on
+        // every one would be worse than the fault; but saying nothing the first time leaves the user believing
+        // Ctrl+V simply broke, which is the reading that sends somebody hunting for a bug that is not there.
+        if (!_announcedHookRecovery && decision.ReinstallHook)
+        {
+            _announcedHookRecovery = true;
+
+            Toast().Notify(
+                "PasteJump reconnected its keyboard",
+                "Windows had stopped sending it keystrokes, which happens when the machine is very busy. "
+                    + "Ctrl+V works again.",
+                TimeSpan.FromSeconds(6),
+                ToastPlacement.BottomRight,
+                detailIsProse: true);
+        }
+    }
+
+    /// <summary>Records that the hook is alive, which is the clock the watchdog measures silence against.</summary>
+    private void NoteHookEvent()
+    {
+        _lastHookEventAt = Stopwatch.GetTimestamp();
+    }
+
     private bool OnKeyEvent(KeyboardHookEvent e)
     {
+        NoteHookEvent();
+
         // Our own synthesised keystrokes. Without this check, sending Ctrl+V to paste would
         // immediately re-enter paste mode and never stop.
         //
@@ -661,7 +790,7 @@ public partial class App : Application
         // stronger state is the one worth showing.
         var name = _keyboardHook switch
         {
-            { IsInstalled: false } => TrayIconArt.Disabled,
+            _ when _gestureDisabled => TrayIconArt.Disabled,
             _ when !_settings.MonitorClipboard => TrayIconArt.Paused,
             _ => TrayIconArt.Normal,
         };
@@ -796,7 +925,7 @@ public partial class App : Application
                     Restart: RestartFromMenu,
                     Exit: ExitApplication),
                 isPaused: !_settings.MonitorClipboard,
-                isDisabled: !_keyboardHook.IsInstalled));
+                isDisabled: _gestureDisabled));
 
         var built = started.Elapsed.TotalMilliseconds;
 
@@ -1563,8 +1692,13 @@ public partial class App : Application
     /// </summary>
     private void ToggleDisabled()
     {
-        if (_keyboardHook.IsInstalled)
+        // Tested against the user's intention rather than against whether the hook happens to be installed. Those
+        // were the same thing until the watchdog arrived; now the hook can be absent because Windows dropped it,
+        // and reading IsInstalled here would make one accidental drop look like the user having switched the
+        // application off - after which the watchdog would refuse to put it back.
+        if (!_gestureDisabled)
         {
+            _gestureDisabled = true;
             // The session is closed first, so the overlay cannot be left on screen with no way to dismiss
             // it once the keys that would dismiss it are no longer being received.
             _recognizer.Reset();
@@ -1575,7 +1709,9 @@ public partial class App : Application
         }
         else
         {
+            _gestureDisabled = false;
             _keyboardHook.Install();
+            NoteHookEvent();
             ApplyHistoryHotkey(announceFailure: false);
             _clipboardMonitor.Start();
 
@@ -1603,7 +1739,7 @@ public partial class App : Application
 
         // Disabled outranks paused, because it is the stronger statement: a disabled PasteJump is not
         // watching the clipboard either, so reporting "paused" would understate what is switched off.
-        if (_keyboardHook is { IsInstalled: false })
+        if (_gestureDisabled)
         {
             return text + " (disabled)";
         }

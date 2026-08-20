@@ -105,6 +105,34 @@ public sealed class LowLevelKeyboardHook : IDisposable
         _hook = IntPtr.Zero;
     }
 
+    /// <summary>How many times the hook has been reinstalled because it appeared to have stopped receiving keys.</summary>
+    /// <remarks>
+    /// Diagnostics, and the number to ask for when somebody reports that Ctrl+V went quiet: a value climbing here
+    /// means this machine really is losing hook events, rather than that PasteJump has a logic bug.
+    /// </remarks>
+    public int ReinstallCount { get; private set; }
+
+    /// <summary>
+    /// Uninstalls and installs again, to recover from Windows having silently discarded the hook.
+    /// </summary>
+    /// <remarks>
+    /// There is no API that answers "is my hook still registered" - Windows drops a hook whose callback exceeded
+    /// <c>LowLevelHooksTimeout</c> and tells nobody - so recovery cannot be conditional on detecting it directly.
+    /// Reinstalling unconditionally when the evidence points that way is the whole technique, and it is safe to do
+    /// when the diagnosis was wrong: the handle is replaced, no queued input is lost, and the cost is a pair of
+    /// user-mode calls.
+    /// <para>
+    /// Uninstall first even though the old handle may already be dead: <c>UnhookWindowsHookEx</c> on a discarded
+    /// hook simply fails, while leaking the handle each time would eventually run the process out of hooks.
+    /// </para>
+    /// </remarks>
+    public void Reinstall()
+    {
+        Uninstall();
+        Install();
+        ReinstallCount++;
+    }
+
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
         if (nCode != NativeConstants.HC_ACTION)
