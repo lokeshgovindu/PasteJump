@@ -137,7 +137,7 @@ public class HookHealthPolicyTests
 
     /// <summary>
     /// A session cannot be left stranded just because the hook is already gone - the overlay still has to come
-    /// down. Nothing is reinstalled, because there is nothing installed to replace.
+    /// down, and the missing hook is itself repaired.
     /// </summary>
     [Fact]
     public void AStrandedSessionIsStillAbandonedWhenTheHookIsAlreadyGone()
@@ -145,16 +145,22 @@ public class HookHealthPolicyTests
         var decision = Decide(hookInstalled: false, sessionActive: true, ctrlHeld: false);
 
         Assert.True(decision.AbandonStuckSession);
-        Assert.False(decision.ReinstallHook);
+        Assert.True(decision.ReinstallHook);
     }
 
+    /// <summary>
+    /// The gesture enabled with no hook installed is an inconsistency, repaired on sight and needing no evidence:
+    /// once the user's own switch is ruled out, this state has no legitimate cause. An earlier version of this
+    /// policy asserted the opposite - that nothing should be done, since "only the code that uninstalled it knows
+    /// whether that was intended" - and a throwaway build that dropped its own hook then sat deaf for ever,
+    /// reproducing the reported symptom exactly.
+    /// </summary>
     [Fact]
-    public void AnUninstalledHookIsNotReinstalledOnDeafnessEvidenceAlone()
+    public void TheGestureEnabledWithNoHookIsRepairedWithoutWaitingForEvidence()
     {
-        // Nothing to diagnose: with no hook installed and no session open, the application is simply not
-        // listening, and only the code that uninstalled it knows whether that was intended.
-        Assert.False(
-            Decide(hookInstalled: false, ctrlHeld: true, msCtrlHeldFor: 5_000, msSinceLastHookEvent: 5_000)
-                .AnythingToDo);
+        var decision = Decide(hookInstalled: false, ctrlHeld: false, msSinceLastHookEvent: 0);
+
+        Assert.True(decision.ReinstallHook);
+        Assert.False(decision.AbandonStuckSession);
     }
 }

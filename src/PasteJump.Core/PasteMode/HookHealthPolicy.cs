@@ -92,12 +92,24 @@ public static class HookHealthPolicy
         // asks for a paste, and this is precisely the case where we do not know that the user did.
         if (sessionActive && !ctrlHeld)
         {
-            return new HookHealthDecision(ReinstallHook: hookInstalled, AbandonStuckSession: true);
+            // Reinstalled whatever IsInstalled claims. A session stranded like this is near-proof that the hook is
+            // dead - a live one would have delivered the Ctrl release - and the flag is exactly what cannot be
+            // trusted here, since Windows discards a hook without updating it.
+            return new HookHealthDecision(ReinstallHook: true, AbandonStuckSession: true);
         }
 
+        // The gesture is on and there is no hook at all: an inconsistency, repaired on sight without waiting for
+        // evidence. It needs none - this state has no legitimate cause once the user's own switch has been ruled
+        // out above, and it is reachable by an Install() that threw at start-up or by any future path that
+        // uninstalls without saying so.
+        //
+        // Note this is NOT the state Windows leaves behind when it discards a hook for exceeding
+        // LowLevelHooksTimeout: there we keep a stale handle and go on believing it is installed, which is why the
+        // evidence-based rule below exists as well. Both are needed, and a throwaway build that dropped the hook
+        // the tidy way proved the point by recovering from neither until this was added.
         if (!hookInstalled)
         {
-            return HookHealthDecision.Nothing;
+            return new HookHealthDecision(ReinstallHook: true, AbandonStuckSession: false);
         }
 
         // Nothing is concluded from silence during an open session, and that is deliberate rather than a gap.

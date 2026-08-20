@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 959 in Debug (`dotnet test`) - 906 in Core.Tests, 53 in Interop.Tests; **957 in Release**, see below |
+| Tests | 980 in Debug (`dotnet test`) - 927 in Core.Tests, 53 in Interop.Tests; **978 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -123,7 +123,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      906 tests.
+tests/PasteJump.Core.Tests      927 tests.
 tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -161,6 +161,32 @@ that immediately caught two real bugs. Expect to do the same again.
 - **The hook callback blocks all keyboard input machine-wide.** Exceed `LowLevelHooksTimeout` and
   Windows silently discards the hook — the app then looks fine but has stopped receiving keys. All
   side effects are queued onto the Dispatcher by `PasteJumpPasteHost`; keep it that way.
+- **A dropped hook is now recovered rather than needing a restart, and the state it leaves behind is not the
+  obvious one (2026-08-20).** Reported as: machine at 100% CPU, a paste into the Run dialog left the overlay stuck,
+  and afterwards Ctrl+V pasted straight through with no overlay. `HookHealthPolicy` (in `Core`, so the thresholds
+  are testable) runs off a 250 ms timer and either reinstalls the hook or ends a stranded session.
+  - **When Windows discards the hook, `IsInstalled` stays TRUE.** We keep a stale handle and are never told, so
+    "is it installed" cannot be the test. That is why there are two rules and not one: an evidence-based one for
+    the silent case, and a repair for `gesture enabled but no hook`, which is a different failure (an `Install`
+    that threw, or a future path that uninstalls without saying so). A throwaway build that dropped its hook the
+    *tidy* way recovered from neither until the second rule existed — the first sabotage was unfaithful to the
+    failure it was imitating.
+  - **The deafness test has to be RELATIVE, and a fixed threshold was a shipped false positive.** Holding Ctrl
+    sends no further key events, so silence-since-the-last-event passes any constant on a perfectly healthy hook —
+    it announced a recovery within a minute of deploying. The question is whether anything has been heard *since
+    Ctrl went down*, plus a margin for the sampler always believing Ctrl went down later than it did.
+  - **Nothing is concluded from silence during an open session.** Somebody reading the overlay sends no keys.
+    Deafness mid-gesture is caught by the rule that needs no hook at all: a session still open while Ctrl is
+    physically up is abandoned, since a live hook would have delivered the release. That is also what un-sticks the
+    overlay.
+  - **`_gestureDisabled` exists because "disabled" used to mean `!IsInstalled`.** With a watchdog those are
+    different states, and conflating them either resurrects an application the user switched off or refuses to fix
+    a genuine drop. Intent is the flag; `IsInstalled` is only the mechanical fact.
+  - **The recovery is announced once per run, not once per recovery.** Under sustained load it can fire
+    repeatedly and a toast each time is worse than the fault, but silence the first time leaves the user believing
+    Ctrl+V simply broke.
+  - Verified end to end against a faithful sabotage: hook killed mid-gesture with the overlay up, the overlay came
+    down 1.2 s after Ctrl was released (`abandonedStuckSession=True`), and the gesture worked immediately after.
 - **Ignore *our own* injected input, not all of it.** Use `KeyboardHookEvent.IsOwnInjection`, which
   matches our `dwExtraInfo` signature. Filtering on `LLKHF_INJECTED` alone — as this once did — kills
   the gesture entirely under Remote Desktop, in VM guest windows, and for anyone on a macro keyboard,
@@ -1776,8 +1802,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   which is precisely why Pause and Disable were reported as being the same command.
 - **An off state's toggle is bold in the tray menu (2026-08-15), and the menu is the one place that must not use
   the disabled-beats-paused precedence.** Asked for, and the reason it is needed is that the menu is opened by
-dotnet test                                         # 959 tests (Debug)
-dotnet test -c Release                              # 957 - what CI runs, and it is not the same set
+dotnet test                                         # 980 tests (Debug)
+dotnet test -c Release                              # 978 - what CI runs, and it is not the same set
   the way out of it. **Both are bold when both apply** — a paused-then-disabled PasteJump genuinely has two things
   to switch back on, and picking one would hide the other, unlike `ApplyTrayIcon` and `BuildTrayTooltip` which have
   to choose a single answer. Note the signal is now shared with About, which is `Emphasised` by request; if a third
@@ -1805,8 +1831,8 @@ dotnet test -c Release                              # 957 - what CI runs, and it
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 949 tests (Debug)
-dotnet test -c Release                              # 947 - what CI runs, and it is not the same set
+dotnet test                                         # 980 tests (Debug)
+dotnet test -c Release                              # 978 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
