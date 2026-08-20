@@ -228,6 +228,17 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out POINT lpPoint);
 
+    /// <summary>
+    /// The window that owns the clipboard, or null when nobody does.
+    /// <para>
+    /// Null is the signature of <c>OleFlushClipboard</c>: an application rendering its formats as it closes, so
+    /// the copy outlives it. That change is byte-identical to what is already stored, so ownership is the only
+    /// thing that distinguishes it from the user pressing Ctrl+C again.
+    /// </para>
+    /// </summary>
+    [DllImport(User32)]
+    public static extern IntPtr GetClipboardOwner();
+
     [DllImport(User32, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);

@@ -51,10 +51,10 @@ internal sealed class FakeClipboardAccess : IClipboardAccess
         return _writeResults.Count > 0 ? _writeResults.Dequeue() : WriteSucceeds;
     }
 
-    public static ClipboardSnapshot TextSnapshot(string text, string? sourceExe = null)
+    public static ClipboardSnapshot TextSnapshot(string text, string? sourceExe = null, bool hasOwner = true)
     {
         var payload = new ClipPayload(13, null, System.Text.Encoding.Unicode.GetBytes(text));
-        return new ClipboardSnapshot([payload], text, ClipKind.Text, sourceExe);
+        return new ClipboardSnapshot([payload], text, ClipKind.Text, sourceExe, hasOwner);
     }
 }
 

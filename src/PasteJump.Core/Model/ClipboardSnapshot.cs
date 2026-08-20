@@ -21,7 +21,8 @@ public sealed class ClipboardSnapshot
         IReadOnlyList<ClipPayload> payloads,
         string? text,
         ClipKind kind,
-        string? sourceExecutable)
+        string? sourceExecutable,
+        bool hasOwner = true)
     {
         ArgumentNullException.ThrowIfNull(payloads);
 
@@ -29,6 +30,7 @@ public sealed class ClipboardSnapshot
         Text = text;
         Kind = kind;
         SourceExecutable = sourceExecutable;
+        HasOwner = hasOwner;
         TotalBytes = payloads.Sum(static p => (long)p.ByteLength);
         ContentHash = ComputeHash(payloads);
         DedupKey = ComputeDedupKey(text, kind, ContentHash);
@@ -43,6 +45,22 @@ public sealed class ClipboardSnapshot
 
     /// <summary>File name of the process that owned the foreground window at capture time.</summary>
     public string? SourceExecutable { get; }
+
+    /// <summary>
+    /// Whether a window still owned the clipboard when this was read. False means the data is there but nobody
+    /// owns it, which is what <c>OleFlushClipboard</c> leaves behind - an application rendering its formats as it
+    /// closes so the copy survives it.
+    /// </summary>
+    /// <remarks>
+    /// Reported so a repeat can be told from a flush. Measured 2026-08-20: a copy made by a live process reports
+    /// an owner (<c>CLIPBRDWNDCLASS</c>, that process), and the same content after that process exits reports
+    /// <c>owner=NULL</c>. Without this, closing Notepad after copying announced "Same as the last copy" - the
+    /// content was genuinely identical, so nothing but the ownership distinguishes the two.
+    /// <para>
+    /// Defaults to true, so every existing caller and test keeps describing an ordinary copy.
+    /// </para>
+    /// </remarks>
+    public bool HasOwner { get; }
 
     public long TotalBytes { get; }
 

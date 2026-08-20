@@ -404,6 +404,60 @@ public sealed class CaptureServiceTests : IDisposable
     }
 
     /// <summary>
+    /// Reported as "I copied in Notepad, closed it, and saw the copy notification again". An application
+    /// rendering its clipboard formats as it closes republishes byte-identical content, so nothing but the
+    /// ownership tells that apart from a copy made again: a live process reports an owning window, a flush
+    /// reports none. Measured 2026-08-20, both cases.
+    /// </summary>
+    [Fact]
+    public void AFlushFromAClosingApplicationIsNotAnnouncedAsARepeat()
+    {
+        var copied = FakeClipboardAccess.TextSnapshot("copied in notepad");
+        var flushed = FakeClipboardAccess.TextSnapshot("copied in notepad", hasOwner: false);
+
+        _clipboard.EnqueueRead(copied);
+        _clipboard.EnqueueRead(flushed);
+
+        var notices = 0;
+        var capture = Build();
+        capture.CaptureObserved += () => notices++;
+        capture.Prime();
+
+        SignalChange(capture);   // the copy
+        SignalChange(capture);   // the application closing and flushing what it had copied
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(1, capture.OwnerlessRepublishSkipCount);
+        Assert.Equal(0, notices);
+    }
+
+    /// <summary>
+    /// The counterpart, and the reason ownership is the test rather than the content: a repeat the user really
+    /// made comes from a live application, which owns the clipboard. That still earns its acknowledgement -
+    /// staying silent would make a repeat copy indistinguishable from PasteJump having missed it.
+    /// </summary>
+    [Fact]
+    public void ARepeatFromALiveApplicationIsStillAnnounced()
+    {
+        var copied = FakeClipboardAccess.TextSnapshot("copied twice by hand");
+
+        _clipboard.EnqueueRead(copied);
+        _clipboard.EnqueueRead(copied);
+
+        var notices = 0;
+        var capture = Build();
+        capture.CaptureObserved += () => notices++;
+        capture.Prime();
+
+        SignalChange(capture);
+        SignalChange(capture);
+
+        Assert.Equal(1, _store.Count);
+        Assert.Equal(0, capture.OwnerlessRepublishSkipCount);
+        Assert.Equal(1, notices);
+    }
+
+    /// <summary>
     /// The bug reported as "after paste, I am getting copied overlay also". One paste is not one notification:
     /// an application that republishes the clipboard after the settle window closes produces a second read of
     /// the same bytes. <c>IsOwnWrite</c> consumes its entry, so that second read used to fall through to the

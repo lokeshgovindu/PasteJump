@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 1000 in Debug (`dotnet test`) - 947 in Core.Tests, 53 in Interop.Tests; **998 in Release**, see below |
+| Tests | 1002 in Debug (`dotnet test`) - 949 in Core.Tests, 53 in Interop.Tests; **1000 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -123,7 +123,7 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      947 tests.
+tests/PasteJump.Core.Tests      949 tests.
 tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -737,6 +737,22 @@ that immediately caught two real bugs. Expect to do the same again.
 - **The overlay must never take focus.** `WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW`
   applied in code, not just the XAML flags. Focus theft sends the user's paste into our overlay.
   Search input therefore arrives through the hook, not a focused text box.
+- **Closing an application republishes its clipboard, and only the OWNER tells that apart from a repeat copy
+  (fixed 2026-08-20).** Reported as "I copied in Notepad, closed it with Alt+F, and saw the copy notification
+  again", and the log showed three `SUPPRESSED as a repeat` entries after one `STORED` - each of which shows the
+  "Same as the last copy" notice. `OleFlushClipboard` renders an application's formats as it closes so the copy
+  outlives it, and that republish is **byte-identical**, so no amount of content comparison can distinguish it.
+  - **`GetClipboardOwner()` is the discriminator.** Measured both cases: a copy from a live process reports an
+    owning window (`CLIPBRDWNDCLASS`, that process), and the same content after that process exits reports
+    `owner=NULL`. `ClipboardSnapshot.HasOwner` carries it, defaulting to true so every existing caller and test
+    keeps describing an ordinary copy.
+  - **Only the NOTICE is suppressed, and nothing is lost.** The clip is already at the top of the stack, so there
+    is no copy going unacknowledged - only an event the user did not cause. A repeat from a live application is
+    still announced, because staying silent there would make a repeat copy indistinguishable from PasteJump having
+    missed it, which is the reasoning `CaptureObserved` already carried.
+  - **Known limit, accepted:** an application that copies via `OpenClipboard(NULL)` owns nothing even for a
+    genuine copy, so a real repeat from one would be suppressed silently. Nothing is stored either way, so the
+    cost is one acknowledgement.
 - **The copy notification shares the overlay's placement mechanism (`CopyNotificationPosition`, 2026-08-20), and
   its default deliberately differs.** Asked as "can we use the same mechanism while copying?" - and the same
   invisibility does apply, because a keyboard-driven copy leaves the pointer wherever it was. Three decisions:
@@ -1834,8 +1850,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   which is precisely why Pause and Disable were reported as being the same command.
 - **An off state's toggle is bold in the tray menu (2026-08-15), and the menu is the one place that must not use
   the disabled-beats-paused precedence.** Asked for, and the reason it is needed is that the menu is opened by
-dotnet test                                         # 1000 tests (Debug)
-dotnet test -c Release                              # 998 - what CI runs, and it is not the same set
+dotnet test                                         # 1002 tests (Debug)
+dotnet test -c Release                              # 1000 - what CI runs, and it is not the same set
   the way out of it. **Both are bold when both apply** — a paused-then-disabled PasteJump genuinely has two things
   to switch back on, and picking one would hide the other, unlike `ApplyTrayIcon` and `BuildTrayTooltip` which have
   to choose a single answer. Note the signal is now shared with About, which is `Emphasised` by request; if a third
@@ -1863,8 +1879,8 @@ dotnet test -c Release                              # 998 - what CI runs, and it
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 1000 tests (Debug)
-dotnet test -c Release                              # 998 - what CI runs, and it is not the same set
+dotnet test                                         # 1002 tests (Debug)
+dotnet test -c Release                              # 1000 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes

@@ -103,6 +103,12 @@ public sealed class CaptureService
     /// </summary>
     public int SelfWriteEchoSkipCount { get; private set; }
 
+    /// <summary>
+    /// Repeats that arrived with no clipboard owner - an application flushing its formats as it closed - and were
+    /// therefore skipped without announcing anything.
+    /// </summary>
+    public int OwnerlessRepublishSkipCount { get; private set; }
+
     /// <summary>Read attempts that could not open the clipboard, including retries.</summary>
     public int ReadFailureCount { get; private set; }
 
@@ -375,6 +381,22 @@ public sealed class CaptureService
             }
 
             ConsecutiveDuplicateSkipCount++;
+
+            // A flush, not a repeat. An application rendering its clipboard formats as it closes
+            // (OleFlushClipboard) republishes byte-identical content, so nothing but the ownership tells the two
+            // apart: a copy made by a live process reports an owning window, and this reports none. Reported as
+            // "I copied in Notepad, closed it, and saw the copy notification again".
+            //
+            // Silent rather than announced, and nothing is lost by it: the clip is already at the top of the
+            // stack, so there is no copy going unacknowledged - only an event the user did not cause.
+            if (!snapshot.HasOwner)
+            {
+                OwnerlessRepublishSkipCount++;
+                _trace?.Invoke("SUPPRESSED as a repeat, and silently: the clipboard has no owner, so an "
+                    + "application flushed it as it closed rather than anybody copying again");
+                return;
+            }
+
             _trace?.Invoke($"SUPPRESSED as a repeat of the previous clip (key={Describe(snapshot.DedupKey)}, "
                 + $"clip {_lastClipId}) - this is what shows the \"Same as the last copy\" notice");
 

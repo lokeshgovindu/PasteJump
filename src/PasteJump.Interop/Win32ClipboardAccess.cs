@@ -88,7 +88,12 @@ public sealed class Win32ClipboardAccess : IClipboardAccess
             var text = ExtractText(kept);
             var kind = ClassifyKind(kept, text);
 
-            return new ClipboardSnapshot(kept, text, kind, _foreground?.GetForegroundProcessName());
+            return new ClipboardSnapshot(
+                kept,
+                text,
+                kind,
+                _foreground?.GetForegroundProcessName(),
+                hasOwner: NativeMethods.GetClipboardOwner() != IntPtr.Zero);
         }
         finally
         {
