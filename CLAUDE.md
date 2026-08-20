@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 958 in Debug (`dotnet test`) - 906 in Core.Tests, 53 in Interop.Tests; **956 in Release**, see below |
+| Tests | 959 in Debug (`dotnet test`) - 906 in Core.Tests, 53 in Interop.Tests; **957 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -1768,8 +1768,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   which is precisely why Pause and Disable were reported as being the same command.
 - **An off state's toggle is bold in the tray menu (2026-08-15), and the menu is the one place that must not use
   the disabled-beats-paused precedence.** Asked for, and the reason it is needed is that the menu is opened by
-  right-clicking the very icon whose hue carries the state, so opening it covers up the indicator: `Resume Capture`
-  and `Enable PasteJump` are `Emphasised`, since the row that undoes an off state is both the state indicator and
+dotnet test                                         # 959 tests (Debug)
+dotnet test -c Release                              # 957 - what CI runs, and it is not the same set
   the way out of it. **Both are bold when both apply** — a paused-then-disabled PasteJump genuinely has two things
   to switch back on, and picking one would hide the other, unlike `ApplyTrayIcon` and `BuildTrayTooltip` which have
   to choose a single answer. Note the signal is now shared with About, which is `Emphasised` by request; if a third
