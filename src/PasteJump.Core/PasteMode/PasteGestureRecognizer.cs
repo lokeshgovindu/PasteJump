@@ -353,14 +353,36 @@ public sealed class PasteGestureRecognizer
                     _searchBuffer.Clear();
                     _controller.Handle(PasteAction.ToggleSearch);
                     return true;
+
+                // The arrows step through the matches, and they are the ONLY way to step while searching.
+                // Clipjump bound exactly these two for the same job (spm_nextres / spm_prevres,
+                // searchPasteMode.ahk:19), and being physical keys they can never be part of a query.
+                case GestureKey.StepOlder:
+                case GestureKey.Back:
+                    _controller.Handle(key.ToAction()!.Value);
+                    return true;
             }
 
-            // While searching, letters and digits are search text, not commands - except when
-            // Ctrl is held, which is how the original let paste-mode keys stay reachable.
-            if (!IsControlDown)
-            {
-                return false;
-            }
+            // EVERY other key is search text. Nothing else acts, and this is a fix rather than a simplification.
+            //
+            // It used to fall through to the action dispatch whenever Ctrl was held - which is ALWAYS, because
+            // holding Ctrl is what keeps the gesture open. So `IsControlDown` could never be false here and the
+            // guard it stood in for did nothing: typing a query fired an action per letter. Reported by typing
+            // "output" into the search box, where the `o` opened the clip in an editor - and `t` would have
+            // opened the tag editor and `p` pinned the clip, so a five-letter word could leave three windows
+            // open and a clip pinned.
+            //
+            // The original is unambiguous here and we had departed from it by accident. While its search box is
+            // up, Clipjump registers precisely four hotkeys - Enter, Home, Up, Down (searchPasteMode.ahk:17-21)
+            // - plus F re-pointed to close the box. No letter is an action. It could afford to leave the
+            // paste-mode letters registered because they are Ctrl chords and its search box is FOCUSED, so
+            // `ctrlCheck` (Clipjump.ahk:882) lets the user release Ctrl and type normally. Search input reaches
+            // us through the hook instead, precisely so focus never moves, which means Ctrl stays down and the
+            // same letters are chords rather than text. Same behaviour, opposite mechanics.
+            //
+            // What this costs is reaching a lettered action mid-search: close the search with Ctrl+F first. That
+            // is a keystroke; the alternative was a query that could not contain half the alphabet.
+            return false;
         }
 
         // ---- digits jump

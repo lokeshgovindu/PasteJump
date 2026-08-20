@@ -293,6 +293,32 @@ that immediately caught two real bugs. Expect to do the same again.
   switches away. That second exception is the safety valve: without it, a session that failed to close would
   present as a dead keyboard with no way out. Note this departs from Clipjump, which binds keys as AHK
   hotkeys and therefore leaks every key it has no binding for.
+- **While the search box is open, NO letter and NO digit is an action, and the guard that was meant to ensure
+  that could never fire (fixed 2026-08-20).** Reported as: pressed `F`, typed `output`, and the `o` opened the clip
+  in an editor. The search branch of `PasteGestureRecognizer` fell through to the action dispatch "except when Ctrl
+  is held" — and **holding Ctrl is what keeps the gesture open**, so `IsControlDown` is true for every keystroke of
+  every query and the exception was the rule. Four of the six letters in that one word are bound: `o` editor,
+  `t` tags, `p` pin. A five-letter word could leave three windows open and a clip pinned.
+  - **The original had it right and we departed from it by accident.** While its search box is up, Clipjump
+    registers exactly four hotkeys — Enter, Home, Up, Down (`searchPasteMode.ahk:17-21`) — plus `F` re-pointed to
+    close the box. No letter is an action. It could afford to leave the paste-mode letters registered because they
+    are `Ctrl` chords *and its search box is focused*, so `ctrlCheck` (`Clipjump.ahk:882`) deliberately does not end
+    paste mode when Ctrl is released: you let go and type normally. **Ours takes search input through the hook so
+    that focus never moves** — which is the right decision for a different reason — and the consequence is that Ctrl
+    stays down and those same letters arrive as chords rather than as text. Same intended behaviour, opposite
+    mechanics, and the mechanics are what the guard got wrong.
+  - **The arrows are the only way to step through matches**, being the one pair that can never be part of a query.
+    That is Clipjump's `spm_nextres`/`spm_prevres` too. The trigger key is *not* kept for stepping: with Ctrl held
+    it is indistinguishable from typing `v`, and a query that cannot contain half the alphabet is worse than one
+    that needs the arrows.
+  - **What it costs is stated as a test**, `Closing_search_makes_the_letters_act_again`, so nobody restores the old
+    behaviour thinking the letters were disabled by mistake. Close search with `Ctrl+F` and they act again.
+  - **1002 tests passed while this was broken, and that is the more useful half of the finding.** Every search test
+    typed its query by calling `HandleCharacter` directly — which sits *downstream* of the decision that was wrong.
+    They proved the buffer accumulates characters, which was never in doubt. **Nothing drove a bound letter through
+    `Handle` while searching, which is what a keyboard does.** When testing a routing decision, drive the key path,
+    not the method the key path is supposed to reach: 16 of the 20 new tests fail against the old code, and none of
+    the old ones did.
 - **`Ctrl+Shift+V` must pass straight through — it is not ours.** Every terminal pastes with it (Visual
   Studio's, VS Code's, Windows Terminal's) and browsers and editors use it for paste-as-plain-text. The
   recognizer therefore declines to open a session when Shift is already held at the trigger, and the guard

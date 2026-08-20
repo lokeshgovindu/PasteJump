@@ -201,11 +201,20 @@ always be empty &mdash; nothing is recording them.</p>
 <tr><th>Key</th><th>Action</th></tr>
 <tr><td class="key">F</td><td>Open search. <code>Ctrl</code> may then be released &mdash; just type to
 filter by clip content or by tag.</td></tr>
-<tr><td class="key">V / Ctrl+C</td><td>Move between matches while searching.</td></tr>
+<tr><td class="key">Ctrl+F</td><td>Close search and go back to browsing.</td></tr>
+<tr><td class="key">Down / Up</td><td>Move between matches. Right and Left do the same.</td></tr>
 <tr><td class="key">Backspace</td><td>Delete a character from the query.</td></tr>
 <tr><td class="key">Enter</td><td>Paste the match.</td></tr>
 <tr><td class="key">Esc</td><td>Cancel.</td></tr>
 </table>
+
+<div class="note">
+<p><b>While the search box is open, every letter and digit is part of the query.</b> None of the lettered
+actions fires &mdash; so typing <i>output</i> searches for &quot;output&quot; rather than opening the clip in an
+editor and pinning it on the way past. Press <code>Ctrl</code>+<code>F</code> to close the search first if you
+want one of those keys. The arrows are the only way to step through matches, because they are the one pair that
+can never be part of what you are typing.</p>
+</div>
 
 <div class="shot shot-inline">
 <img src="images/overlay-search.png" alt="The overlay in search mode, showing the query and a match count">

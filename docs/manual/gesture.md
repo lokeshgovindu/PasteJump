@@ -113,10 +113,15 @@ It combines with search: narrow to images, then `F` and type to search within th
 | Key | Action |
 | --- | --- |
 | **F** | Open search. `Ctrl` may then be released — just type to filter by clip content or by tag. |
-| **V / Ctrl+C** | Move between matches while searching. |
+| **Ctrl+F** | Close search and go back to browsing. |
+| **Down / Up** | Move between matches. Right and Left do the same. |
 | **Backspace** | Delete a character from the query. |
 | **Enter** | Paste the match. |
 | **Esc** | Cancel. |
+
+> **Note**
+>
+> **While the search box is open, every letter and digit is part of the query.** None of the lettered actions fires — so typing *output* searches for "output" rather than opening the clip in an editor and pinning it on the way past. Press `Ctrl`+`F` to close the search first if you want one of those keys. The arrows are the only way to step through matches, because they are the one pair that can never be part of what you are typing.
 
 Search mode adds a row above the preview: the query, and how many clips match it.
 
