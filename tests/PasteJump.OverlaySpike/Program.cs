@@ -121,6 +121,11 @@ internal static class Program
                 continue;
             }
 
+            // The same line PasteJump writes to its own trace when a gesture opens, so a report from this spike
+            // and a report from the running application can be laid side by side. Printed after focusing, since
+            // it describes the foreground.
+            Say("   " + ForegroundWindowInfo.DescribeForegroundForTrace());
+
             foreach (var mode in modes)
             {
                 var anchor = ForegroundWindowInfo.GetPreferredOverlayAnchor(mode);

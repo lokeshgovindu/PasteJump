@@ -136,6 +136,62 @@ public sealed class ForegroundWindowInfo : IForegroundWindowInfo
         => NativeMethods.GetCursorPos(out var cursor) ? (cursor.X, cursor.Y) : (0, 0);
 
     /// <summary>
+    /// The three inputs the overlay's position is chosen from, as one line for the trace: the foreground window's
+    /// rectangle, its extended style, and whether it exposed a caret.
+    /// </summary>
+    /// <remarks>
+    /// Logging where the overlay was DRAWN turned out not to be enough, and this is why: a report of "the overlay
+    /// is not visible in Edge" survived a day of investigation in which the recognizer, the placement rules and
+    /// the paste were each proved correct in Edge from the logs. Without the inputs there is no way to tell a
+    /// wrong answer from a right answer to a wrong question - an off-screen rectangle, a stale caret, or a window
+    /// Windows draws above ours all produce a perfectly plausible "drawn at" line. Read once per gesture, never
+    /// per keystroke.
+    /// </remarks>
+    public static string DescribeForegroundForTrace()
+    {
+        try
+        {
+            var hwnd = NativeMethods.GetForegroundWindow();
+
+            if (hwnd == IntPtr.Zero)
+            {
+                return "fg=(none)";
+            }
+
+            var rect = NativeMethods.GetWindowRect(hwnd, out var r)
+                ? $"({r.Left},{r.Top})-({r.Right},{r.Bottom})"
+                : "(unreadable)";
+
+            var exStyle = NativeMethods.GetWindowLong(hwnd, NativeConstants.GWL_EXSTYLE);
+            var caret = "none";
+
+            var threadId = NativeMethods.GetWindowThreadProcessId(hwnd, out _);
+
+            if (threadId != 0)
+            {
+                var info = new GUITHREADINFO();
+                info.cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<GUITHREADINFO>();
+
+                if (NativeMethods.GetGUIThreadInfo(threadId, ref info) && info.hwndCaret != IntPtr.Zero)
+                {
+                    var point = new POINT { X = info.rcCaret.Left, Y = info.rcCaret.Bottom };
+
+                    caret = NativeMethods.ClientToScreen(info.hwndCaret, ref point)
+                        ? $"({point.X},{point.Y})"
+                        : "stale handle";
+                }
+            }
+
+            return $"fg={GetForegroundProcessNameForTrace()} hwnd=0x{hwnd:X} rect={rect} "
+                + $"ex=0x{exStyle:X8} iconic={NativeMethods.IsIconic(hwnd)} caret={caret}";
+        }
+        catch (Exception ex)
+        {
+            return "fg=(failed: " + ex.GetType().Name + ")";
+        }
+    }
+
+    /// <summary>
     /// The foreground process name for a diagnostic line, never throwing and never null. Static because the
     /// overlay host has no <see cref="IForegroundWindowInfo"/> of its own and does not need one for this.
     /// </summary>

@@ -312,11 +312,15 @@ public sealed class PasteJumpPasteHost : IPasteModeHost
 
         if (opening)
         {
+            // The device rectangle of the overlay's own HWND, not Left/Top, which are WPF's device-independent
+            // idea of where it asked to be. Those two disagree the moment scaling is involved, and "where did
+            // Windows actually put it" is the question - a difference between them is itself the finding.
             _trace?.Invoke(
                 $"overlay: preference={_overlayPosition} anchor=({anchor.X},{anchor.Y}) "
                 + $"placement={anchor.Placement} avoid={anchor.Avoid?.ToString() ?? "none"} "
                 + $"-> drawn at ({_overlay.Left:F0},{_overlay.Top:F0}) {_overlay.ActualWidth:F0}x{_overlay.ActualHeight:F0} "
-                + $"in {ForegroundWindowInfo.GetForegroundProcessNameForTrace()}");
+                + $"hwnd={WindowInterop.DescribeWindowForTrace(_overlay)} | "
+                + ForegroundWindowInfo.DescribeForegroundForTrace());
         }
     }
 

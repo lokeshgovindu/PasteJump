@@ -11,6 +11,58 @@ internal static class WindowInterop
 {
     private const int GWL_EXSTYLE = -20;
 
+    /// <summary>
+    /// Where Windows has actually put a window, for the trace: its device rectangle, its extended style, and
+    /// whether Windows considers it visible.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately read from the HWND rather than from WPF. <c>Window.Left</c> is what the window asked for in
+    /// device-independent units and <c>Window.IsVisible</c> is WPF's own bookkeeping; neither is evidence about
+    /// the thing on the screen, and a disagreement between the two is exactly the kind of fault that presents as
+    /// "the overlay is not there" while every property in the debugger looks right.
+    /// </remarks>
+    public static string DescribeWindowForTrace(System.Windows.Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        try
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+
+            if (handle == IntPtr.Zero)
+            {
+                return "(no handle)";
+            }
+
+            var rect = GetWindowRect(handle, out var r)
+                ? $"({r.Left},{r.Top})-({r.Right},{r.Bottom})"
+                : "(unreadable)";
+
+            var exStyle = (long)GetWindowLongPtr(handle, GWL_EXSTYLE);
+
+            return $"0x{handle:X} {rect} ex=0x{exStyle:X8} visible={IsWindowVisible(handle)}";
+        }
+        catch (Exception ex)
+        {
+            return "(failed: " + ex.GetType().Name + ")";
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TRACERECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out TRACERECT rect);
+
     private const int WS_EX_TRANSPARENT = 0x00000020;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_LAYERED = 0x00080000;
