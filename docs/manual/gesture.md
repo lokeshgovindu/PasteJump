@@ -144,6 +144,36 @@ After three taps of `X`. The banner is red, and it names what releasing `Ctrl` w
 
 Letters already bound to an action would not be offered, because the trigger key doubles as "step to an older clip" and would otherwise shadow that action for ever.
 
+## Where the overlay appears
+
+**Beside the text caret — where you are already looking.**
+
+That is the point of it: a clipboard picker in a fixed corner of the screen makes you glance away from the very place you are about to paste into, and glance back. PasteJump asks Windows where the caret is and puts the overlay just below and to the right of it, so the clip you are choosing appears next to the line you are choosing it for. Near the bottom of the screen it flips above the caret instead, rather than covering the line you are typing on.
+
+**Not every application tells Windows where its caret is**, and there is no way for PasteJump to ask more politely. A caret that Windows knows about belongs to the edit controls it draws itself; an application that paints its own caret — which is most of the modern ones — reports none at all. This is not a guess about what they do internally, it is simply what the operating system will answer when asked.
+
+| Application | Where the overlay appears |
+| --- | --- |
+| **Notepad, including the Windows 11 one** | Beside the caret |
+| **The Run dialog, and dialogs like it** | Beside the caret |
+| **ConEmu, Cmder** | Beside the caret |
+| **Most older Win32 programs** | Beside the caret |
+| **Microsoft Edge, Chrome, any Chromium browser** | Centred on the window |
+| **Visual Studio Code, and Electron applications generally** | Centred on the window |
+| **Visual Studio** | Centred on the window |
+| **Windows Terminal** | Centred on the window |
+| **The new Outlook, Microsoft Teams** | Centred on the window |
+| **Fork, xplorer²** | Centred on the window |
+| **The Start menu, and anything always-on-top** | A corner of the screen |
+
+Note that this does not divide neatly into old and new: **ConEmu exposes a caret and Windows Terminal does not**, though both are console hosts. It depends on how the text is drawn, not on how modern the program is.
+
+**Where there is no caret, the overlay centres itself on the window you are pasting into.** That cannot be on the wrong monitor and cannot be behind the window you are working in, which are the two ways a clipboard picker becomes useless. It is a deliberate second choice rather than a failure: the mouse pointer was tried first and is worse, because it sits wherever you last left it — often in a toolbar at the top of the window, and on a multi-monitor desktop frequently on another screen entirely.
+
+> **Note**
+>
+> **The Start menu is a third case.** Windows draws it above every ordinary window, PasteJump's overlay included, so there is no position on top of it that you could see. The overlay steps aside to a corner of the screen instead. The same applies to anything else Windows keeps above other windows, and to an application you have pinned always-on-top — PasteJump would rather sit beside a window you deliberately pinned than cover it.
+
 ## What the overlay shows
 
 A text clip states its size the way a picture does: lines and characters on the left, bytes on the right.

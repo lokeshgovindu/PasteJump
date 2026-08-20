@@ -22,8 +22,13 @@ That gesture — a *jog wheel* for your clipboard — is the whole point.
 Built with .NET 10 and WPF. Ships as **a single self-contained `PasteJump.exe`** — no .NET runtime
 needed on the target machine, nothing to install, and nothing beside it.
 
-Two things beyond the jog wheel are worth knowing about up front:
+Three things beyond the jog wheel are worth knowing about up front:
 
+- **The overlay comes to you.** It appears right beside the text caret — where you are already looking — rather
+  than in a fixed corner of the screen you have to glance away to. In applications that expose no caret to
+  Windows (every browser, Electron, and Visual Studio among them) it centres itself on the window you are pasting
+  into, so it is never on another monitor; and when that window is one Windows draws above everything, such as the
+  Start menu, it steps aside to a corner rather than hiding behind it.
 - **Join several clips into one paste.** Select several rows in the history window and Copy becomes *Copy Joined* —
   they paste as *one* clip rather than one after another, with a separator of your choosing; images are left out and
   counted. There is a key for doing the same during the gesture, **switched off by default** because most people
@@ -178,7 +183,8 @@ document to publish with a release.
 
 ## The gesture
 
-Press <kbd>Ctrl</kbd>+<kbd>V</kbd> and **keep Ctrl held**. An overlay appears near your caret.
+Press <kbd>Ctrl</kbd>+<kbd>V</kbd> and **keep Ctrl held**. An overlay appears beside your caret — see
+[Where the overlay appears](#where-the-overlay-appears) for what happens in applications that have no caret.
 While Ctrl is down:
 
 | Key | Action |
@@ -234,6 +240,43 @@ gesture to any letter not already used above — useful if something else on you
 **Open history with**, off by default since a global hotkey takes that chord from every other application.
 
 Paste formats: Original, Plain text, Collapse whitespace, Sentence case, Unindent.
+
+### Where the overlay appears
+
+**Beside the text caret — where you are already looking.** A clipboard picker in a fixed corner makes you glance
+away from the place you are about to paste into and glance back; PasteJump puts the clip you are choosing next to
+the line you are choosing it for. Near the bottom of the screen it flips above the caret rather than covering the
+line you are typing on.
+
+**Not every application tells Windows where its caret is**, and PasteJump cannot ask more politely — a caret
+Windows knows about belongs to the edit controls it draws itself, while an application that paints its own reports
+none. Measured, not assumed:
+
+| Application | Where the overlay appears |
+|---|---|
+| Notepad (including the Windows 11 one) | Beside the caret |
+| The **Run** dialog, and dialogs like it | Beside the caret |
+| ConEmu, Cmder | Beside the caret |
+| Most older Win32 programs | Beside the caret |
+| Microsoft Edge, Chrome, any Chromium browser | Centred on the window |
+| Visual Studio Code, and Electron apps generally | Centred on the window |
+| Visual Studio | Centred on the window |
+| Windows Terminal | Centred on the window |
+| The new Outlook, Microsoft Teams | Centred on the window |
+| Fork, xplorer² | Centred on the window |
+| The Start menu, and anything always-on-top | A corner of the screen |
+
+It does not divide neatly into old and new: **ConEmu exposes a caret and Windows Terminal does not**, though both
+are console hosts. It depends on how the text is drawn.
+
+Centring on the window is a deliberate second choice, not a failure — it cannot be on the wrong monitor and
+cannot be behind what you are working in. The mouse pointer was tried first and is worse: it sits wherever you
+last left it, often in a toolbar at the top of the window, and on a multi-monitor desktop frequently on another
+screen.
+
+**The Start menu is a third case.** Windows draws it above every ordinary window, so no position on top of it
+could be seen; the overlay steps aside to a corner. The same goes for any window you have pinned always-on-top —
+PasteJump would rather sit beside it than cover it.
 
 ---
 

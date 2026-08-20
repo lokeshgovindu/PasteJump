@@ -1078,6 +1078,14 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   - **A headerless two-column table becomes a definition list**, not a table with a blank header: GitHub demands a
     header row, and nine of the manual's tables are glossaries that would each carry an empty grey strip. Whether
     the first row was `<th>` is recorded while parsing, never inferred from how the text looks.
+  - **`<br>` inside a table cell is FLATTENED, so never list items that way** - a cell holding four `<br>`-separated
+    applications came out as one run-on line of prose in the Markdown, unreadable and not obviously wrong in the
+    HTML. One row per item converts cleanly and reads better in both. `<br>` is not in the vocabulary above, which
+    is the tell.
+  - **`td.name` already emits `**bold**`, so markup inside one nests and breaks.** A cell reading
+    `The <b>Run</b> dialog` produced `**The **Run** dialog**`, which renders as neither. Judge a doc change by
+    reading the generated Markdown, not only by the converter exiting 0 - `--check` compares the output against the
+    HTML, and is perfectly happy with output that is faithfully converted nonsense.
 - **Delete arms CANCEL: after pressing Delete, releasing Ctrl pastes nothing (2026-08-14). This reverses an
   earlier deliberate decision.** Reported as a bug, and it was one. Deleting leaves the cursor on the clip that
   moved up, so releasing pasted *that* one - a user who pressed Ctrl+V, deleted the clip they did not want, and let
