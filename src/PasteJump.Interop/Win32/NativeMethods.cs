@@ -203,6 +203,22 @@ internal static class NativeMethods
     public static extern uint RegisterWindowMessage(string lpString);
 
     /// <summary>
+    /// Lets a window receive one specific message from processes of LOWER integrity than its own.
+    /// </summary>
+    /// <remarks>
+    /// Needed only when PasteJump is running elevated. Windows blocks messages sent up an integrity boundary,
+    /// so without this an ordinary process - the deployment script, or a second launch of PasteJump itself -
+    /// cannot reach an elevated instance at all, and asking it to exit or to show itself silently does
+    /// nothing. Opting in per message rather than wholesale is the point: nothing else gets through.
+    /// </remarks>
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool ChangeWindowMessageFilterEx(
+        IntPtr hWnd,
+        uint message,
+        uint action,
+        IntPtr changeInfo);
+
+    /// <summary>
     /// Lets the named process take the foreground next time it asks.
     /// <para>
     /// Currently unused, and kept because it is the missing piece the moment anything here needs to raise

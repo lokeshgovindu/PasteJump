@@ -468,6 +468,7 @@ public partial class SettingsWindow : Window
             .First(c => c.Keystroke == source.PasteKeystroke).Label;
 
         WarnAboutConflictCheck.IsChecked = source.WarnAboutClipboardManagerConflict;
+        WarnAboutFilteredKeyboardCheck.IsChecked = source.WarnAboutFilteredKeyboard;
 
         TriggerKeyCombo.SelectedItem = TriggerKey.Normalise(source.PasteModeTriggerKey).ToString();
 
@@ -556,6 +557,7 @@ public partial class SettingsWindow : Window
         ShowTagsCheck.IsChecked = source.ShowOverlayTags;
         ShowSourceCheck.IsChecked = source.ShowOverlaySource;
         ShowPinnedCheck.IsChecked = source.ShowOverlayPinned;
+        ShowTimestampCheck.IsChecked = source.ShowOverlayTimestamp;
 
         // Deliberately just the setting. Load reconciles it with the Startup folder afterwards, which is right
         // for opening the dialog and wrong for a reset: resetting means "go back to not starting at logon", and
@@ -2184,6 +2186,7 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.DefaultFormatterId)] = "Paste Mode",
         [nameof(PasteJumpSettings.PasteKeystroke)] = "Paste Mode",
         [nameof(PasteJumpSettings.WarnAboutClipboardManagerConflict)] = "Paste Mode",
+        [nameof(PasteJumpSettings.WarnAboutFilteredKeyboard)] = "Paste Mode",
 
         // Keys
         [nameof(PasteJumpSettings.PasteModeTriggerKey)] = "Keys",
@@ -2227,6 +2230,7 @@ public partial class SettingsWindow : Window
         [nameof(PasteJumpSettings.ShowOverlayTags)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlaySource)] = "Appearance",
         [nameof(PasteJumpSettings.ShowOverlayPinned)] = "Appearance",
+        [nameof(PasteJumpSettings.ShowOverlayTimestamp)] = "Appearance",
         [nameof(PasteJumpSettings.ShowCopyNotification)] = "Appearance",
         [nameof(PasteJumpSettings.CopyNotificationMs)] = "Appearance",
         [nameof(PasteJumpSettings.CopyNotificationPosition)] = "Appearance",
@@ -2612,6 +2616,7 @@ public partial class SettingsWindow : Window
             .Keystroke;
 
         settings.WarnAboutClipboardManagerConflict = WarnAboutConflictCheck.IsChecked == true;
+        settings.WarnAboutFilteredKeyboard = WarnAboutFilteredKeyboardCheck.IsChecked == true;
 
         settings.PasteModeTriggerKey = TriggerKey
             .Normalise(TriggerKeyCombo.SelectedItem as string)
@@ -2658,6 +2663,7 @@ public partial class SettingsWindow : Window
         settings.ShowOverlayTags = ShowTagsCheck.IsChecked == true;
         settings.ShowOverlaySource = ShowSourceCheck.IsChecked == true;
         settings.ShowOverlayPinned = ShowPinnedCheck.IsChecked == true;
+        settings.ShowOverlayTimestamp = ShowTimestampCheck.IsChecked == true;
         settings.BeepDurationMs = beepMs;
         settings.PreviewMaxChars = previewChars;
         settings.HistoryLoadLimit = historyLimit;

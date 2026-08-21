@@ -34,6 +34,7 @@ namespace PasteJump.Core.PasteMode;
 /// <param name="Source">The chip naming the application the clip was copied from.</param>
 /// <param name="Formatter">The chip naming the paste format - Original, Plain text, and so on.</param>
 /// <param name="Pinned">The <c>PINNED</c> chip.</param>
+/// <param name="Timestamp">When the clip was copied, at the right of the facts row.</param>
 /// <param name="KeyHint">The row of key reminders along the bottom.</param>
 /// <remarks>
 /// A record <b>class</b>, not a record struct, and that is not a style choice. With a struct, <c>new OverlayParts()</c>
@@ -54,6 +55,7 @@ public sealed record OverlayParts(
     bool Source = true,
     bool Formatter = true,
     bool Pinned = true,
+    bool Timestamp = true,
     bool KeyHint = true)
 {
     /// <summary>Everything on, which is what a fresh install gets and what every existing install had.</summary>

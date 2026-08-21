@@ -1256,18 +1256,17 @@
                             SnapsToDevicePixels="True">
                         <Grid Height="26">
                             <Grid.ColumnDefinitions>
-                                <!-- Glyph or check mark, label, gesture, submenu arrow. -->
+                                <!-- Glyph, label, gesture, check mark, submenu arrow. -->
                                 <ColumnDefinition Width="26" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="12" />
                             </Grid.ColumnDefinitions>
 
                             <!--
-                                One column, two possible occupants, and the check mark wins: it is state, while
-                                the glyph is decoration, and a tick hidden behind an icon would be unreadable.
-                                The glyph inherits Foreground rather than setting its own, which is what makes the
-                                disabled trigger below reach it too.
+                                The glyph inherits Foreground rather than setting its own, which is what makes
+                                the disabled trigger below reach it too.
                             -->
                             <ContentPresenter x:Name="Icon"
                                               Grid.Column="0"
@@ -1275,14 +1274,37 @@
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
 
-                            <TextBlock x:Name="Check"
-                                       Grid.Column="0"
-                                       Text="&#x2713;"
-                                       FontSize="12"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource AccentBrush}"
-                                       Visibility="Collapsed" />
+                            <!--
+                                The check mark sits on the RIGHT and the glyph stays on the left, which is what
+                                Windows itself does and what was asked for. It was one shared column with the
+                                check replacing the icon, on the reasoning that state beats decoration - true as
+                                far as it went, and it cost the row its glyph exactly when the row mattered
+                                most. A ticked item also goes semi-bold, in TrayMenuBuilder: the tick is small,
+                                and weight is what makes an on state legible at a glance.
+
+                                Its own column rather than sharing the gesture's, so a checked item that also
+                                had a shortcut would not draw the two on top of each other.
+                            -->
+                            <!--
+                                Drawn, not typed. It was the U+2713 character, and asking for a bolder tick
+                                showed why that could not work: FontWeight does nothing to it, because the font
+                                that ends up supplying the glyph has no bold cut - side-by-side crops of 13px
+                                SemiBold against 16px Bold differ in size and not at all in weight. A stroked
+                                path takes its thickness from an actual number, stays crisp at any size, and
+                                follows the palette; the submenu arrow below is drawn for the same reason.
+                            -->
+                            <Path x:Name="Check"
+                                  Grid.Column="3"
+                                  Data="M 0,5.5 L 4.5,10 L 12,0"
+                                  Stroke="{DynamicResource AccentBrush}"
+                                  StrokeThickness="2.4"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Margin="0,0,10,0"
+                                  HorizontalAlignment="Right"
+                                  VerticalAlignment="Center"
+                                  Visibility="Collapsed" />
 
                             <ContentPresenter Grid.Column="1"
                                               ContentSource="Header"
@@ -1303,7 +1325,7 @@
                                        Foreground="{DynamicResource MutedTextBrush}" />
 
                             <Path x:Name="Arrow"
-                                  Grid.Column="3"
+                                  Grid.Column="4"
                                   Data="M 0,0 L 4,4 L 0,8 Z"
                                   Fill="{DynamicResource MutedTextBrush}"
                                   HorizontalAlignment="Center"
@@ -1341,9 +1363,9 @@
                                     Value="{DynamicResource ControlHoverBrush}" />
                         </Trigger>
 
+                        <!-- The glyph stays: it says what the row is about, and the tick says whether it is on. -->
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Check" Property="Visibility" Value="Visible" />
-                            <Setter TargetName="Icon" Property="Visibility" Value="Collapsed" />
                         </Trigger>
 
                         <Trigger Property="Role" Value="SubmenuHeader">

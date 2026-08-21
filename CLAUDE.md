@@ -47,6 +47,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
+| Architecture | `docs/architecture.md` + `docs/architecture.html` - **two hand-kept copies, edit both** |
 | Publish | single self-contained `PasteJump.exe`, ~65 MB, `win-x64` |
 
 **The count differs by configuration, and that is the point rather than an oddity.** `StartupTrace.Mark` is
@@ -132,7 +133,28 @@ tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop 
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.OverlaySpike    Is the overlay VISIBLE in every running application? Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
+tests/PasteJump.NativeGestureSpike  The gesture in plain Win32 C++, no .NET. Not built by the solution.
 ```
+
+**`tests/PasteJump.NativeGestureSpike` is the answer to "would this be better in Win32", and it is kept because that
+question was asked three times in one day.** It is the gesture - hook, clip stack, overlay, paste - in about 700 lines
+of plain Win32 C++ with no .NET in the process, and it behaves *identically* to the shipping application: measured at
+medium integrity, three rounds, with a `cmd` control immediately before each browser, it saw 4 keys and opened its
+overlay in `cmd` and Chrome and saw **0** in Edge. So the runtime is not what decides it, and a rewrite buys nothing:
+the probes that measured the fault were already direct `user32` calls, and Windows sees a function pointer either way.
+Four things about it:
+
+- **`build.cmd` ignores `vcvars64.bat`'s exit code**, because on this machine it reports failure over a missing
+  `vswhere.exe` while setting the environment perfectly well. It checks whether `cl.exe` is reachable instead. The
+  first version trusted the exit code and refused to build for no reason.
+- **Nothing in the solution builds it** - no `.csproj`, CI never sees it - and its output goes to
+  `artifacts/native-spike/`, because the rule about not writing beside the source applies to C++ too.
+- **It refuses to start while PasteJump is running.** Two managers both swallowing Ctrl+V fight rather than coexist:
+  the most recently installed hook is called first, consumes the chord, and the other never sees it - which looks
+  exactly like the fault the spike is used to investigate. `--force` overrides, `--only <process>` points the sweep at
+  one safe window rather than typing into everything somebody has open.
+- **The sweep sends Escape before releasing Ctrl**, so a session is cancelled rather than committed and nothing is
+  pasted into anybody's documents.
 
 **`tests/PasteJump.OverlaySpike` is the instrument that settled "I cannot see the overlay", and it is kept because
 the question will be asked again.** It focuses every window on the machine in turn, places the real overlay through
@@ -184,6 +206,21 @@ overlay's real HWND rectangle. Three things worth keeping:
   ex-style, `IsWindowVisible` - never from `Window.Left` or `Window.IsVisible`, which are what WPF asked for and
   WPF's own bookkeeping rather than evidence about the screen. A disagreement between the two *is* the finding.
 
+**The architecture is drawn as well as described, in `docs/architecture.md`.** Seven views - layers,
+components, classes, the capture sequence, the gesture sequence, the session state machine, the store - plus the
+thread-budget figure. Three things about it:
+
+- **There are two copies and nothing generates one from the other**, unlike the manual: `architecture.md` is what
+  GitHub renders (it will not render repository HTML, which is the whole reason `docs/manual` exists) and
+  `architecture.html` is the same content styled for the website. Prose changes belong in both, same commit. The
+  two **share** their hand-drawn figures in `docs/images/arch-*.svg`, so a drawing has exactly one copy.
+- **The diagrams are mermaid text, not pictures**, so they are diffable and cannot silently drift from a caption.
+  The Markdown deliberately carries **no `%%{init}%%` theme directive** - GitHub themes them for the reader, and a
+  directive its mermaid version rejects fails the whole diagram rather than looking slightly wrong. The HTML sets
+  the dark drafting-panel palette, which is what the two SVG plates already are in both themes.
+- **It ends with a case study rather than a summary**, because the reported bug it describes lives on the one edge
+  a component diagram cannot show: the paste coming back round as a clipboard change.
+
 **`Core` must never reference WPF or Win32, and must never need a message loop.** Win32 access is
 expressed as interfaces in `Core/Abstractions` and implemented in `Interop`. This is the whole reason
 for leaving AutoHotkey — if logic lands somewhere untestable, move it rather than adding a UI test.
@@ -201,7 +238,8 @@ that immediately caught two real bugs. Expect to do the same again.
    a pinned clip is one `UPDATE`; in the original it was three `FileMove` calls per clip across
    parallel directories (`manageFIXATE`, `Clipjump.ahk:820`).
 3. **Self-inflicted clipboard changes are matched by content hash**, not by a flag or a time window.
-   No timing component, so no race.
+   No timing component, so no race. The hash is `SelfWriteKey`, **not** `ContentHash`, and the difference is
+   load-bearing — see the landmine below: a clipboard write does not read back as what was written.
 
 ---
 
@@ -242,6 +280,105 @@ that immediately caught two real bugs. Expect to do the same again.
     Ctrl+V simply broke.
   - Verified end to end against a faithful sabotage: hook killed mid-gesture with the overlay up, the overlay came
     down 1.2 s after Ctrl was released (`abandonedStuckSession=True`), and the gesture worked immediately after.
+- **A hook can go deaf in ONE application while working everywhere else, and the watchdog cannot see it
+  (2026-08-21).** Reported as PasteJump having "stopped working on Edge". It had not: three hooks in three
+  separate processes - PasteJump's, a throwaway probe's and the OverlaySpike's own witness - were all deaf while
+  Edge held the foreground, and every other application delivered keys normally throughout.
+  - **Measured, and the numbers are the finding.** Edge delivered 939 keystrokes to the hook on 2026-08-20 and
+    33 on 2026-08-21, 28 of which were three working gestures at 07:55. After that, 2,736 seconds of Edge
+    foreground produced **zero** key events, while Terminal gave 4,899 the same day. A probe then injected
+    Ctrl+Alt+J into each application in turn and watched three mechanisms: in Edge, `SendInput` reported **6/6
+    events accepted** while `WH_KEYBOARD_LL`, raw input with `RIDEV_INPUTSINK` and `RegisterHotKey` all saw
+    nothing. Every other application: all three fired.
+  - **Two methodological corrections, both found by re-checking rather than by being told.** A fourth column
+    reading `GetLastInputInfo` appeared to be frozen in Edge and is **not evidence**: that clock is system-wide,
+    so it moves whenever the user touches anything, and a later run showed it advancing during the same Edge
+    failure. Only counters of our *own* injected chord mean anything here. And the probe originally ordered Edge
+    **first**, with a comment claiming that removed an ordering effect - the opposite is true, since the first
+    target absorbs any warm-up cost in the harness. Re-run with Edge **last**, after five applications had each
+    succeeded moments earlier, Edge still reported `hook 0, rawinput 0, hotkey 0`. That is what makes the finding
+    about Edge rather than about the instrument.
+  - **Four implementations fail identically, including Clipjump.** PasteJump (.NET), a probe making direct
+    `user32` calls, `tests/PasteJump.NativeGestureSpike` (native C++), and the original **Clipjump** itself -
+    AutoHotkey v1, unrelated codebase, `$^V` on its own hook - are all blind in the affected application at
+    medium integrity, while elevated PasteJump works. That last one was found by the user and is the cheapest
+    check available: if a second, unrelated clipboard manager fails the same way, the question is not about
+    this application at all. Do it early next time.
+  - **It is not the language, and it IS the integrity level - which reverses an earlier conclusion here.** A
+    rewrite in C++ would change nothing: the probes that measured this are direct `DllImport`s of the same
+    `user32` exports a native program calls, and Windows sees a function pointer either way. But the block is
+    **not applied to an elevated process.** Measured from ordinary usage on 2026-08-21, four seconds apart:
+    `fg=AltTab.exe | previous=msedge.exe ... hook heard 0` (Alt+Tab pressed in Edge - `AltTab.exe`, HIGH
+    integrity and hook-based, responded while PasteJump saw nothing) against `key=Alt down ...
+    fg=ApplicationFrameHost.exe` moments later (same chord from an ordinary window - both saw it). Eight such
+    Edge switches in one day.
+    So the avenue is **running PasteJump elevated**, which is a manifest or a logon-task change rather than a
+    rewrite - and it is how `AltTab.exe` already runs on that machine. **Confirmed the same day: launched as
+    administrator, the overlay appears in Edge and the gesture works.** `tools/install-elevated-task.ps1` makes
+    it permanent through a logon task with the highest privileges, because a shortcut cannot request elevation
+    without a UAC prompt every time.
+  - **Why elevation is the fix is UIPI, and this is the reading that fits all seven facts.** Windows excludes a
+    lower-integrity low-level hook from input whose effective owner outranks it. Edge itself is MEDIUM, which
+    is why UIPI looked ruled out - but `MpDlpService` and `SenseDlpProcessor` are not openable from a medium
+    process, so they are above it, and keyboard input for the watched application appears to be routed through
+    one of them for inspection. That explains the medium hook seeing nothing, an elevated hook seeing
+    everything, `SendInput` from medium being accepted and then discarded (UIPI blocks injection aimed above
+    you, and the call still succeeds), the user's own physical keys still reaching the browser, only one
+    application being affected, and the whole thing starting at a DLP policy push. It is inference about a
+    component nobody here can see inside, so state it as such - but it is the only account consistent with
+    every measurement.
+  - **It is browsers as a class, it is INTERMITTENT, and that is what makes it look like an application bug.**
+    Measured at medium integrity in one run, seconds apart, with a `cmd` control passing between every attempt:
+    Chrome `hook 6 / rawinput 5 / hotkey 1`, then `0 / 0 / 0`, then `6 / 5 / 1`, while Edge stayed dark in all
+    three rounds. So the protection engages and disengages - Edge on corporate pages was continuously engaged,
+    a blank Chrome window mostly was not. **This is the answer to "but it works sometimes, so it must be
+    PasteJump":** the identical flicker happens to a throwaway probe sharing no code with PasteJump, and an
+    earlier unreproducible run where Edge worked at medium was simply one of these gaps rather than the anomaly
+    it looked like. Elevation removes the flicker entirely, which is the practical difference between "works
+    most of the time" and "works".
+  - **Turn the ordinary "Run at logon" shortcut OFF when the task is installed.** Two triggers start two
+    copies, and the second only surfaces the first through the single-instance mutex.
+  - **`deploy-dev.ps1` cannot stop an elevated copy from an ordinary prompt**, and used to fail on a locked
+    executable afterwards. It now names the situation and offers the two ways forward instead.
+  - **Both directions are blocked, and `SendInput` returning success means nothing.** The obvious salvage - drop
+    the gesture there and paste from the history window with an injected Ctrl+V, triggered by the mouse - was
+    measured and does not work either: with Edge focused, `Ctrl+L`, `Ctrl+A`, `Ctrl+V`, `Ctrl+A`, `Ctrl+C`
+    injected in sequence changed nothing, while `SendInput` reported every event accepted. Windows *queues* the
+    events and something discards them before Edge, so a success return is not delivery. **The user's own
+    physical Ctrl+V does still paste**, which is why the notice tells them to Copy in the history window and
+    paste by hand - the one route needing no keystroke from us.
+  - **The test that established the opposite first was vacuous, and the shape is worth recognising.** It put a
+    marker on the clipboard, injected paste-then-copy in Edge, and checked the clipboard for the marker - which
+    was already there, so total failure and complete success produced identical output. A second sentinel written
+    between the paste and the copy is what makes the two differ. Third instance of this in the codebase, after
+    the pan-routing test and the search-mode invariant: **when a test passes, check it can fail.**
+  - **`HookHealthPolicy` is blind to it by construction**, which is why `ForegroundDeafnessTracker` is a separate
+    rule: the watchdog asks whether anything has been heard since Ctrl went down, and keys from every other
+    application keep answering yes. A hook deaf to one application looks healthy to it for ever.
+  - **The tracker's job is the appearance, not the fault.** It reports once per application per run, as a toast,
+    and its wording admits the guess - the same bargain `RivalClipboardManagers` strikes. Silence is ambiguous
+    (somebody may be reading with the mouse), so the rule is **relative**: at least two *other* applications must
+    have delivered keys first, or the honest diagnosis is a dead hook rather than a filtered application.
+    Thresholds are generous - 120s over 4 visits - and drop to 15s once a **copy** made in that application
+    corroborates it, which is near-conclusive because capture rides `WM_CLIPBOARDUPDATE` and no hook can suppress
+    that.
+  - **One key exonerates an application for the whole run**, deliberately not decayed: a per-application filter
+    does not come and go within a session, and forgetting would turn a quiet afternoon in a working application
+    into a false accusation. Half of `ForegroundDeafnessTests` is about *not* reporting, which is the hard half.
+  - **The dating instrument is Defender event 5007**, which names every endpoint-DLP policy push:
+    `DLP Configs\Tag\Tag` went `0xF` -> `0x10` at 08:18:34, inside the window where the gesture stopped working
+    in Edge. That is a correlation, not a proven mechanism - a policy that silences the window manager's own
+    hotkey dispatch for one application is not explained by anything I can read from user mode - so do not write
+    it up as established fact.
+  - **The OverlaySpike's gesture pass is the on-demand discriminator**, and it is worth reaching for first next
+    time: one run, one line per application, and Edge came back as the single failure out of 17 with
+    `[our own hook saw: NOTHING]`. Note its *placement* pass works over Edge perfectly and always will - it only
+    shows a window - so "the spike works in Edge" is true and answers a different question.
+    **Expect to be asked that question more than once**, and answer it with the one run that contains both
+    halves: over the same Edge window, in the same sweep, placement reported `visible (482/531 pixels match)`
+    while the gesture reported `did NOT open`. Window operations on Edge are unaffected - `SetForegroundWindow`
+    succeeds, the overlay draws, a screenshot proves it - and only the keyboard is dark. Any explanation that
+    does not account for both halves at once is not an explanation.
 - **Ignore *our own* injected input, not all of it.** Use `KeyboardHookEvent.IsOwnInjection`, which
   matches our `dwExtraInfo` signature. Filtering on `LLKHF_INJECTED` alone — as this once did — kills
   the gesture entirely under Remote Desktop, in VM guest windows, and for anyone on a macro keyboard,
@@ -490,6 +627,68 @@ that immediately caught two real bugs. Expect to do the same again.
   mark-of-the-web opens with every page blank** ("Navigation to the webpage was canceled") — detected by probing
   the `Zone.Identifier` alternate data stream and *reported*, not stripped, because silently removing a Windows
   security marker is not this application's business.
+- **"Always Run as Administrator" and "Run at Startup" are ticked TOGGLES in the tray, and the one-shot version
+  was the wrong shape (2026-08-21).** It shipped first as a single "Restart as Administrator…" action and was
+  corrected the same day: elevation is not something you do once, it is the state the application should come
+  back in every time - and the tick is the only thing anywhere that answers "am I elevated right now".
+  - **Why it exists at all:** where endpoint security routes one application's keyboard input through a
+    component of higher integrity than PasteJump, Windows excludes PasteJump's hook from that input (UIPI,
+    working as designed) and the gesture silently dies in that one application. Elevation is the only remedy.
+    See the landmine above; it is the machine, not this application.
+  - **A scheduled task is the mechanism, and it has to be.** Windows offers no way to mark a shortcut "run as
+    administrator" without a UAC prompt on every start, which is unusable for something that starts at logon.
+    `ElevatedLogonTask` drives `schtasks.exe` with `/RL HIGHEST /SC ONLOGON /IT` - the same command line
+    `tools/install-elevated-task.ps1` uses, and deliberately the same **task name**, so the script and the
+    toggle cannot end up with two tasks fighting over logon.
+  - **Registering the task needs the privileges it grants**, so when PasteJump is not already elevated the
+    toggle relaunches under UAC and lets the elevated copy register it. **One prompt buys both halves** -
+    asking twice for one decision is how a switch comes to feel broken. That is what
+    `RelaunchRequest.EnableElevatedLogonSwitch` carries.
+  - **The launch comes BEFORE the shutdown, the reverse of `Restart()`.** The ordinary restart shuts down
+    first and relaunches from its own `Exit` handler, which is what releases the single-instance mutex in time.
+    An elevated launch can be **refused** - UAC is a prompt - and shutting down first would leave the user with
+    no PasteJump at all over a dialog they merely dismissed. `ERROR_CANCELLED` (1223) is caught and does
+    nothing, deliberately: they know what they just clicked.
+  - **Which is why `--replace <pid>` exists.** The new copy starts while the old one still holds the mutex, so
+    it waits for that process before touching it - otherwise it would conclude it was a second launch, surface
+    the old copy and exit, which looks exactly like the toggle doing nothing. Bounded at 10 s and then starting
+    anyway, because a replacement that never appears is worse than the collision it avoids. Verified: told to
+    wait for a process that never exits, it gave up after **10.3 s** and left the original running.
+  - **There is one logon entry, never two.** Enabling elevation removes the startup shortcut and disabling it
+    puts the shortcut back when `RunAtLogon` is set; turning "Run at Startup" off removes both. Two entries
+    would start two copies, and the second would merely surface the first - a duplicate that appears to do
+    nothing.
+  - **Both ticks are read from the machine, not from settings.** `StartupShortcut.Exists` and
+    `ElevatedLogonTask.Exists`: either can be removed behind our back, by the user or by policy, and a tick
+    reporting an intention rather than a fact is exactly as misleading as no tick.
+  - **The tick is a stroked `Path`, not the U+2713 character, and asking for a bolder one is what proved it
+    had to be.** `FontWeight` does nothing to that glyph: the font that ends up supplying it has no bold cut,
+    so 13px SemiBold against 16px Bold differed in size and not at all in weight - visible only in a 6x
+    nearest-neighbour crop of the two side by side, which is the way to judge any mark this small. A stroked
+    path takes its thickness from a number (2.4), stays crisp at any size and follows the palette. The submenu
+    arrow in the same template was already drawn for the same reason.
+  - **A ticked item keeps its glyph, ticks on the RIGHT, and goes semi-bold.** It first drew the check mark
+    *in place of* the icon - the template's own rule, "one column, two possible occupants, and the check mark
+    wins", on the reasoning that state beats decoration. True as far as it went, and it cost the row its glyph
+    at exactly the moment the row mattered most; reported with a screenshot of AltTab beside ours. The check
+    now has its own column so a checked item with a shortcut could not draw the two on top of each other, and
+    the semi-bold comes from `TrayMenuBuilder` alongside `Emphasised` rather than being a second weight -
+    two kinds of bold in one menu would mean neither said anything.
+  - **`Check("TrayMenu", ...)` in the UI smoke harness is what would have caught that, and it exists now.**
+    A `ContextMenu` draws in its own popup HWND that no render of the owning window reaches, so the tray menu
+    had only ever been checked by eye once with a throwaway application - which is precisely why a template
+    change to it went unnoticed. `TrayMenuBuilder.BuildForPreview` puts the *same* composed items in a `Menu`,
+    which renders in an ordinary visual tree, so the shot is the real thing rather than a mock-up: same
+    `TrayMenu.Items`, same `Compose`, only the popup missing. Rendered in both themes with both toggles
+    ticked, so an on state is always in the picture.
+  - **The shield is U+EA18, and existence was not the test.** `GetGlyphIndices` reported all seven candidates
+    present in `Segoe Fluent Icons` - only a rendered contact sheet showed that E192 is a key, E72E a padlock
+    and E1E5 signal bars, and that E7EF (a window with a shield, semantically closest) is far too busy for a
+    16px row. Same method the other tray glyphs were chosen by.
+  - **`VerifyToggleTracksItsState` in the UI smoke harness asserts each tick follows its OWN flag.** Crossing
+    the two wires is the obvious mistake here and produces a menu that looks perfectly normal; verified by
+    crossing them, which fails 2 checks. Items are found by their `Invoke` delegate, so renaming a label
+    cannot fake a pass.
 - **A left click on the tray is configurable; a right click is not, and that asymmetry is deliberate.**
   `TrayClickAction` offers history (the default, and what it always did), the menu, settings or nothing - there is
   no single convention, and plenty of tray applications open their menu on the left button. **Right click always
@@ -943,6 +1142,42 @@ that immediately caught two real bugs. Expect to do the same again.
   an offline server is a hang rather than a pause, and being wrong about a network folder costs one trailing
   backslash. Probes are capped at 64 for the same reason. Note names past `PreviewMaxChars` are still not
   searchable: a file list stores no full-text blob the way long text does.
+- **A clipboard write does not read back as what was written, so a paste was captured back as a new clip
+  (fixed 2026-08-21).** Reported as pressing Ctrl+V in Edge, seeing the paste overlay, and a **copy** toast
+  appearing immediately after it. Neither the notification nor Edge was at fault: the paste's own write was not
+  recognised as ours, so it was stored as a brand new clip and announced like any copy — one duplicate clip and
+  one history row per paste, and `NotifyClipCaptured` resetting the browse position each time.
+  `FilterForWrite` drops `CF_TEXT`, `CF_OEMTEXT` and `CF_LOCALE` whenever `CF_UNICODETEXT` is present, and
+  **Windows regenerates them from the *pasting* thread's locale rather than the copying application's**. So the
+  write→read round trip is not the identity, and `ContentHash` — every format's bytes — could not match it.
+  - **Measured on the user's own store, not deduced.** Clips 3698 and 3699 hold the same 66 characters, the same
+    four formats and the same 2,044 bytes, and differ in exactly one byte pair: `CF_LOCALE` `0x4009` (English,
+    India) as captured against `0x0409` (English, US) as synthesised. That store holds **347 clips with the
+    first value and 228 with the second**, and 8 of its 10 largest same-text clip groups differ *only* in that
+    byte — so those groups are paste-recaptures, not repeat copies.
+  - **It is self-limiting per clip, which is exactly why it survived.** The recaptured twin carries the
+    synthesised locale, so it *is* a fixed point: every later paste of that clip is recognised. The log reads
+    like an intermittent fault — `STORED clip 3699 (new=True)` once, then `skipped: this is our own write`
+    for the two pastes after it — and a bug that stops reproducing on the second attempt is one that gets
+    dismissed. It reappears per newly captured clip, for ever.
+  - **The fix separates two questions that had been sharing one hash.** `ContentHash` identifies a *clip* and
+    is unchanged (it is a stored column, and those bytes really do differ). `ClipboardSnapshot.SelfWriteKey`
+    identifies a *round trip*: the same hash over the payloads Windows does not refill. Where nothing is
+    dropped it **is** `ContentHash`, so images, file lists and every existing store are untouched.
+  - **The list lives in `Core` as `SynthesisedTextFormats`, and `FilterForWrite` calls it.** One list, not two:
+    what the writer drops and what the guard ignores drifting apart is precisely this bug. Same arrangement as
+    `RedundantImageFormats`, and `NativeConstants` now carries only a note saying where the rule went.
+  - **`DropDerived` refuses to drop anything without `CF_UNICODETEXT` present**, because a clip holding only
+    `CF_TEXT` would otherwise canonicalise to an *empty* set — and an empty set identifies every such clip as
+    the same one, which would make a paste suppress the capture of an unrelated copy.
+  - **Not fixed, and unproven rather than dismissed:** an image clip holding only `CF_DIBV5` has the same shape
+    of problem, since Windows synthesises `CF_DIB` and `RedundantImageFormats.Prune` then keeps the synthesised
+    one and drops the V5 we wrote. Exclusion cannot fix that (the two are different bytes, not a derived
+    sibling), and no such clip has been observed — every image in the reported store carries a real `CF_DIB`.
+  - **The instruments answered this in minutes and the reasoning would not have.** `logs\gesture.log` gave the
+    commit (`Ctrl up ... fg=msedge.exe` at 07:55:37.305) and `logs\capture.log` gave the read 135 ms later
+    (`STORED clip 3699`); the store gave the one byte. Three sources, no guessing — and the *store* is the one
+    that named the cause, which is worth remembering next time a capture question comes up.
 - **One logical copy can raise two clipboard notifications with *different* sequence numbers.**
   Anything using OLE does `OleSetClipboard` + `OleFlushClipboard`. `ClipStore.Add` reports
   insert-vs-promote so history does not double-log; the sequence number alone cannot collapse these.

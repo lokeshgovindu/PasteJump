@@ -67,8 +67,19 @@ public partial class App : Application
 
     private long? _ctrlUpSince;
 
+    /// <summary>
+    /// The command line, kept because <see cref="Compose"/> needs it and only <c>OnStartup</c> is given it.
+    /// </summary>
+    private string[] _startupArguments = [];
+
     private readonly KeyRepeatFilter _traceRepeats = new();
     private bool _announcedHookRecovery;
+
+    /// <summary>
+    /// Watches for the hook going deaf in one application while working in the others. Not a health problem and
+    /// not fixable here - see the type - but silent until this existed, which made PasteJump look broken.
+    /// </summary>
+    private readonly ForegroundDeafnessTracker _deafness = new();
     private GlobalHotkey _historyHotkey = null!;
     private TrayIcon _trayIcon = null!;
 
@@ -137,6 +148,14 @@ public partial class App : Application
         // No main window, so WPF must not decide to exit when a transient window closes.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+        _startupArguments = e.Args;
+
+        // Before the mutex, which is the entire point: an elevated restart starts this copy while the old one
+        // is still running and still holding it, because the UAC prompt can be refused and shutting down first
+        // would leave the user with nothing. Without the wait we would find the mutex held, conclude we were a
+        // second launch, surface the old copy and exit - which looks exactly like the restart doing nothing.
+        WaitForTheCopyWeAreReplacing(e.Args);
+
         if (!TryAcquireSingleInstance())
         {
             // A second copy must not keep running: it would install a second keyboard hook and fight the
@@ -179,6 +198,48 @@ public partial class App : Application
                 kind: DialogKind.Error);
 
             Shutdown();
+        }
+    }
+
+    /// <summary>
+    /// Waits for the instance this one was started to replace, when it was started that way.
+    /// </summary>
+    /// <remarks>
+    /// Bounded by <see cref="RelaunchRequest.MaxWait"/>, and carrying on regardless when it expires: the
+    /// predecessor may already be gone, or may be wedged, and a replacement that never appears is worse than
+    /// the mutex collision this avoids - which has a sane outcome of its own.
+    /// <para>
+    /// Every failure here is silent and harmless. The process may have exited between being named and being
+    /// looked up (<see cref="ArgumentException"/>), or be one we cannot open, and in both cases there is
+    /// nothing to wait for. Waiting for our own id is refused rather than deadlocking on ourselves.
+    /// </para>
+    /// </remarks>
+    private static void WaitForTheCopyWeAreReplacing(string[]? arguments)
+    {
+        if (RelaunchRequest.TryParseReplacedProcessId(arguments) is not { } processId
+            || processId == Environment.ProcessId)
+        {
+            return;
+        }
+
+        try
+        {
+            using var previous = System.Diagnostics.Process.GetProcessById(processId);
+
+            DebugConsole.Log($"  waiting up to {RelaunchRequest.MaxWait.TotalSeconds:0}s for pid {processId} to exit");
+
+            if (!previous.WaitForExit(RelaunchRequest.MaxWait))
+            {
+                DebugConsole.Log("  it did not exit in time - starting anyway");
+            }
+        }
+        catch (ArgumentException)
+        {
+            // Already gone, which is the happy case.
+        }
+        catch (Exception ex)
+        {
+            DebugConsole.Log($"  could not wait for pid {processId}: {ex.GetType().Name}");
         }
     }
 
@@ -266,6 +327,12 @@ public partial class App : Application
         _messageWindow = new MessageOnlyWindow(windowName: SingleInstanceSignal.WindowName);
 
         _messageWindow.MessageReceived += OnMessageWindowMessage;
+
+        // Without this an ELEVATED PasteJump is unreachable: Windows blocks messages sent up an integrity
+        // boundary, so a second launch could not ask it to show itself and the deployment script could not ask
+        // it to exit - both would silently do nothing. Called unconditionally because it is harmless when not
+        // elevated, and a privilege check here is one more thing to get wrong.
+        SingleInstanceSignal.AllowRequestsFromLowerIntegrity(_messageWindow.Handle);
         _clipboardMonitor = new ClipboardMonitor(_messageWindow);
 
         _pasteHost = new PasteJumpPasteHost(
@@ -387,6 +454,15 @@ public partial class App : Application
             {
                 MaybeOfferLegacyImport();
                 HintAboutRivalManagers();
+
+                // Deferred with the other start-up prompts, and for the same reason: this can show a dialog on
+                // failure, and anything modal inside Compose owns the UI thread with its own message loop -
+                // which does not drain the Dispatcher, so every side effect the paste host queues would sit
+                // unprocessed and the gesture would look dead for as long as it was up.
+                if (RelaunchRequest.WantsElevatedLogonTask(_startupArguments) && IsRunningElevated())
+                {
+                    EnableElevatedLogonTask();
+                }
 
                 // Last, and at idle, so it delays nothing the user can see. A tray-only application shows no
                 // window at startup, which leaves WPF's window stack cold until the first click - and that
@@ -603,15 +679,106 @@ public partial class App : Application
                 ? string.Empty
                 : $" | previous={_lastForegroundName} held it {heldFor.TotalSeconds:F1}s, hook heard {keysHeard} key(s)"));
 
+        // The same two numbers the line above reports, handed to the thing that can draw a conclusion from
+        // them. A name in brackets is one of the placeholders GetForegroundProcessNameForTrace returns when
+        // there is no foreground window or it could not be read; it is not an application.
+        if (_lastForegroundHwnd != IntPtr.Zero && !_lastForegroundName.StartsWith('('))
+        {
+            // Clamped rather than cast: the counter is a long because it runs for the life of the process,
+            // while one focus spell cannot plausibly overflow an int - and the tracker only compares it to zero.
+            _deafness.NoteFocusSpell(_lastForegroundName, heldFor, (int)Math.Min(int.MaxValue, keysHeard));
+        }
+
         _lastForegroundHwnd = hwnd;
         _lastForegroundSince = Stopwatch.GetTimestamp();
         _lastForegroundName = ForegroundWindowInfo.GetForegroundProcessNameForTrace();
         _keysHeardAtForegroundChange = _keysHeard;
     }
 
+    /// <summary>
+    /// Says once, per application, that the hook is hearing nothing there while hearing everything elsewhere.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Not a repair, because there is nothing to repair: measured on a managed machine, four independent
+    /// mechanisms were equally deaf while one application held the foreground - the low-level hook, raw input
+    /// with <c>RIDEV_INPUTSINK</c>, <c>RegisterHotKey</c> and even <c>GetLastInputInfo</c> - while
+    /// <c>SendInput</c> reported success for every event it injected. Nothing in user mode can see the keyboard
+    /// there, so this exists purely so the user is told rather than left concluding that PasteJump is broken.
+    /// </para>
+    /// <para>
+    /// A toast rather than a dialog, and once per application per run, for the same reason
+    /// <c>HintAboutRivalManagers</c> is: the conclusion is a guess from ambiguous evidence, and a guess that
+    /// blocks is worse than the fault it describes. <c>ForegroundDeafnessTracker.Describe</c> owns the wording,
+    /// hedge included.
+    /// </para>
+    /// <para>
+    /// Note the <b>watchdog cannot see this failure</b> and never could: <c>HookHealthPolicy</c> asks whether
+    /// anything has been heard since Ctrl went down, and keys from every other application keep answering yes.
+    /// A hook deaf to one application looks perfectly healthy to it, indefinitely - which is exactly why this
+    /// is a separate rule rather than another branch of that one.
+    /// </para>
+    /// </remarks>
+    /// <summary>
+    /// Whether this process is elevated. Never throws: the notice is worth showing even if the token cannot be
+    /// read, and a wrong answer only changes which remedy is suggested.
+    /// </summary>
+    private static bool IsRunningElevated()
+    {
+        try
+        {
+            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+
+            return new System.Security.Principal.WindowsPrincipal(identity)
+                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private void ReportFilteredKeyboardOnce()
+    {
+        if (!_settings.WarnAboutFilteredKeyboard || _gestureDisabled)
+        {
+            return;
+        }
+
+        if (_deafness.TryClaimNotice() is not { } deaf)
+        {
+            return;
+        }
+
+        // Whether we are elevated decides whether there is a remedy to offer - see Describe. Read here rather
+        // than cached: it cannot change within a run, but reading it at the one place it is used keeps the fact
+        // next to the decision it informs.
+        var elevated = IsRunningElevated();
+        var detail = ForegroundDeafnessTracker.Describe(deaf, elevated);
+
+        // Into the gesture log as well as the screen: the toast is transient, and this is precisely the finding
+        // somebody will want to read back an hour later when they report it.
+        _gestureTrace.Note(
+            $"KEYBOARD FILTERED in {deaf.Application}: {deaf.FocusedFor.TotalSeconds:F0}s of foreground over "
+            + $"{deaf.Spells} spell(s) with nothing heard, corroboratedByACopy={deaf.Corroborated}, "
+            + $"applications heard from={_deafness.ApplicationsHeard}, elevated={elevated}");
+
+        // Prose, so the detail line is not set in the font a clip preview wants - the same reason the
+        // single-instance toast passes detailIsProse.
+        // Bottom-right, like the second-launch toast: this is a message about the application itself, and that
+        // is where Windows puts its own, so it is where people already look for one.
+        Toast().Notify(
+            $"PasteJump cannot see the keyboard in {deaf.Application}",
+            detail,
+            TimeSpan.FromSeconds(12),
+            ToastPlacement.BottomRight,
+            detailIsProse: true);
+    }
+
     private void CheckHookHealth()
     {
         NoteForegroundChange();
+        ReportFilteredKeyboardOnce();
 
         var ctrlHeld = VirtualKeyTranslator.IsCtrlDown();
 
@@ -850,6 +1017,11 @@ public partial class App : Application
     private void OnClipCaptured(Clip clip)
     {
         _historyWindow?.QueueRefresh();
+
+        // A copy in an application we have never heard a key from is the strongest evidence available that the
+        // keyboard is being filtered there rather than merely idle: capture rides WM_CLIPBOARDUPDATE, which no
+        // hook can suppress, so this arrives even when every keystroke is taken. See ForegroundDeafnessTracker.
+        _deafness.NoteClipboardActivity(clip.SourceExecutable);
 
         // Before the notification checks below, and independent of them: the beep exists precisely for the
         // case where the toast is off or on a monitor you are not looking at.
@@ -1096,9 +1268,17 @@ public partial class App : Application
                     PauseToggle: TogglePaused,
                     DisableToggle: ToggleDisabled,
                     Restart: RestartFromMenu,
+                    RunAtStartupToggle: ToggleRunAtStartup,
+                    AlwaysElevatedToggle: ToggleAlwaysRunAsAdministrator,
                     Exit: ExitApplication),
                 isPaused: !_settings.MonitorClipboard,
-                isDisabled: _gestureDisabled));
+                isDisabled: _gestureDisabled,
+
+                // Read from the machine, not from settings. The shortcut or the task can be removed behind our
+                // back - by the user, by another tool, by policy - and a tick reporting an intention rather
+                // than a fact would be exactly as misleading as no tick at all.
+                runsAtStartup: StartupShortcut.Exists || ElevatedLogonTask.Exists,
+                alwaysElevated: ElevatedLogonTask.Exists));
 
         var built = started.Elapsed.TotalMilliseconds;
 
@@ -1443,6 +1623,16 @@ public partial class App : Application
     /// </summary>
     private IntPtr? OnMessageWindowMessage(uint message, IntPtr wParam, IntPtr lParam)
     {
+        // A deployment asking us to make way. Queued rather than shutting down inside the window procedure,
+        // which is reached from the message pump and must return - and shut down through the ordinary Exit
+        // path, so settings are saved and the database closed cleanly rather than cut off mid-write.
+        if (SingleInstanceSignal.IsExitRequest(message))
+        {
+            DebugConsole.Log("exit requested by another process - shutting down");
+            Dispatcher.BeginInvoke(new Action(Shutdown));
+            return IntPtr.Zero;
+        }
+
         if (!SingleInstanceSignal.IsShowRequest(message))
         {
             return null;
@@ -1798,6 +1988,201 @@ public partial class App : Application
     /// </para>
     /// </summary>
     private void RestartFromMenu() => Restart();
+
+    /// <summary>
+    /// Turns starting-with-Windows on or off, from the tray.
+    /// </summary>
+    /// <remarks>
+    /// The same setting the Settings dialog owns, reachable in one click because it is one of the two things
+    /// anybody checks about a resident application. Turning it off also removes the elevated logon task,
+    /// because that task <em>is</em> a logon entry - leaving it behind would mean "do not start at logon"
+    /// quietly starting at logon, elevated.
+    /// </remarks>
+    private void ToggleRunAtStartup()
+    {
+        var on = StartupShortcut.Exists || ElevatedLogonTask.Exists;
+
+        if (on)
+        {
+            _settings.RunAtLogon = false;
+            _settingsStore.Save(_settings);
+            StartupShortcut.Apply(false);
+
+            var (removed, message) = ElevatedLogonTask.TryRemove();
+
+            Toast().Notify(
+                "PasteJump will not start with Windows",
+                removed
+                    ? "Both the startup shortcut and the elevated logon task are gone."
+                    : "The startup shortcut is gone, but the elevated task could not be removed. " + message,
+                TimeSpan.FromSeconds(6),
+                ToastPlacement.BottomRight,
+                detailIsProse: true);
+
+            return;
+        }
+
+        _settings.RunAtLogon = true;
+        _settingsStore.Save(_settings);
+        StartupShortcut.Apply(true);
+
+        Toast().Notify(
+            "PasteJump will start with Windows",
+            "Not elevated. Switch on Always Run as Administrator too if the gesture has to work in an "
+                + "application whose keyboard input is intercepted by security software.",
+            TimeSpan.FromSeconds(6),
+            ToastPlacement.BottomRight,
+            detailIsProse: true);
+    }
+
+    /// <summary>
+    /// Turns "always run as administrator" on or off - a state, not a one-off restart.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This was built first as a one-shot "Restart as Administrator" and that was the wrong shape: elevation
+    /// is not something you do once, it is the state the application should come back in every time. The tick
+    /// is also the only thing anywhere that answers "am I elevated right now".
+    /// </para>
+    /// <para>
+    /// <b>A scheduled task is the mechanism, and it has to be:</b> Windows offers no way to mark a shortcut
+    /// "run as administrator" without a UAC prompt on every start, which is unusable for something that starts
+    /// at logon. A task registered with the highest privileges starts elevated silently.
+    /// </para>
+    /// <para>
+    /// Registering that task needs the privileges it grants, so when PasteJump is not already elevated it
+    /// relaunches itself under UAC and lets the elevated copy register it - one prompt for both halves. See
+    /// <see cref="RelaunchRequest"/>.
+    /// </para>
+    /// </remarks>
+    private void ToggleAlwaysRunAsAdministrator()
+    {
+        if (ElevatedLogonTask.Exists)
+        {
+            var (removed, message) = ElevatedLogonTask.TryRemove();
+
+            if (!removed)
+            {
+                MessageDialog.Show("The elevated logon task could not be removed. " + message);
+                return;
+            }
+
+            // The task WAS the logon entry, so put the ordinary one back if starting at logon is still wanted.
+            // Without this, switching elevation off would silently switch auto-start off with it.
+            if (_settings.RunAtLogon)
+            {
+                StartupShortcut.Apply(true);
+            }
+
+            Toast().Notify(
+                "PasteJump will no longer start as administrator",
+                "This copy keeps the rights it already has until you restart it. Note the gesture may stop "
+                    + "working in applications whose keyboard input is intercepted by security software.",
+                TimeSpan.FromSeconds(8),
+                ToastPlacement.BottomRight,
+                detailIsProse: true);
+
+            return;
+        }
+
+        if (IsRunningElevated())
+        {
+            EnableElevatedLogonTask();
+            return;
+        }
+
+        // Not elevated: relaunch under UAC and let that copy register the task. The launch comes before the
+        // shutdown because UAC can be refused, and shutting down first would leave the user with nothing over
+        // a dialog they merely dismissed.
+        RelaunchElevated(enableElevatedLogonTask: true);
+    }
+
+    /// <summary>Registers the logon task and reports what happened. Only meaningful while elevated.</summary>
+    private void EnableElevatedLogonTask()
+    {
+        var (registered, message) = ElevatedLogonTask.TryRegister();
+
+        if (!registered)
+        {
+            MessageDialog.Show("The elevated logon task could not be registered. " + message);
+            return;
+        }
+
+        // One logon entry, not two. Both would start two copies, and the second would find the first through
+        // the single-instance mutex and merely surface it - which reads as a duplicate that does nothing.
+        StartupShortcut.Apply(false);
+        _settings.RunAtLogon = true;
+        _settingsStore.Save(_settings);
+
+        Toast().Notify(
+            "PasteJump will always run as administrator",
+            "It starts elevated at logon from now on, which is what lets the gesture work in applications "
+                + "whose keyboard input is intercepted by security software.",
+            TimeSpan.FromSeconds(8),
+            ToastPlacement.BottomRight,
+            detailIsProse: true);
+    }
+
+    /// <summary>
+    /// Relaunches elevated, so the keyboard hook is not excluded from input whose owner outranks us.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Why this exists rather than a manifest asking for administrator: PasteJump starts at logon and runs all
+    /// day, and <c>requireAdministrator</c> would mean a UAC prompt on every single start. This asks once, when
+    /// the user chooses to. <c>tools/install-elevated-task.ps1</c> is the permanent form, through a logon task.
+    /// </para>
+    /// <para>
+    /// <b>The order is the opposite of <see cref="Restart"/>'s, and it has to be.</b> That one shuts down first
+    /// and starts the replacement from its own <c>Exit</c> handler, which is what releases the mutex in time.
+    /// Here the launch can be <em>refused</em> - UAC is a prompt the user may cancel - and shutting down first
+    /// would leave them with no PasteJump at all over a dialog they simply dismissed. So the replacement is
+    /// started while this instance is still alive, and told to wait for it: see <see cref="RelaunchRequest"/>.
+    /// </para>
+    /// </remarks>
+    private void RelaunchElevated(bool enableElevatedLogonTask = false)
+    {
+        var exePath = Environment.ProcessPath;
+
+        if (string.IsNullOrEmpty(exePath))
+        {
+            MessageDialog.Show("PasteJump could not work out its own path, so it cannot restart itself.");
+            return;
+        }
+
+        try
+        {
+            var elevated = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = exePath,
+                Arguments = RelaunchRequest.Arguments(Environment.ProcessId, enableElevatedLogonTask),
+                UseShellExecute = true,
+
+                // The whole point. ShellExecute is the only way to ask for elevation from a running process.
+                Verb = "runas",
+            });
+
+            if (elevated is null)
+            {
+                MessageDialog.Show("Windows did not start the elevated copy of PasteJump.");
+                return;
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // ERROR_CANCELLED: the user dismissed the UAC prompt. Nothing to report - they know what they just
+            // did - and nothing to change. Staying alive is the whole reason the launch comes before the exit.
+            return;
+        }
+        catch (Exception ex)
+        {
+            MessageDialog.Show($"PasteJump could not restart as administrator: {ex.Message}");
+            return;
+        }
+
+        // Only now, with an elevated copy known to be starting and waiting for this process id.
+        Shutdown();
+    }
 
     /// <summary>
     /// Relaunches and exits. The new process has to wait for this one to release the single-instance

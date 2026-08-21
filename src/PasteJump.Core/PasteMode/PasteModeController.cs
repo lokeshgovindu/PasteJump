@@ -888,6 +888,7 @@ public sealed class PasteModeController
             CurrentIsMarked = CurrentIsMarked,
             TextFacts = DescribeTextFacts(current),
             TotalBytes = current?.TotalBytes ?? 0,
+            CapturedAt = current?.CreatedUtc,
             IsEmpty = current is null,
             SourceExecutable = current?.SourceExecutable,
         });

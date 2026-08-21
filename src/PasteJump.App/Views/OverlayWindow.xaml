@@ -290,12 +290,26 @@
                            Margin="0,6,0,0"
                            Visibility="Collapsed" />
 
-                <!-- Dimensions left, bytes right: the two facts a picture cannot tell you about itself. -->
+<!--
+                    Everything the clip says about ITSELF on the left - lines, characters, bytes, resolution -
+                    and the time it was copied alone on the right. The size sat on the right at first, between
+                    the two, which split one kind of fact across both ends of the row and left the timestamp
+                    looking like part of it.
+                -->
                 <Grid x:Name="ImageFacts" Grid.Row="2" Margin="0,6,0,0" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
                     <TextBlock x:Name="ImageDimensions"
+                               Grid.Column="0"
                                HorizontalAlignment="Left"
+                               TextTrimming="CharacterEllipsis"
                                Style="{StaticResource ChipText}" />
-                    <TextBlock x:Name="ImageBytes"
+                    <TextBlock x:Name="CapturedAtText"
+                               Grid.Column="1"
+                               Margin="8,0,0,0"
                                HorizontalAlignment="Right"
                                Style="{StaticResource ChipText}" />
                 </Grid>

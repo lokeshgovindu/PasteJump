@@ -306,6 +306,18 @@ public sealed class PasteJumpSettings
     /// </summary>
     public bool WarnAboutClipboardManagerConflict { get; set; } = true;
 
+    /// <summary>
+    /// Say so when the keyboard hook is receiving nothing in one application while working in the others. On by
+    /// default, for the reason the setting above is: the symptom otherwise is Ctrl+V doing nothing in that one
+    /// application and PasteJump saying nothing about it, which reads as PasteJump being broken.
+    /// </summary>
+    /// <remarks>
+    /// Switchable because the conclusion is a guess from ambiguous evidence - see
+    /// <see cref="PasteMode.ForegroundDeafnessTracker"/> - and anyone who knows their machine filters a browser
+    /// does not need telling twice a day.
+    /// </remarks>
+    public bool WarnAboutFilteredKeyboard { get; set; } = true;
+
     // ------------------------------------------------------------ appearance
 
     /// <summary>
@@ -464,6 +476,16 @@ public sealed class PasteJumpSettings
     public bool ShowOverlayPinned { get; set; } = true;
 
     /// <summary>
+    /// Show when the clip was copied, at the right of the facts row.
+    /// </summary>
+    /// <remarks>
+    /// Cosmetic, so it gets a switch like the other twelve - the rule being that anything which does not
+    /// change what releasing Ctrl does is the user's to hide. On by default: it was asked for, and a clip's age
+    /// is often the thing that tells two similar clips apart.
+    /// </remarks>
+    public bool ShowOverlayTimestamp { get; set; } = true;
+
+    /// <summary>
     /// The overlay's parts as one value, for handing to the view. Computed rather than stored, exactly like
     /// <see cref="PasteModeOptions"/>, so there is no second copy of these flags to fall out of step.
     /// </summary>
@@ -480,6 +502,7 @@ public sealed class PasteJumpSettings
         ShowOverlaySource,
         ShowOverlayFormatter,
         ShowOverlayPinned,
+        ShowOverlayTimestamp,
         ShowOverlayKeyHint);
 
     /// <summary>Show a brief notification near the cursor after each copy, as Clipjump did.</summary>

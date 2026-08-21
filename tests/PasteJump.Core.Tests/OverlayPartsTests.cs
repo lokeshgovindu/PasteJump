@@ -183,11 +183,34 @@ public class OverlayPartsTests
     {
         var switches = typeof(OverlayParts).GetProperties().Where(static p => p.PropertyType == typeof(bool)).ToList();
 
-        Assert.Equal(12, switches.Count);
+        Assert.Equal(13, switches.Count);
 
         foreach (var forbidden in new[] { "Pop", "Join", "Marked", "KindFilter", "CommitMode", "Preview", "Banner" })
         {
             Assert.DoesNotContain(forbidden, switches.Select(static p => p.Name));
         }
+    }
+    /// <summary>
+    /// The timestamp is cosmetic, so it is switchable - and its row has to survive the other two facts being
+    /// switched off, which is the part that was easy to get wrong.
+    /// </summary>
+    [Fact]
+    public void The_timestamp_is_switchable_and_on_by_default()
+    {
+        Assert.True(OverlayParts.All.Timestamp);
+        Assert.True(new PasteJumpSettings().OverlayParts.Timestamp);
+
+        Assert.False(new PasteJumpSettings { ShowOverlayTimestamp = false }.OverlayParts.Timestamp);
+
+        // Independent of the details and size switches: hiding those must not take the timestamp with them.
+        var onlyTimestamp = new PasteJumpSettings
+        {
+            ShowOverlayTextDetails = false,
+            ShowOverlayTextSize = false,
+        }.OverlayParts;
+
+        Assert.True(onlyTimestamp.Timestamp);
+        Assert.False(onlyTimestamp.TextDetails);
+        Assert.False(onlyTimestamp.TextSize);
     }
 }

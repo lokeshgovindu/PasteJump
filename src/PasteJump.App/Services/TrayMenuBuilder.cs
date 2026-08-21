@@ -87,6 +87,43 @@ internal static class TrayMenuBuilder
     /// </para>
     public static void InvalidateForThemeChange() => _menu = null;
 
+    /// <summary>
+    /// The same items, in a control that can be rendered inside a window - for the UI smoke harness.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The tray menu itself cannot be screenshotted: a <see cref="ContextMenu"/> draws in its own popup HWND,
+    /// which no render of the owning window reaches. So it was checked by eye once, with a throwaway
+    /// application - and that is exactly why a template change that put the check mark <em>in place of</em>
+    /// each item's glyph went unnoticed until somebody looked at the menu and said so.
+    /// </para>
+    /// <para>
+    /// A <see cref="Menu"/> with a vertical panel renders in the ordinary visual tree while using the same
+    /// implicit <c>MenuItem</c> style and the same <see cref="Compose"/> path, so what the shot shows is the
+    /// real thing rather than a mock-up of it. Only the popup is missing, and the popup is the one part that
+    /// was never in question.
+    /// </para>
+    /// </remarks>
+    internal static Menu BuildForPreview(IReadOnlyList<TrayMenuItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        var menu = new Menu
+        {
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0, 4, 0, 4),
+            ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(StackPanel))),
+        };
+
+        foreach (var item in items)
+        {
+            menu.Items.Add(Compose(item));
+        }
+
+        return menu;
+    }
+
     /// <summary>One item, or a separator. Recurses for submenus, of which there are none today.</summary>
     private static object Compose(TrayMenuItem item)
     {
@@ -102,7 +139,11 @@ internal static class TrayMenuBuilder
             IsChecked = item.IsChecked,
         };
 
-        if (item.Emphasised)
+        // Checked items are semi-bold as well as ticked, which is what was asked for and is what Windows'
+        // own menus do for an on state: the tick is small and easy to miss at a glance, and the weight is what
+        // actually reads. Same treatment as Emphasised rather than a second weight - two kinds of bold in one
+        // menu would mean neither said anything.
+        if (item.Emphasised || item.IsChecked)
         {
             element.FontWeight = FontWeights.SemiBold;
         }

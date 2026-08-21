@@ -227,7 +227,12 @@
                                         SortMemberPath="Kind"
                                         ElementStyle="{StaticResource CellText}" />
 
-                    <DataGridTextColumn Header="When"
+                    <!--
+                        Width is a starting point only: the format is the machine's own now, so its width is
+                        not knowable here. WhenColumn is measured and widened at load - see MeasureWhenColumn.
+                    -->
+                    <DataGridTextColumn x:Name="WhenColumn"
+                                        Header="When"
                                         Binding="{Binding LocalTimeText}"
                                         Width="116"
                                         SortMemberPath="CapturedUtc"

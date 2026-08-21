@@ -36,6 +36,18 @@ internal static class TrayGlyph
     public const string Updates = "";      // Sync: two arrows chasing each other
     public const string Disable = "";      // a prohibition sign
     public const string Restart = "";      // one circular arrow, distinct from Sync's two
+    // U+E7E8 - a power/boot mark, for "starts with Windows". Chosen the same way as the shield below.
+    public const string Startup = "";
+
+    // U+EA18, a plain shield - the mark Windows itself puts on an elevation prompt, so the row reads as "this
+    // asks for administrator" without a word.
+    //
+    // Picked by rendering the candidates and looking at them, as every other glyph here was. Existence is not
+    // the test: GetGlyphIndices says all seven candidates exist in the font, and only a rendered contact sheet
+    // shows that E192 is a key, E72E a padlock and E1E5 signal bars. E7EF (a window with a shield on it) is
+    // semantically the closest and is busier - at the 16px a menu row gives it, the detail turns to mush.
+    public const string Elevate = "";
+
     public const string Exit = "";         // an X in a circle
 }
 
@@ -82,6 +94,8 @@ internal sealed record TrayCommands(
     Action PauseToggle,
     Action DisableToggle,
     Action Restart,
+    Action RunAtStartupToggle,
+    Action AlwaysElevatedToggle,
     Action Exit);
 
 /// <summary>
@@ -93,7 +107,21 @@ internal static class TrayMenu
 {
     /// <param name="isPaused">Capture is paused, so the item offers to resume.</param>
     /// <param name="isDisabled">The hook is released, so the item offers to enable.</param>
-    public static IReadOnlyList<TrayMenuItem> Items(TrayCommands commands, bool isPaused, bool isDisabled)
+    /// <param name="runsAtStartup">PasteJump starts itself at logon, by shortcut or by scheduled task.</param>
+    /// <param name="alwaysElevated">
+    /// The elevated logon task is registered, so PasteJump starts with administrator rights.
+    /// <para>
+    /// A ticked toggle rather than a one-shot "restart as administrator", which is what this was first built as
+    /// and it was the wrong shape: elevation is not something you do once, it is a state the application should
+    /// come back in. The tick is also the only thing on screen that answers "am I elevated right now".
+    /// </para>
+    /// </param>
+    public static IReadOnlyList<TrayMenuItem> Items(
+        TrayCommands commands,
+        bool isPaused,
+        bool isDisabled,
+        bool runsAtStartup = false,
+        bool alwaysElevated = false)
     {
         ArgumentNullException.ThrowIfNull(commands);
 
@@ -163,9 +191,26 @@ internal static class TrayMenu
                 ? new TrayMenuItem("_Enable PasteJump", commands.DisableToggle, TrayGlyph.Disable, Emphasised: true)
                 : new TrayMenuItem("_Disable PasteJump (Ctrl+V passes through)", commands.DisableToggle, TrayGlyph.Disable),
 
-            // Restart sits immediately above Exit. Both are the same kind of end-of-session action, and grouping
-            // them leaves Exit at the very bottom where muscle memory expects it - appending Restart last would
-            // have moved Exit and caused mis-clicks.
+            // The two state toggles, grouped together above the session commands. Both are ticked when on,
+            // which is what makes them answer a question as well as offering a command: "does this start with
+            // Windows" and "is this elevated" are both otherwise invisible.
+            //
+            // Startup first, because "always as administrator" is a qualifier on it: with elevation on, the
+            // logon entry becomes a scheduled task, since a shortcut cannot ask for elevation at all.
+            new("Run at Start_up", commands.RunAtStartupToggle, TrayGlyph.Startup, IsChecked: runsAtStartup),
+
+            // Not a preference, and worth saying why it is here at all: where endpoint security routes one
+            // application's keyboard input through a component of higher integrity than PasteJump, Windows
+            // excludes PasteJump's hook from that input entirely and the gesture silently stops working in that
+            // one application. Elevation is the only thing that restores it. Measured 2026-08-21, and
+            // reproduced by three unrelated programs including Clipjump - see CLAUDE.md.
+            new("Always Run as _Administrator", commands.AlwaysElevatedToggle, TrayGlyph.Elevate,
+                IsChecked: alwaysElevated),
+
+            TrayMenuItem.Separator,
+
+            // Restart sits immediately above Exit. Both are the same kind of end-of-session action, and
+            // grouping them leaves Exit at the very bottom where muscle memory expects it.
             new("_Restart PasteJump", commands.Restart, TrayGlyph.Restart),
             new("E_xit PasteJump", commands.Exit, TrayGlyph.Exit),
         ];

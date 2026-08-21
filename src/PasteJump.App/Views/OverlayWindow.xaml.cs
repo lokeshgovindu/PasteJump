@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PasteJump.App.Services;
+using PasteJump.Core;
 using PasteJump.Core.Model;
 using PasteJump.Core.Settings;
 using PasteJump.Core.PasteMode;
@@ -381,6 +383,10 @@ public partial class OverlayWindow : Window
 
     private void RenderBody(PasteOverlayModel model)
     {
+        // Held for this render rather than threaded through four call sites: ShowImageFacts is reached from
+        // five branches and every one of them wants the same answer.
+        _capturedAt = model.CapturedAt;
+
         if (model.IsEmpty)
         {
             PreviewText.Visibility = Visibility.Collapsed;
@@ -472,15 +478,39 @@ public partial class OverlayWindow : Window
     /// switches about its dimensions and the file switches about its size.
     /// </param>
     /// <param name="sizeKind">The kind governing the size half, when it differs from <paramref name="kind"/>.</param>
+    /// <summary>When the clip in the current frame was captured. See <see cref="RenderBody"/>.</summary>
+    private DateTimeOffset? _capturedAt;
+
     private void ShowImageFacts(ClipKind kind, string dimensions, string? bytes, ClipKind? sizeKind = null)
     {
         var showDetails = _parts.DetailsFor(kind) && dimensions.Length > 0;
         var showSize = _parts.SizeFor(sizeKind ?? kind) && !string.IsNullOrEmpty(bytes);
 
-        ImageDimensions.Text = showDetails ? dimensions : string.Empty;
-        ImageBytes.Text = showSize ? bytes! : string.Empty;
+        // Independent of the other two, which is the whole reason the row's visibility below is a three-way
+        // test now. Switching text details and text size off used to collapse the row, and with a timestamp in
+        // it that would take the timestamp away for every kind at once.
+        var showTimestamp = _parts.Timestamp && _capturedAt is not null;
 
-        ImageFacts.Visibility = showDetails || showSize ? Visibility.Visible : Visibility.Collapsed;
+        // One left-hand string, joined with the separator this application uses everywhere it lists facts -
+        // the history window's preview header reads "#18 . Image . 895 x 462 . 1.6 MB" the same way. Either
+        // half can be switched off independently, so all four combinations have to read properly.
+        ImageDimensions.Text = (showDetails, showSize) switch
+        {
+            (true, true) => dimensions + " · " + bytes,
+            (true, false) => dimensions,
+            (false, true) => bytes!,
+            _ => string.Empty,
+        };
+
+        // The machine's own date and time format, through the one helper the history window also uses - see
+        // LocalTimestamp for why this is not a pattern of ours. Relative time ("3m ago") reads better in prose
+        // and worse here: the gesture exists to choose between clips copied minutes apart, where two clock
+        // times compare at a glance and "3m ago" against "4m ago" does not.
+        CapturedAtText.Text = showTimestamp ? LocalTimestamp.Format(_capturedAt!.Value) : string.Empty;
+
+        ImageFacts.Visibility = showDetails || showSize || showTimestamp
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private static string FormatBytes(long bytes) => bytes switch
@@ -544,6 +574,18 @@ public partial class OverlayWindow : Window
     /// Reads the visual tree rather than the resources, which is the point: a resource can hold 18 while a
     /// <c>FontSize="12"</c> left behind in the XAML keeps a row at twelve, and nothing else would notice.
     /// </remarks>
+    /// <summary>
+    /// What the facts row's right-hand slot is showing, for the UI smoke harness.
+    /// </summary>
+    /// <remarks>
+    /// Read from the rendered <c>TextBlock</c> rather than recomputed, which is the point: a screenshot cannot
+    /// tell a rendered timestamp from a blank slot, and a check that formatted the value again would pass even
+    /// if nothing reached the control. Reports visibility too, since the row can be collapsed while the text
+    /// underneath it is perfectly correct.
+    /// </remarks>
+    internal (string Text, bool RowVisible) CapturedAtForSmokeTest() =>
+        (CapturedAtText.Text, ImageFacts.Visibility == Visibility.Visible);
+
     public double LargestTextSizeForSmokeTest()
     {
         var largest = 0d;

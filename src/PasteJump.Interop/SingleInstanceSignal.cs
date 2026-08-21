@@ -38,8 +38,77 @@ public static class SingleInstanceSignal
     /// </summary>
     private static readonly uint ShowRequest = NativeMethods.RegisterWindowMessage("PasteJump.ShowExisting");
 
+    /// <summary>
+    /// Interned message asking the running instance to shut down.
+    /// </summary>
+    /// <remarks>
+    /// Exists for deployment. Replacing the executable means stopping the running copy first, and
+    /// <c>Stop-Process</c> cannot touch an elevated one from an ordinary prompt - PasteJump legitimately runs
+    /// elevated where endpoint security intercepts keyboard input above medium integrity. Asking it to leave
+    /// works across that boundary, provided the elevated instance has opted in with
+    /// <see cref="AllowRequestsFromLowerIntegrity"/>.
+    /// <para>
+    /// A request, not a kill: the instance shuts down through its own <c>Exit</c> path, so settings are saved
+    /// and the database is closed cleanly rather than being cut off mid-write.
+    /// </para>
+    /// </remarks>
+    private static readonly uint ExitRequest = NativeMethods.RegisterWindowMessage("PasteJump.RequestExit");
+
     /// <summary>Whether a received message is the "show yourself" request.</summary>
     public static bool IsShowRequest(uint message) => ShowRequest != 0 && message == ShowRequest;
+
+    /// <summary>Whether a received message is the "please shut down" request.</summary>
+    public static bool IsExitRequest(uint message) => ExitRequest != 0 && message == ExitRequest;
+
+    /// <summary>
+    /// Opts this window in to receiving our two requests from processes of lower integrity.
+    /// </summary>
+    /// <remarks>
+    /// Only matters while elevated, and harmless otherwise - which is why it is called unconditionally rather
+    /// than behind a privilege check that could get the answer wrong. Without it, an elevated PasteJump is
+    /// unreachable: a deployment script cannot ask it to exit, and a second launch cannot ask it to show
+    /// itself, so both appear to do nothing at all.
+    /// <para>
+    /// Per message, deliberately. Nothing else is let through.
+    /// </para>
+    /// </remarks>
+    public static void AllowRequestsFromLowerIntegrity(IntPtr window)
+    {
+        const uint allow = 1;  // MSGFLT_ALLOW
+
+        foreach (var message in new[] { ShowRequest, ExitRequest })
+        {
+            if (message != 0)
+            {
+                NativeMethods.ChangeWindowMessageFilterEx(window, message, allow, IntPtr.Zero);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asks the running instance to shut down. False when there is none to reach.
+    /// </summary>
+    /// <remarks>
+    /// Posted rather than sent, for the reason the show request is: the other instance's UI thread may be
+    /// mid-gesture holding the keyboard hook, and blocking on it would block every keystroke on the machine.
+    /// The caller therefore has to wait for the process to actually exit rather than assuming it has.
+    /// </remarks>
+    public static bool TryRequestExit()
+    {
+        if (ExitRequest == 0)
+        {
+            return false;
+        }
+
+        var target = NativeMethods.FindWindowEx(
+            NativeConstants.HWND_MESSAGE,
+            IntPtr.Zero,
+            null,
+            WindowName);
+
+        return target != IntPtr.Zero
+            && NativeMethods.PostMessage(target, ExitRequest, IntPtr.Zero, IntPtr.Zero);
+    }
 
     /// <summary>
     /// Asks the running instance to surface itself. Returns false when there is none to reach - no window in

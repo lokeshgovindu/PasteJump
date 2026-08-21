@@ -365,6 +365,17 @@ public sealed record PasteOverlayModel
     /// <summary>Bytes the clip occupies, as history reports it. Zero when not applicable.</summary>
     public long TotalBytes { get; init; }
 
+    /// <summary>
+    /// When the clip was captured, for the right-hand end of the facts row. Null when there is no clip.
+    /// </summary>
+    /// <remarks>
+    /// Nullable rather than required, deliberately: the UI smoke harness and a great many tests construct
+    /// frames by hand, and a required member would break every one of them to say something none of them
+    /// cares about. Carried as the captured instant, so the view decides how to show it - the overlay renders
+    /// local time, because a clip copied twenty minutes ago in UTC reads as a clip from another day.
+    /// </remarks>
+    public DateTimeOffset? CapturedAt { get; init; }
+
     public required bool IsEmpty { get; init; }
 
     public string? SourceExecutable { get; init; }

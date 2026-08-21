@@ -575,6 +575,11 @@
                                   Content="Tell Me When Another Clipboard Manager Is Running" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Shows a brief notification at start-up if a manager known to claim Ctrl+V is running. It is only a hint — PasteJump cannot tell whether the other program's paste shortcut is actually switched on, so it says what to check rather than claiming anything is broken." />
+
+                        <CheckBox x:Name="WarnAboutFilteredKeyboardCheck"
+                                  Content="Tell Me When PasteJump Cannot See The Keyboard In A Program" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="Some managed machines stop keyboard input reaching other programs while one particular application is in front &#8212; a browser, usually, under security policy. PasteJump cannot work around that, but it can say which program it is, once, instead of leaving Ctrl+V looking broken there." />
                         </StackPanel>
                         </Border>
 
@@ -977,6 +982,10 @@
                         <CheckBox x:Name="ShowPinnedCheck" Content="The PINNED Marker" Margin="0,7,0,0" />
                         <TextBlock Style="{StaticResource CheckHelp}"
                                    Text="Pinning itself is unaffected — this only hides the marker. A pinned clip still sorts first and still survives Delete All." />
+
+                        <CheckBox x:Name="ShowTimestampCheck" Content="When It Was Copied" Margin="0,7,0,0" />
+                        <TextBlock Style="{StaticResource CheckHelp}"
+                                   Text="Shown at the right of the facts row under the preview, in local time, for every kind of clip. Often the quickest way to tell two similar clips apart." />
 
                         <!--
                             The key reminder sat in the Paste Overlay group above, which was where it had always

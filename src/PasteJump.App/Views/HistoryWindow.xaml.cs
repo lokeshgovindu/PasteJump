@@ -13,6 +13,7 @@ using PasteJump.Core.Abstractions;
 using PasteJump.Core.Capture;
 using PasteJump.Core.Formatting;
 using PasteJump.Core.Imaging;
+using PasteJump.Core;
 using PasteJump.Core.Model;
 using PasteJump.Core.Paste;
 using PasteJump.Core.PasteMode;
@@ -138,7 +139,11 @@ public sealed class HistoryRow
         }
     }
 
-    public string LocalTimeText => CapturedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+    /// <summary>
+    /// When it was copied, in the machine's own format - see <see cref="LocalTimestamp"/>. Shared with the
+    /// paste overlay, which showed the same clip's time a different way until both went through one helper.
+    /// </summary>
+    public string LocalTimeText => LocalTimestamp.Format(CapturedUtc);
 
     public string SizeText => Bytes switch
     {
@@ -277,6 +282,7 @@ public partial class HistoryWindow : Window
 
         Loaded += (_, _) =>
         {
+            MeasureWhenColumn();
             Refresh();
             SearchBox.Focus();
         };
@@ -288,6 +294,54 @@ public partial class HistoryWindow : Window
             _searchDebounce.Stop();
             _refreshDebounce.Stop();
         };
+    }
+
+    /// <summary>
+    /// Widens the <b>When</b> column to fit the machine's own date and time format.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It used to be a hard-coded 116px, measured for a hard-coded <c>yyyy-MM-dd HH:mm</c>. Now that the
+    /// format is whatever Windows is set to, that number is a guess about somebody else's regional settings:
+    /// an English (India) machine writes <c>22-12-2026 11:58 pm</c>, which is wider, and the column would
+    /// silently truncate the one fact the column exists for.
+    /// </para>
+    /// <para>
+    /// Measured with <see cref="FormattedText"/> against the cell's real typeface and size, plus the padding
+    /// a cell adds and room for the sort glyph the header shows when this column is sorted - the same
+    /// reasoning the other widths in this window were arrived at. Only ever widened: a narrower measurement
+    /// would fight the layout the rest of the columns were fitted to.
+    /// </para>
+    /// </remarks>
+    private void MeasureWhenColumn()
+    {
+        try
+        {
+            var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+
+            var text = new FormattedText(
+                LocalTimestamp.WidestSample(),
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                FontSize,
+                Brushes.Black,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+
+            // 20 for the cell's own padding, 16 for the sort glyph the header draws when sorted by this
+            // column - both of which are inside the width the DataGrid hands the cell.
+            var needed = Math.Ceiling(text.Width) + 20 + 16;
+
+            if (needed > WhenColumn.Width.DisplayValue)
+            {
+                WhenColumn.Width = new DataGridLength(needed);
+            }
+        }
+        catch (Exception)
+        {
+            // A measurement that fails leaves the designed width in place, which is a slightly narrow column
+            // rather than a broken window. Not worth failing the whole history view over.
+        }
     }
 
     /// <summary>
@@ -1751,7 +1805,7 @@ public partial class HistoryWindow : Window
         // Registered before the write, exactly as the single-entry path does: without it the capture service
         // sees a clipboard change it did not cause and files the joined text as a brand-new clip, on top of the
         // one added deliberately below.
-        _selfWrites.NoteWrite(snapshot.ContentHash);
+        _selfWrites.NoteWrite(snapshot.SelfWriteKey);
 
         if (!_clipboard.TryWrite(payloads))
         {
@@ -1833,7 +1887,7 @@ public partial class HistoryWindow : Window
 
             if (stored.Count > 0)
             {
-                _selfWrites.NoteWrite(new ClipboardSnapshot(stored, null, row.Kind, null).ContentHash);
+                _selfWrites.NoteWrite(new ClipboardSnapshot(stored, null, row.Kind, null).SelfWriteKey);
 
                 if (!_clipboard.TryWrite(stored))
                 {
@@ -1876,7 +1930,7 @@ public partial class HistoryWindow : Window
         // Registered before writing so the capture service recognises this as our own write and does not file
         // it as a brand-new clip - it is added to the stack explicitly below instead, which also keeps it out
         // of the history archive, where it already has a row.
-        _selfWrites.NoteWrite(snapshot.ContentHash);
+        _selfWrites.NoteWrite(snapshot.SelfWriteKey);
 
         if (!_clipboard.TryWrite(payloads))
         {

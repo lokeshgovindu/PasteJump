@@ -185,7 +185,7 @@ Note that this does not divide neatly into old and new: **ConEmu exposes a caret
 
 ## What the overlay shows
 
-A text clip states its size the way a picture does: lines and characters on the left, bytes on the right.
+A text clip states its size the way a picture does: lines and characters on the left, bytes on the right, and **when it was copied** at the far right — local time, and for every kind of clip, which is often the quickest way to tell two similar clips apart. Hide it with **When It Was Copied** on the Appearance tab; the row survives on its own if you switch the other two facts off.
 
 **A copied text file shows its contents too.** The path stays on top, the first lines of the file appear beneath it in a muted colour, and the facts row gives the line count and the file's size on disk — the same treatment a copied image file gets, where a thumbnail appears instead. Only the first file of a copy is read, only the first few kilobytes of it, never a file on a network share, and only for extensions that are plainly text: the overlay is redrawn on every tap of the trigger key, so nothing here may be slow. What a paste puts on the clipboard is still the path, which is why the contents are dimmed.
 

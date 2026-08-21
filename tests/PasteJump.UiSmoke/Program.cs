@@ -631,7 +631,91 @@ internal static class Program
                     });
 
 
-                Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()));
+                // The tray menu, rendered. Not a mock-up: the same TrayMenu.Items and the same TrayMenuBuilder
+                // composition, hosted in a Menu so it lands in a visual tree a screenshot can reach. Both
+                // toggles ticked, so the shot shows what an on state looks like - glyph on the left, tick on
+                // the right, label semi-bold.
+                Check("TrayMenu", () =>
+                {
+                    var window = new Window
+                    {
+                        Title = "Tray menu",
+                        Width = 330,
+                        Height = 420,
+                        WindowStyle = WindowStyle.None,
+                        ResizeMode = ResizeMode.NoResize,
+                        Background = (System.Windows.Media.Brush)Application.Current.Resources["SurfaceRaisedBrush"],
+                    };
+
+                    window.Content = new System.Windows.Controls.Border
+                    {
+                        BorderBrush = (System.Windows.Media.Brush)Application.Current.Resources["BorderBrush"],
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(6),
+                        Child = TrayMenuBuilder.BuildForPreview(TrayMenu.Items(
+                            NoOpTrayCommands,
+                            isPaused: false,
+                            isDisabled: false,
+                            runsAtStartup: true,
+                            alwaysElevated: true)),
+                    };
+
+                    return window;
+                });
+
+                Check("OverlayWindow-TextFacts", () => RenderOverlay(TextFactsFrame()), (window, _) =>
+                {
+                    // The timestamp at the right of the facts row. Asserted rather than left to the shot,
+                    // because a screenshot cannot tell a rendered timestamp from an empty slot - and the value
+                    // is read back off the TextBlock rather than formatted again here, so a check cannot pass
+                    // while nothing reached the control.
+                    var (text, rowVisible) = ((OverlayWindow)window).CapturedAtForSmokeTest();
+
+                    if (text != "2026-08-21 15:12" && text != "2026-08-21 09:42")
+                    {
+                        // Local time, so the expected string depends on the machine's offset - both the UTC
+                        // instant and this machine's rendering of it are accepted, and anything else is a
+                        // finding rather than a timezone.
+                        if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"^2026-08-2[12] \d\d:\d\d$"))
+                        {
+                            _failures++;
+                            Console.WriteLine($"  FAIL  the overlay's timestamp reads \"{text}\", not a date and time");
+                        }
+                    }
+
+                    if (!rowVisible)
+                    {
+                        _failures++;
+                        Console.WriteLine("  FAIL  the facts row is collapsed, so the timestamp cannot be seen");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  overlay timestamp: {text}");
+                    }
+                });
+
+                // The row has to survive both other facts being switched off - it carries the timestamp for
+                // every kind now, and collapsing it would take that away for all of them at once.
+                Check(
+                    "OverlayWindow-TimestampOnly",
+                    () => RenderOverlay(
+                        TextFactsFrame(),
+                        OverlayParts.All with { TextDetails = false, TextSize = false }),
+                    (window, _) =>
+                    {
+                        var (text, rowVisible) = ((OverlayWindow)window).CapturedAtForSmokeTest();
+
+                        if (!rowVisible || text.Length == 0)
+                        {
+                            _failures++;
+                            Console.WriteLine(
+                                "  FAIL  with details and size off the facts row collapsed, hiding the timestamp");
+                        }
+                        else
+                        {
+                            Console.WriteLine("  overlay timestamp: survives details and size being switched off");
+                        }
+                    });
 
                 // A copied TEXT FILE, whose contents are read off disk. Written as a real file because that is
                 // the branch being exercised - FileTextPreviewCache opens it - and seeding a path that does not
@@ -782,6 +866,7 @@ internal static class Program
     /// <summary>A text clip mid-gesture, with tags, a source application and a pop pending.</summary>
     private static PasteOverlayModel TextFrame() => new()
     {
+        CapturedAt = SeededCaptureTime,
         Position = 3,
         Total = 41,
         PreviewText =
@@ -1384,20 +1469,97 @@ internal static class Program
             Console.WriteLine($"  FAIL  tray menu items with no icon: {string.Join(", ", withoutGlyph)}");
         }
 
-        // Every state the two toggles can be in, since each swaps a label and one of them swaps its glyph.
+        // Every state the four flags can be in. The two toggles each swap a label and one swaps its glyph;
+        // the two state ticks change which items draw an icon at all, since a ticked item shows a check mark
+        // in place of its glyph - so an item that forgot its glyph could hide in the ticked state.
         foreach (var (paused, disabled) in new[] { (true, false), (false, true), (true, true) })
         {
-            foreach (var item in TrayMenu.Items(NoOpTrayCommands, paused, disabled))
+            foreach (var startup in new[] { false, true })
             {
-                if (!item.IsSeparator && string.IsNullOrEmpty(item.Glyph))
+                foreach (var elevated in new[] { false, true })
                 {
-                    _failures++;
-                    Console.WriteLine($"  FAIL  tray menu item with no icon when paused={paused} disabled={disabled}: {item.Text}");
+                    foreach (var item in TrayMenu.Items(NoOpTrayCommands, paused, disabled, startup, elevated))
+                    {
+                        if (!item.IsSeparator && string.IsNullOrEmpty(item.Glyph))
+                        {
+                            _failures++;
+                            Console.WriteLine(
+                                $"  FAIL  tray menu item with no icon when paused={paused} disabled={disabled} "
+                                    + $"startup={startup} elevated={elevated}: {item.Text}");
+                        }
+                    }
                 }
             }
         }
 
+        // The two toggles are always present - they report state as well as offering a command, so hiding
+        // either would remove the only answer to "does this start with Windows" and "am I elevated".
+        // Located by their Invoke delegates, so renaming a label cannot fail this and a swapped pair cannot
+        // pass it.
+        VerifyToggleTracksItsState("run at startup", NoOpTrayCommands.RunAtStartupToggle, startupOn: true);
+        VerifyToggleTracksItsState("always elevated", NoOpTrayCommands.AlwaysElevatedToggle, startupOn: false);
+
+        // A ticked item keeps its glyph AND goes semi-bold. Both were got wrong: the template drew the check
+        // mark in place of the icon, and nothing anywhere noticed because a ContextMenu renders in its own
+        // popup HWND that no screenshot reaches. The shot below is the instrument that would have caught it.
+        var ticked = TrayMenu.Items(
+            NoOpTrayCommands,
+            isPaused: false,
+            isDisabled: false,
+            runsAtStartup: true,
+            alwaysElevated: true);
+
+        foreach (var item in ticked.Where(static i => i.IsChecked))
+        {
+            if (string.IsNullOrEmpty(item.Glyph))
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  ticked item \"{item.Text}\" has no glyph to keep");
+            }
+        }
+
         VerifyOffStateIsEmphasised();
+    }
+
+    /// <summary>
+    /// A state toggle is present in both states, and its tick follows the state rather than being decoration.
+    /// </summary>
+    /// <remarks>
+    /// The tick is the only thing in the application that answers "does this start with Windows" and "am I
+    /// running elevated", so a toggle whose <c>IsChecked</c> stopped following the flag would silently become a
+    /// button that lies. Which flag drives which item is asserted here rather than assumed: crossing the two
+    /// wires is the obvious mistake and produces a menu that looks perfectly normal.
+    /// </remarks>
+    private static void VerifyToggleTracksItsState(string what, Action command, bool startupOn)
+    {
+        foreach (var flag in new[] { false, true })
+        {
+            var items = TrayMenu.Items(
+                NoOpTrayCommands,
+                isPaused: false,
+                isDisabled: false,
+                runsAtStartup: startupOn ? flag : false,
+                alwaysElevated: startupOn ? false : flag);
+
+            var item = items.SingleOrDefault(i => ReferenceEquals(i.Invoke, command));
+
+            if (item is null)
+            {
+                _failures++;
+                Console.WriteLine($"  FAIL  tray menu has no {what} toggle");
+                return;
+            }
+
+            if (item.IsChecked != flag)
+            {
+                _failures++;
+                Console.WriteLine(
+                    $"  FAIL  {what} toggle is {(item.IsChecked ? "ticked" : "unticked")} when the state is {flag}");
+                return;
+            }
+        }
+
+        Console.WriteLine($"  tray menu: {what} toggle ticks with its state");
     }
 
     /// <summary>
@@ -1487,6 +1649,8 @@ internal static class Program
         PauseToggle: () => { },
         DisableToggle: () => { },
         Restart: () => { },
+        RunAtStartupToggle: () => { },
+        AlwaysElevatedToggle: () => { },
         Exit: () => { });
 
     private static void VerifyTrayIcons()
@@ -1616,6 +1780,7 @@ internal static class Program
     /// </summary>
     private static PasteOverlayModel ImageFrame() => new()
     {
+        CapturedAt = SeededCaptureTime,
         Position = 2,
         Total = 41,
         PreviewText = "[image]",
@@ -1660,8 +1825,16 @@ internal static class Program
     /// A multi-line text clip, which is the frame that exercises the facts line for text - lines and characters
     /// on the left, bytes on the right. The ordinary TextFrame is one line and would not show the plural.
     /// </summary>
+    /// <summary>
+    /// Fixed rather than <c>DateTimeOffset.Now</c>: the manual's images are checked in, and a timestamp that
+    /// moved would make every regeneration a diff. Local, because that is what the overlay renders.
+    /// </summary>
+    private static readonly DateTimeOffset SeededCaptureTime =
+        new(2026, 8, 21, 9, 42, 0, TimeSpan.Zero);
+
     private static PasteOverlayModel TextFactsFrame() => new()
     {
+        CapturedAt = SeededCaptureTime,
         Position = 4,
         Total = 41,
         PreviewText = "SELECT id, preview, captured_utc\nFROM history\nWHERE kind = 0\nORDER BY captured_utc DESC;",
@@ -1721,6 +1894,7 @@ internal static class Program
     /// <summary>The X cycle at its last stop, which is the one worth showing a picture of.</summary>
     private static PasteOverlayModel DeleteAllFrame() => new()
     {
+        CapturedAt = SeededCaptureTime,
         Position = 3,
         Total = 41,
         PreviewText = "the clip that will NOT be pasted, because X was tapped three times",

@@ -111,13 +111,93 @@ Write-Host ("  PasteJump {0}: {1} files, {2:N1} MB" -f $version, $published.Coun
 
 $running = Get-Process PasteJump -ErrorAction SilentlyContinue
 
+# Whether the way is clear. Nothing to stop counts as stopped.
+$stopped = $true
+
 if ($running) {
     Write-Host "Stopping the running copy..."
+    $stopped = $false
 
-    # Stop-Process rather than CloseMainWindow: this application has no main window, so there is nothing to
-    # send a close message to.
-    $running | Stop-Process -Force
-    Start-Sleep -Milliseconds 800
+    # Three ways, in order of politeness, because one of them has to work: this script must never leave the
+    # machine with nothing deployed and nothing running just because the copy in the way is privileged.
+    #
+    #   1. Stop-Process. Fails on an ELEVATED copy from an ordinary prompt, and PasteJump legitimately runs
+    #      elevated where endpoint security intercepts keyboard input above medium integrity.
+    #   2. Ask it to leave. A registered window message crosses the integrity boundary, provided the running
+    #      copy is new enough to have opted in - see SingleInstanceSignal. It also shuts down cleanly, saving
+    #      settings and closing the database, which Stop-Process does not.
+    #   3. Rename the files out of the way. Windows lets a running executable and its loaded assemblies be
+    #      RENAMED even while they cannot be deleted, so the new build still lands and takes effect the next
+    #      time PasteJump starts.
+    $stopped = $false
+
+    try {
+        $running | Stop-Process -Force -ErrorAction Stop
+        Start-Sleep -Milliseconds 800
+        $stopped = $true
+    }
+    catch {
+        Write-Host '  Stop-Process was refused - that copy is elevated. Asking it to exit instead...'
+
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class PasteJumpExitRequest
+{
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string name);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string window);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr w, IntPtr l);
+
+    public static bool Send()
+    {
+        uint message = RegisterWindowMessage("PasteJump.RequestExit");
+
+        if (message == 0)
+        {
+            return false;
+        }
+
+        // HWND_MESSAGE, and by window TITLE: the class name is unique per instance by design, so the title
+        // is the only stable handle on a message-only window.
+        IntPtr target = FindWindowEx(new IntPtr(-3), IntPtr.Zero, null, "PasteJump.SingleInstance.9F2C41A6");
+
+        return target != IntPtr.Zero && PostMessage(target, message, IntPtr.Zero, IntPtr.Zero);
+    }
+}
+'@ -ErrorAction SilentlyContinue
+
+        if ([PasteJumpExitRequest]::Send()) {
+            for ($waited = 0; $waited -lt 10; $waited++) {
+                Start-Sleep -Seconds 1
+
+                if (-not (Get-Process -Id $running.Id -ErrorAction SilentlyContinue)) {
+                    $stopped = $true
+                    Write-Host "  it exited after $($waited + 1)s"
+                    break
+                }
+            }
+        }
+
+        if (-not $stopped) {
+            # Old builds do not understand the request, so this is the normal path until one deploy has
+            # replaced them. Renaming is not a workaround for a broken deploy - it IS a deploy, and the only
+            # thing it costs is that the running copy stays on the old build until it next starts.
+            Write-Host '  It is still running, so the old files will be renamed out of the way instead.'
+            Write-Host '  The new build lands now and takes effect the next time PasteJump starts.' -ForegroundColor DarkYellow
+        }
+    }
+}
+
+# Left over from a previous rename-in-place deploy. Cleared first, and best-effort: whatever still cannot be
+# deleted is simply still in use, and will go on the next run.
+foreach ($orphan in @(Get-ChildItem $Destination -File -Filter '*.replaced-*' -ErrorAction SilentlyContinue)) {
+    try { Remove-Item -LiteralPath $orphan.FullName -Force -ErrorAction Stop } catch { }
 }
 
 # --------------------------------------------------------------- clear
@@ -136,7 +216,22 @@ if ($stale.Count -or $staleDirectories.Count) {
         $stale.Count, $staleDirectories.Count, ($staleBytes / 1MB))
 
     foreach ($item in @($stale) + @($staleDirectories)) {
-        Remove-Item -LiteralPath $item.FullName -Recurse -Force
+        try {
+            Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            # Held open by the copy still running. Windows allows a RENAME of a running executable and of
+            # loaded assemblies even when it refuses a delete, which is what lets the new build land anyway.
+            # The stamp keeps successive deploys from colliding on the same name.
+            $parked = "{0}.replaced-{1}" -f $item.FullName, (Get-Date -Format 'HHmmss')
+
+            try {
+                Rename-Item -LiteralPath $item.FullName -NewName (Split-Path $parked -Leaf) -ErrorAction Stop
+            }
+            catch {
+                Write-Warning "  could not remove or rename $($item.Name): $($_.Exception.Message)"
+            }
+        }
     }
 }
 
@@ -206,8 +301,34 @@ $landed = Get-ChildItem $Destination -File -Recurse | Where-Object { $_.FullName
 Write-Host ("Deployed to {0}: {1} files, {2:N1} MB (data\ untouched)" -f
     $Destination, $landed.Count, (($landed | Measure-Object -Property Length -Sum).Sum / 1MB)) -ForegroundColor Green
 
-if (-not $NoStart) {
-    Start-Process (Join-Path $Destination 'PasteJump.exe')
+if (-not $NoStart -and -not $stopped) {
+    Write-Host ''
+    Write-Host 'The previous copy is STILL RUNNING on the old build, so a new one has NOT been started.' -ForegroundColor DarkYellow
+    Write-Host 'Starting one would achieve nothing: it finds the single-instance mutex held and exits - and'  -ForegroundColor DarkYellow
+    Write-Host 'if the running copy is elevated it cannot even be reached to be told, so the new copy sits'  -ForegroundColor DarkYellow
+    Write-Host 'on a modal dialog instead. The files are in place: exit PasteJump from its tray icon and'     -ForegroundColor DarkYellow
+    Write-Host 'start it again to pick up this build.'                                                       -ForegroundColor DarkYellow
+}
+elseif (-not $NoStart) {
+    # Started through the elevated logon task when one exists, and that is not a nicety. On a machine where
+    # endpoint security intercepts a browser's keyboard input above medium integrity, PasteJump only works
+    # elevated - and starting the exe directly from an ordinary prompt silently hands back a medium-integrity
+    # copy, so the gesture stops working in that application again with nothing to say why. Deploying must not
+    # quietly undo the one thing that fixed it.
+    #
+    # schtasks /Run on a task the user owns starts it with the privileges the task was registered with, which
+    # is how tools\install-elevated-task.ps1 sets it up.
+    $elevatedTask = 'PasteJump (elevated)'
+    $haveTask = $null -ne (Get-ScheduledTask -TaskName $elevatedTask -ErrorAction SilentlyContinue)
+
+    if ($haveTask) {
+        Write-Host "Starting through '$elevatedTask' so the restarted copy keeps its privileges..."
+        schtasks /Run /TN $elevatedTask | Out-Null
+    }
+    else {
+        Start-Process (Join-Path $Destination 'PasteJump.exe')
+    }
+
     Start-Sleep -Seconds 3
 
     $started = Get-Process PasteJump -ErrorAction SilentlyContinue
@@ -217,4 +338,12 @@ if (-not $NoStart) {
     }
 
     Write-Host "Running: pid $($started.Id)"
+
+    if (-not $haveTask) {
+        Write-Host ''
+        Write-Host 'Started NOT elevated. If the gesture has to work in an application whose input is'         -ForegroundColor DarkYellow
+        Write-Host 'intercepted above medium integrity - a browser under endpoint DLP - register the task once:' -ForegroundColor DarkYellow
+        Write-Host '  powershell -ExecutionPolicy Bypass -File tools\install-elevated-task.ps1'                -ForegroundColor DarkYellow
+        Write-Host 'after which this script will start it elevated on every deploy.'                            -ForegroundColor DarkYellow
+    }
 }
