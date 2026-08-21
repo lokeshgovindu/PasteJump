@@ -33,6 +33,11 @@ public sealed class ClipboardSnapshot
         HasOwner = hasOwner;
         TotalBytes = payloads.Sum(static p => (long)p.ByteLength);
         ContentHash = ComputeHash(payloads);
+
+        // The canonical set is usually the whole set, and then this is the same hash rather than a second one.
+        var canonical = SynthesisedTextFormats.DropDerived(payloads);
+        SelfWriteKey = ReferenceEquals(canonical, payloads) ? ContentHash : ComputeHash(canonical);
+
         DedupKey = ComputeDedupKey(text, kind, ContentHash);
     }
 
@@ -77,6 +82,32 @@ public sealed class ClipboardSnapshot
     /// </para>
     /// </summary>
     public string ContentHash { get; }
+
+    /// <summary>
+    /// How we recognise our own writes, and deliberately <em>not</em> <see cref="ContentHash"/>.
+    /// <para>
+    /// <see cref="ContentHash"/> covers every format's bytes, which is right for identifying a clip and wrong
+    /// for identifying a round trip: the bytes on the clipboard after our write are not the bytes we handed
+    /// over. The writer drops the formats Windows derives from <c>CF_UNICODETEXT</c> - see
+    /// <see cref="SynthesisedTextFormats"/> for why - and Windows then regenerates them from the pasting
+    /// thread's own locale rather than the copying application's. So a clip copied under one keyboard layout
+    /// reads back with a different <c>CF_LOCALE</c> than the one stored with it, and hashing everything meant
+    /// PasteJump did not recognise the clipboard it had just written.
+    /// </para>
+    /// <para>
+    /// Measured, on the store that produced the report: two clips of the same 66 characters, both four formats
+    /// and 2,044 bytes, differing in exactly one byte pair - <c>CF_LOCALE</c> <c>0x4009</c> (English, India) as
+    /// captured, against <c>0x0409</c> (English, US) as Windows synthesised it on the way back. The symptom was
+    /// a paste being stored as a brand new clip and announced with a copy notification, so the overlay came up
+    /// and a copy toast followed it - one clip added to the stack and to history per paste, and the browse
+    /// position reset each time.
+    /// </para>
+    /// <para>
+    /// This key is the same string as <see cref="ContentHash"/> whenever nothing is dropped, which is every
+    /// image, every file list, and any text clip that never carried the derived formats.
+    /// </para>
+    /// </summary>
+    public string SelfWriteKey { get; }
 
     /// <summary>
     /// Identifies a clip by what the user would call "the same thing", which is deliberately looser

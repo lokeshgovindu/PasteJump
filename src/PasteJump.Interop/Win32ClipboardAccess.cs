@@ -321,19 +321,20 @@ public sealed class Win32ClipboardAccess : IClipboardAccess
     /// <summary>
     /// Drops formats Windows will synthesise for us, so a stale sibling cannot contradict the
     /// authoritative one.
+    /// <para>
+    /// The synthesised-text half is <see cref="SynthesisedTextFormats.DropDerived"/> rather than a rule of its
+    /// own, and calling the same method the identity key uses is the point of it: what we write and what we
+    /// recognise as ours have to be the same set, or a paste is captured back as a new clip. See
+    /// <see cref="ClipboardSnapshot.SelfWriteKey"/>.
+    /// </para>
     /// </summary>
     private static List<ClipPayload> FilterForWrite(IReadOnlyList<ClipPayload> payloads)
     {
-        var hasUnicodeText = payloads.Any(static p => p.FormatId == NativeConstants.CF_UNICODETEXT);
-        var result = new List<ClipPayload>(payloads.Count);
+        var kept = SynthesisedTextFormats.DropDerived(payloads);
+        var result = new List<ClipPayload>(kept.Count);
 
-        foreach (var payload in payloads)
+        foreach (var payload in kept)
         {
-            if (hasUnicodeText && NativeConstants.SynthesisedFromUnicodeText.Contains(payload.FormatId))
-            {
-                continue;
-            }
-
             if (NativeConstants.NonGlobalFormats.Contains(payload.FormatId))
             {
                 continue;

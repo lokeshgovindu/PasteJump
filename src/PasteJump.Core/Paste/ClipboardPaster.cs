@@ -150,7 +150,7 @@ public sealed class ClipboardPaster
         // provokes is recognised as ours instead of being captured as a brand new clip. Computed on
         // the normalised payloads, since those are what actually reach the clipboard.
         var snapshot = new ClipboardSnapshot(payloads, null, ClipKind.Other, null);
-        _selfWrites.NoteWrite(snapshot.ContentHash);
+        _selfWrites.NoteWrite(snapshot.SelfWriteKey);
 
         if (_clipboard.TryWrite(payloads))
         {

@@ -61,13 +61,8 @@ internal static class NativeConstants
         CF_DSPENHMETAFILE,
     ];
 
-    /// <summary>
-    /// Formats Windows regenerates for us on write, given a richer sibling. Writing them back
-    /// explicitly is not merely redundant - a stale <c>CF_TEXT</c> captured under a different
-    /// system codepage can disagree with the <c>CF_UNICODETEXT</c> beside it, and whichever
-    /// format the target app happens to prefer decides which one the user gets.
-    /// </summary>
-    public static readonly uint[] SynthesisedFromUnicodeText = [CF_TEXT, CF_OEMTEXT, CF_LOCALE];
+    // Note: which text formats Windows regenerates on write lives in Core, as SynthesisedTextFormats, so the
+    // write filter and the rule that identifies our own writes are one list rather than two that can disagree.
 
     // Note: the rule for dropping duplicate image encodings lives in Core, as RedundantImageFormats, so it
     // can be tested without a clipboard. It is applied by Win32ClipboardAccess at capture.

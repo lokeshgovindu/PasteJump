@@ -319,7 +319,7 @@ public sealed class CaptureService
             return;
         }
 
-        if (_selfWrites.IsOwnWrite(snapshot.ContentHash))
+        if (_selfWrites.IsOwnWrite(snapshot.SelfWriteKey))
         {
             SelfWriteSkipCount++;
             _trace?.Invoke("skipped: this is our own write, put there in order to paste");
@@ -331,7 +331,7 @@ public sealed class CaptureService
         // matched the consecutive-duplicate branch below, and that branch announces itself. Every paste into such
         // an application therefore ended with a "Same as the last copy" toast. Silent here, deliberately: the
         // paste was never a copy, so there is nothing to acknowledge.
-        if (_selfWrites.IsEchoOfOwnWrite(snapshot.ContentHash))
+        if (_selfWrites.IsEchoOfOwnWrite(snapshot.SelfWriteKey))
         {
             SelfWriteEchoSkipCount++;
             _trace?.Invoke("skipped: a second notification for the paste we just made - no clip, no notice");
