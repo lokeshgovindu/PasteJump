@@ -16,6 +16,13 @@
 administrator, so the gesture does not work in them. Running PasteJump itself elevated via a scheduled
 task fixes it, at the cost of arranging that once.</li>
 
+<li><b>Security software can hide one application's keyboard from PasteJump entirely.</b> On a managed
+machine, data-loss-prevention policy can route one application's keyboard input &mdash; a browser, usually
+&mdash; through a component with more privilege than PasteJump, and Windows then hides that input from
+PasteJump's hook by design. Ctrl+V does nothing in that one application while working everywhere else.
+Ticking <b>Always Run as Administrator</b> in the tray menu is the fix; see
+<a href="troubleshooting.html">Troubleshooting</a>.</li>
+
 <li><b>A copy can be lost under heavy clipboard contention.</b> The clipboard is a machine-wide lock;
 PasteJump retries with backoff and then twice more on a delay, but a process that holds it longer than
 that wins. Inherent to the Win32 clipboard.</li>

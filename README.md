@@ -358,6 +358,11 @@ Clipjump had features this does not, dropped on purpose to keep the surface hone
 
 ## Architecture
 
+**[The architecture in seven views](docs/architecture.md)** — layers, components, classes, the capture and
+gesture sequences, the session state machine, the store, and the thread budget that shapes all of it, with
+diagrams. ([Styled version on the website](https://lokeshgovindu.github.io/PasteJump/architecture.html).) What
+follows here is the summary.
+
 ```
 src/
   PasteJump.Core      Domain logic. net10.0, deliberately NOT net10.0-windows.
@@ -370,8 +375,10 @@ src/
   PasteJump.Import    One-time migration of Clipjump 12.x history.
   PasteJump.App       WPF: overlay, history window, settings, tray wiring.
 tests/
-  PasteJump.Core.Tests      480 tests over the state machine, store, capture path,
+  PasteJump.Core.Tests      997 tests over the state machine, store, capture path,
                           formatters and importer.
+  PasteJump.Interop.Tests   74 tests over the key bindings and hook decoding —
+                          anything in Interop needing no message loop.
   PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 ```
 
@@ -391,7 +398,9 @@ repositioning a pinned clip is one `UPDATE` and nothing on disk moves.
 **3. Self-inflicted clipboard changes are recognised by content hash.** Pasting writes to the
 clipboard, which raises a change notification that would otherwise be captured as a new clip.
 Clipjump guarded this with a mutable flag plus a 200 ms time-difference heuristic — both had timing
-windows. Hashing what we wrote has no timing component at all.
+windows. Hashing what we wrote has no timing component at all. The hash covers the payloads Windows
+does *not* regenerate for itself, which is a distinction with teeth — see
+[the case study](docs/architecture.md#case-study-the-loop-that-closed-wrong).
 
 ### Storage
 
@@ -443,6 +452,21 @@ retention off.
 - **Elevated windows.** A non-elevated keyboard hook cannot see keystrokes in elevated windows, so
   the gesture does not work in them. Running PasteJump elevated via a scheduled task fixes it, at the
   cost of a UAC prompt at setup.
+- **Endpoint security can hide one application's keyboard from PasteJump entirely.** On a managed machine,
+  data-loss-prevention policy may route a particular application's keyboard input — a browser, typically —
+  through a component running at a higher integrity level than PasteJump. Windows then excludes PasteJump's
+  keyboard hook from that input, exactly as UIPI is designed to, and **Ctrl+V does nothing in that one
+  application** while working everywhere else. Copying keeps working, because capture rides
+  `WM_CLIPBOARDUPDATE`, which no hook can suppress — and that asymmetry makes it read as a PasteJump bug.
+  It is not, and no version of this application can work around it. Measured on such a machine: a low-level
+  hook, raw input with `RIDEV_INPUTSINK`, a registered hotkey and injected keystrokes were all equally blind
+  in that application, while a `cmd` control succeeded between every attempt — and three unrelated programs
+  failed identically, including a native Win32 build of this same gesture
+  (`tests/PasteJump.NativeGestureSpike`) and Clipjump itself.
+  **The remedy is to run elevated** — tick *Always Run as Administrator* in the tray menu, which registers a
+  logon task with the highest privileges. Without it, the clipboard history window still works: press
+  **Copy** there and paste with your own Ctrl+V. PasteJump detects the state and names the application once
+  per run rather than leaving Ctrl+V looking broken.
 - **~65 MB on disk**, compressed from 143 MB. WPF supports neither trimming nor NativeAOT, so a build that
   needs no runtime installed is large. Accepted trade: the alternative was hand-writing every window in
   Win32. Compression also means each start decompresses assemblies, which costs a little launch time.

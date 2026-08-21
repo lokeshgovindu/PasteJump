@@ -9,6 +9,7 @@
 ## Known limits
 
 - **Elevated windows.** A non-elevated keyboard hook cannot see keystrokes in windows running as administrator, so the gesture does not work in them. Running PasteJump itself elevated via a scheduled task fixes it, at the cost of arranging that once.
+- **Security software can hide one application's keyboard from PasteJump entirely.** On a managed machine, data-loss-prevention policy can route one application's keyboard input — a browser, usually — through a component with more privilege than PasteJump, and Windows then hides that input from PasteJump's hook by design. Ctrl+V does nothing in that one application while working everywhere else. Ticking **Always Run as Administrator** in the tray menu is the fix; see [Troubleshooting](troubleshooting.md).
 - **A copy can be lost under heavy clipboard contention.** The clipboard is a machine-wide lock; PasteJump retries with backoff and then twice more on a delay, but a process that holds it longer than that wins. Inherent to the Win32 clipboard.
 - **An image's reported size is larger than the file it came from,** and correctly so — the clipboard hands over raw pixels. See [Troubleshooting](troubleshooting.md).
 - **Full-text search only reaches as far as the stored preview.** Longer text is archived in full and comes back intact when copied, but is not searchable past the cap. Raise **Characters Kept per Entry** if that matters to you; it applies to new captures.

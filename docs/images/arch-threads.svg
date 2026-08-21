@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" width="900" height="380" role="img" aria-label="Timeline showing the hook thread returning within its budget while every side effect is queued onto the UI thread via BeginInvoke, where the clipboard write, settle delay and SendInput happen.">
+  <title>The hook thread decides and returns; the Dispatcher does the work</title>
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#DCE7ED"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="900" height="380" fill="#0D151B"/>
+
+  <!-- hook lane -->
+  <text x="20" y="46" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="13" font-weight="600" fill="#E8845A">HOOK THREAD</text>
+  <text x="20" y="66" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#8CA6B4">blocks every keystroke on the machine</text>
+  <line x1="20" y1="96" x2="880" y2="96" stroke="#A8451A" stroke-width="1.5"/>
+
+  <rect x="60" y="76" width="150" height="40" rx="2" fill="#241812" stroke="#A8451A" stroke-width="1.2"/>
+  <text x="135" y="101" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#F0C4AE">translate key</text>
+
+  <rect x="226" y="76" width="170" height="40" rx="2" fill="#241812" stroke="#A8451A" stroke-width="1.2"/>
+  <text x="311" y="101" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#F0C4AE">recognizer + controller</text>
+
+  <rect x="412" y="76" width="150" height="40" rx="2" fill="#241812" stroke="#A8451A" stroke-width="1.2"/>
+  <text x="487" y="101" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#F0C4AE">queue effects</text>
+
+  <rect x="578" y="76" width="120" height="40" rx="2" fill="#0F2B2E" stroke="#2E7D88" stroke-width="1.2"/>
+  <text x="638" y="101" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#7FD3DE">return</text>
+
+  <text x="714" y="94" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#8CA6B4">swallow = true</text>
+  <text x="714" y="112" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#8CA6B4">or pass through</text>
+
+  <line x1="60" y1="140" x2="698" y2="140" stroke="#8CA6B4" stroke-width="1" marker-start="url(#ar2)" marker-end="url(#ar2)"/>
+  <text x="379" y="162" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#E8845A">must finish inside LowLevelHooksTimeout &#8212; overrun and Windows discards the hook silently</text>
+
+  <!-- BeginInvoke -->
+  <path d="M 487 116 L 487 210" fill="none" stroke="#DCE7ED" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
+  <text x="500" y="188" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#8CA6B4">Dispatcher.BeginInvoke</text>
+
+  <!-- UI lane -->
+  <text x="20" y="240" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="13" font-weight="600" fill="#7FD3DE">UI THREAD</text>
+  <text x="20" y="260" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="12" fill="#8CA6B4">where anything slow, modal or visible happens</text>
+  <line x1="20" y1="290" x2="880" y2="290" stroke="#2E7D88" stroke-width="1.5"/>
+
+  <rect x="60" y="270" width="140" height="40" rx="2" fill="#0F2B2E" stroke="#2E7D88" stroke-width="1.2"/>
+  <text x="130" y="295" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#DCE7ED">show overlay</text>
+
+  <rect x="216" y="270" width="150" height="40" rx="2" fill="#0F2B2E" stroke="#2E7D88" stroke-width="1.2"/>
+  <text x="291" y="295" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#DCE7ED">clipboard write</text>
+
+  <rect x="382" y="270" width="150" height="40" rx="2" fill="#0F2B2E" stroke="#2E7D88" stroke-width="1.2"/>
+  <text x="457" y="295" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#DCE7ED">settle delay</text>
+
+  <rect x="548" y="270" width="150" height="40" rx="2" fill="#0F2B2E" stroke="#2E7D88" stroke-width="1.2"/>
+  <text x="623" y="295" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#DCE7ED">SendInput</text>
+
+  <rect x="714" y="270" width="150" height="40" rx="2" fill="#0F2B2E" stroke="#2E7D88" stroke-width="1.2"/>
+  <text x="789" y="295" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#DCE7ED">dialogs, toasts</text>
+
+  <text x="60" y="344" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="12" fill="#8CA6B4">one-shot DispatcherTimer, never Thread.Sleep &#8212; 0 to 500 ms, per application</text>
+</svg>

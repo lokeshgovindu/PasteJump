@@ -31,14 +31,46 @@ so claiming that chord would swallow a keystroke you were using to type a charac
 
 <h2>The gesture does nothing in one particular window</h2>
 
-<p>Two likely causes:</p>
+<p>Three likely causes:</p>
 
 <ul>
 <li><b>The window is running as administrator.</b> A non-elevated keyboard hook cannot see keystrokes in
 elevated windows, so the gesture cannot start there. This is a Windows security boundary, not a
 setting.</li>
 <li><b>Another program's hook is ahead of ours.</b> As above.</li>
+<li><b>Security policy is intercepting that application's keyboard.</b> See the next section.</li>
 </ul>
+
+<h2>Ctrl+V does nothing in one application, usually a browser</h2>
+
+<p>Everything else works. Copying in that application still works. Only the gesture is dead, and only
+there. On a managed machine this is usually not PasteJump at all.</p>
+
+<p>Endpoint data-loss-prevention policy can route one application's keyboard input through a component
+running with more privilege than PasteJump has. Windows then excludes PasteJump's keyboard hook from that
+input &mdash; deliberately, as a security boundary &mdash; so the trigger key never arrives and no overlay
+can appear. Copying is unaffected because capture watches for clipboard changes instead of keystrokes,
+and no policy suppresses those. That asymmetry is what makes it look like a fault in PasteJump.</p>
+
+<div class="note">
+<p>PasteJump notices this and says so, once per application per run, naming the application. If you would
+rather it stayed quiet, turn off <b>Tell Me When PasteJump Cannot See The Keyboard In A Program</b> on the
+Paste Mode tab of Settings.</p>
+</div>
+
+<p><b>The fix is to run PasteJump as administrator.</b> Right-click the tray icon and tick <b>Always Run
+as Administrator</b>. PasteJump asks Windows for permission once, registers a logon task so it starts
+elevated from then on, and restarts itself. The tick is also how you tell at a glance whether it is
+running elevated now.</p>
+
+<p>If you would rather not run it elevated, the clipboard history window is unaffected: open it from the
+tray, select the clip you want, press <b>Copy</b>, then paste with your own Ctrl+V in the application. Your
+own keystrokes still reach it &mdash; it is only PasteJump that is prevented from seeing them.</p>
+
+<p>Two things worth knowing before assuming this is the cause. It can come and go: the same application
+may work for an hour and then stop, because the policy is evaluated on the fly. And it is not confined to
+one program &mdash; a second clipboard manager, or any tool driven by a keyboard hook, fails in exactly
+the same application at the same time, which is the quickest way to confirm what you are looking at.</p>
 
 <h2>An application pastes the previous clip</h2>
 

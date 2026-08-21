@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PasteJump &mdash; architecture</title>
+<meta name="description" content="Seven views of PasteJump's internals: layers, components, classes, the capture and gesture sequences, session state, the store, and the thread budget.">
+<link rel="icon" href="pastejump-256.png" type="image/png">
+<!--
+  Two copies of this document exist and they must be edited together: architecture.md is what GitHub renders
+  (it will not render HTML held in the repository, which is the same reason docs/manual exists), and this file
+  is the same content styled for the website. Nothing generates one from the other. Both share the figures in
+  docs/images, so a drawing has exactly one copy.
+
+  Mermaid is loaded from a CDN because these diagrams are authored as text, and shipping a copy of the library
+  in the repository to render them offline is a worse trade than the one dependency: this page is served from
+  GitHub Pages, where the reader is already online.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  /* Light: cool drafting paper, biased towards the structural teal. */
+  --paper:      #F1F4F5;
+  --surface:    #FFFFFF;
+  --surface-2:  #E7ECEE;
+  --ink:        #10171C;
+  --ink-2:      #3C4A52;
+  --ink-3:      #6A7A83;
+  --rule:       #CBD5D9;
+  --rule-soft:  #DEE5E8;
+  --teal:       #0C6B77;   /* structure, ordinary paths */
+  --teal-soft:  rgba(12,107,119,.10);
+  --ember:      #A8451A;   /* the hook path, and the hot bytes */
+  --ember-soft: rgba(168,69,26,.10);
+  --danger:     #932A31;
+  --good:       #2F6A45;
+
+  /* The diagram panel is deliberately the same in both themes: a drafting table. */
+  --panel:      #0D151B;
+  --panel-2:    #16222B;
+  --panel-ink:  #DCE7ED;
+  --panel-ink-2:#8CA6B4;
+  --panel-rule: #2A414F;
+
+  --measure: 68ch;
+  --step--1: 0.8125rem;
+  --step-0:  1.0rem;
+  --step-1:  1.1875rem;
+  --step-2:  1.5rem;
+  --step-3:  2.0rem;
+  --step-4:  2.75rem;
+  --step-5:  3.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:     #0B1116;
+    --surface:   #121B21;
+    --surface-2: #18242C;
+    --ink:       #E4EDF2;
+    --ink-2:     #AFC1CB;
+    --ink-3:     #7B8E99;
+    --rule:      #263640;
+    --rule-soft: #1C2A33;
+    --teal:      #5FC2CE;
+    --teal-soft: rgba(95,194,206,.12);
+    --ember:     #E8845A;
+    --ember-soft:rgba(232,132,90,.13);
+    --danger:    #E3767D;
+    --good:      #7FC59B;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:     #0B1116;
+  --surface:   #121B21;
+  --surface-2: #18242C;
+  --ink:       #E4EDF2;
+  --ink-2:     #AFC1CB;
+  --ink-3:     #7B8E99;
+  --rule:      #263640;
+  --rule-soft: #1C2A33;
+  --teal:      #5FC2CE;
+  --teal-soft: rgba(95,194,206,.12);
+  --ember:     #E8845A;
+  --ember-soft:rgba(232,132,90,.13);
+  --danger:    #E3767D;
+  --good:      #7FC59B;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 3rem) 6rem; }
+.col  { max-width: var(--measure); }
+
+/* ---------- masthead ---------- */
+
+header.mast {
+  border-bottom: 2px solid var(--ink);
+  padding: clamp(2.5rem, 7vw, 5rem) 0 1.25rem;
+  margin-bottom: 2.5rem;
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--step--1);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ember);
+  margin: 0 0 1.25rem;
+}
+
+h1 {
+  font-family: Archivo, "Helvetica Neue", sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.5rem, 7.5vw, var(--step-5));
+  line-height: 0.96;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  margin: 0 0 1rem;
+}
+
+.dek { font-size: var(--step-1); color: var(--ink-2); max-width: 58ch; margin: 0 0 2rem; }
+
+.facts {
+  display: flex; flex-wrap: wrap; gap: 0 2.5rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--step--1);
+  color: var(--ink-3);
+  border-top: 1px solid var(--rule);
+  padding-top: 1rem;
+}
+.facts b { color: var(--ink); font-weight: 500; }
+
+/* ---------- sections ---------- */
+
+section { margin: 0 0 4.5rem; scroll-margin-top: 2rem; }
+
+.view-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--step--1);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-top: 1px solid var(--ink);
+  padding-top: .5rem;
+  margin: 0 0 1.5rem;
+  display: block;
+}
+.view-label span { color: var(--teal); }
+
+h2 {
+  font-family: Archivo, sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 4vw, var(--step-3));
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0 0 1rem;
+}
+
+h3 {
+  font-family: Archivo, sans-serif;
+  font-weight: 600;
+  font-size: var(--step-1);
+  letter-spacing: -0.01em;
+  margin: 2.5rem 0 .6rem;
+}
+
+p { margin: 0 0 1.1rem; }
+a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible, .toc a:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; }
+
+code, .mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .875em;
+}
+p code, li code, td code, th code, figcaption code {
+  background: var(--surface-2);
+  border-radius: 3px;
+  padding: .08em .3em;
+}
+
+strong { font-weight: 600; }
+em { color: var(--ink-2); }
+
+ul, ol { margin: 0 0 1.2rem; padding-left: 1.3rem; }
+li { margin-bottom: .5rem; }
+li::marker { color: var(--ink-3); }
+
+/* ---------- table of contents ---------- */
+
+.toc {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4rem;
+  background: var(--surface);
+}
+.toc a {
+  display: flex; flex-direction: column; gap: .2rem;
+  padding: .9rem 1rem;
+  border-right: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  text-decoration: none;
+  color: var(--ink);
+}
+.toc a:hover { background: var(--teal-soft); }
+.toc .k {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .6875rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+}
+.toc .v { font-weight: 500; font-size: .9375rem; line-height: 1.3; }
+
+/* ---------- figures ---------- */
+
+figure {
+  margin: 2rem 0 2.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--panel);
+}
+figure .plate {
+  padding: 1.5rem 1.25rem;
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--panel-rule) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(to bottom, var(--panel-rule) 1px, transparent 1px) 0 0 / 32px 32px,
+    var(--panel);
+  background-blend-mode: soft-light, soft-light, normal;
+}
+figure svg,
+figure img { display: block; margin: 0 auto; max-width: 100%; height: auto; color: var(--panel-ink); }
+figcaption {
+  font-size: var(--step--1);
+  color: var(--ink-2);
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+  padding: .8rem 1rem;
+  line-height: 1.5;
+}
+figcaption b { color: var(--ink); font-weight: 600; }
+
+pre.mermaid {
+  margin: 0;
+  min-height: 60px;
+  display: flex; justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--panel-ink-2);
+  font-size: 12px;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+
+/* ---------- callouts ---------- */
+
+.note, .fix {
+  border-left: 3px solid var(--teal);
+  background: var(--teal-soft);
+  padding: 1rem 1.1rem;
+  margin: 1.75rem 0;
+  border-radius: 0 2px 2px 0;
+}
+.fix { border-left-color: var(--ember); background: var(--ember-soft); }
+.note > :last-child, .fix > :last-child { margin-bottom: 0; }
+.note .lede, .fix .lede {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .6875rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--teal); margin: 0 0 .4rem;
+}
+.fix .lede { color: var(--ember); }
+
+/* ---------- tables ---------- */
+
+.tablewrap { overflow-x: auto; margin: 1.75rem 0 2rem; border: 1px solid var(--rule); border-radius: 2px; }
+table { border-collapse: collapse; width: 100%; background: var(--surface); font-size: .9375rem; }
+th, td { text-align: left; padding: .65rem .85rem; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+thead th {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3); background: var(--surface-2); border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: 0; }
+td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+td .mono, td code { white-space: nowrap; }
+
+/* ---------- byte evidence ---------- */
+
+.bytes {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px;
+  background: var(--rule); border: 1px solid var(--rule); border-radius: 2px;
+  margin: 1.75rem 0 2rem; overflow: hidden;
+}
+.bytes > div { background: var(--surface); padding: 1rem 1.1rem; }
+.bytes .who { font-family: "IBM Plex Mono", monospace; font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: .5rem; }
+.bytes .hex { font-family: "IBM Plex Mono", monospace; font-size: 1.25rem; font-weight: 500; letter-spacing: .02em; }
+.bytes .hex .hot { color: var(--ember); }
+.bytes .what { font-size: var(--step--1); color: var(--ink-2); margin-top: .35rem; }
+
+/* ---------- steps ---------- */
+
+ol.steps { list-style: none; padding: 0; counter-reset: s; margin: 1.5rem 0 2rem; }
+ol.steps > li {
+  counter-increment: s;
+  display: grid; grid-template-columns: 2.4rem 1fr; gap: .9rem;
+  padding: .8rem 0; border-top: 1px solid var(--rule-soft); margin: 0;
+}
+ol.steps > li::before {
+  content: counter(s, decimal-leading-zero);
+  font-family: "IBM Plex Mono", monospace; font-size: .75rem; font-weight: 500;
+  color: var(--ember); padding-top: .25rem;
+}
+ol.steps b { font-weight: 600; }
+ol.steps .where { display: block; font-family: "IBM Plex Mono", monospace; font-size: .75rem; color: var(--ink-3); margin-top: .2rem; }
+
+footer {
+  border-top: 2px solid var(--ink);
+  padding-top: 1.25rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: var(--step--1);
+  color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Architecture reference &middot; hold Ctrl, tap V</p>
+  <h1>PasteJump &mdash; architecture</h1>
+  <p class="dek">Seven views of one machine: the layers, the components, the classes, the two
+  sequences that matter, the session state, the store, and the thread budget that shapes all of it.</p>
+  <div class="facts">
+    <span><b>.NET 10</b> &middot; WPF, win-x64</span>
+    <span><b>4</b> projects</span>
+    <span><b>1,071</b> tests</span>
+    <span><b>2026.1.0.<i>n</i></b> &middot; n = commit count</span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <a href="#gesture"><span class="k">Premise</span><span class="v">The one gesture</span></a>
+  <a href="#layers"><span class="k">View 1 &middot; Layers</span><span class="v">Four projects, one rule</span></a>
+  <a href="#components"><span class="k">View 2 &middot; Components</span><span class="v">Who talks to whom</span></a>
+  <a href="#classes"><span class="k">View 3 &middot; Classes</span><span class="v">The paste-mode core</span></a>
+  <a href="#capture"><span class="k">View 4 &middot; Sequence</span><span class="v">Copy to clip</span></a>
+  <a href="#paste"><span class="k">View 5 &middot; Sequence</span><span class="v">Ctrl+V to paste</span></a>
+  <a href="#state"><span class="k">View 6 &middot; State</span><span class="v">Session and commit</span></a>
+  <a href="#store"><span class="k">View 7 &middot; Data</span><span class="v">The store, three identities</span></a>
+  <a href="#threads"><span class="k">Constraint</span><span class="v">Two threads, one budget</span></a>
+  <a href="#case"><span class="k">Case study</span><span class="v">The loop that closed wrong</span></a>
+</nav>
+
+<!-- ============================================ PREMISE -->
+<section id="gesture">
+  <span class="view-label">Premise &mdash; <span>what the whole design protects</span></span>
+  <div class="col">
+    <h2>Hold Ctrl. Tap V. Let go.</h2>
+    <p>Every tap of <code>V</code> steps one clip further back through the stack; the overlay follows under
+    your cursor; releasing <code>Ctrl</code> pastes whatever is showing. No window to click, no mouse, no
+    focus change. That gesture is the product, and three of its properties dictate the entire architecture.</p>
+
+    <p><strong>The keyboard hook is machine-wide and on a deadline.</strong> A
+    <code>WH_KEYBOARD_LL</code> callback blocks every keystroke on the computer until it returns, and
+    Windows silently discards a hook that outlives <code>LowLevelHooksTimeout</code> &mdash; leaving an app
+    that looks healthy and has gone deaf. So nothing in the callback sleeps, prompts, parses or draws;
+    it decides, queues, and returns.</p>
+
+    <p><strong>Swallowing a keystroke takes it away from everyone.</strong> With no session open, exactly one
+    chord is consumed &mdash; <code>Ctrl</code> plus the trigger &mdash; and nothing else, swept over all 256
+    virtual keys in every modifier state by <code>IdleKeyboardTests</code>. With a session open the gesture
+    owns the keyboard <em>except</em> Alt and Win chords, which stay with the shell so <code>Alt+Tab</code>
+    is always the way out.</p>
+
+    <p><strong>An empty store must not break Ctrl+V.</strong> The hook swallows the chord to build the
+    gesture, so a store with nothing in it hands the keystroke straight back as a native paste
+    (<code>PasteCommitKind.PassedThrough</code>). Silently breaking Ctrl+V system-wide is the worst thing
+    this application could do.</p>
+
+    <div class="note">
+      <p class="lede">The rule that follows from all three</p>
+      <p><code>PasteJump.Core</code> references neither WPF nor Win32 and never needs a message loop. Win32
+      access is expressed as interfaces in <code>Core/Abstractions</code> and implemented in
+      <code>Interop</code>. Anything that lands somewhere untestable gets moved, not covered by a UI test
+      &mdash; which is why the capture service and the whole state machine are plain classes with 997 tests
+      around them.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ LAYERS -->
+<section id="layers">
+  <span class="view-label">View 1 &mdash; <span>layers and dependencies</span></span>
+  <div class="col">
+    <h2>Four projects, and the seam between them</h2>
+    <p>Dependencies point one way only. <code>Core</code> is the floor: it knows about clips, sessions and
+    settings, and nothing about windows or the operating system. Everything the OS provides arrives through
+    four small interfaces, which is also what lets tests drive the machine with a fake clipboard and no
+    keyboard at all.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <img src="images/arch-layers.svg" alt="PasteJump project dependencies: App depends on Interop, Import and Core; Interop and Import depend on Core; Core depends on nothing, and the boundary is crossed only by IClipboardAccess, IPasteSender, IForegroundWindowInfo and IClock.">
+    </div>
+    <figcaption><b>Dependencies point down, never up.</b> Interop implements what Core declares, so the
+    same state machine runs against a real clipboard in the app and a scripted one in tests. Build output
+    lands in <code>artifacts/</code>, never under <code>src/</code>.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================ COMPONENTS -->
+<section id="components">
+  <span class="view-label">View 2 &mdash; <span>components and event sources</span></span>
+  <div class="col">
+    <h2>Four ways in, one composition root</h2>
+    <p>PasteJump has no main window. Everything starts from one of four operating-system events, and
+    <code>App.Compose()</code> wires the objects that handle them by hand &mdash; about a dozen with fixed
+    lifetimes, so a DI container would add indirection and remove nothing.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"darkMode":true,"background":"#0D151B","primaryColor":"#16222B","primaryTextColor":"#DCE7ED","primaryBorderColor":"#3E6273","secondaryColor":"#0F2B2E","tertiaryColor":"#241812","lineColor":"#7FA6BB","fontFamily":"IBM Plex Mono, monospace","fontSize":"13px","clusterBkg":"#101A21","clusterBorder":"#2A414F","edgeLabelBackground":"#0D151B"}}}%%
+flowchart TB
+  subgraph OS["Windows"]
+    KEY["Keystroke"]
+    CLIP["Clipboard change"]
+    HOT["Registered hotkey"]
+    TRAY["Tray click"]
+  end
+
+  subgraph IO["PasteJump.Interop &mdash; Win32 adapters"]
+    HOOK["LowLevelKeyboardHook&lt;br/&gt;WH_KEYBOARD_LL"]
+    MSGW["MessageOnlyWindow&lt;br/&gt;HWND_MESSAGE"]
+    MON["ClipboardMonitor&lt;br/&gt;AddClipboardFormatListener"]
+    HK["GlobalHotkey&lt;br/&gt;RegisterHotKey + MOD_NOREPEAT"]
+    TI["TrayIcon"]
+    VKT["VirtualKeyTranslator"]
+    CBA["Win32ClipboardAccess"]
+    SND["InputSender&lt;br/&gt;SendInput + real scan code"]
+    FG["ForegroundWindowInfo"]
+  end
+
+  subgraph CORE["PasteJump.Core &mdash; decisions"]
+    REC["PasteGestureRecognizer&lt;br/&gt;what to swallow"]
+    CTL["PasteModeController&lt;br/&gt;the session"]
+    CAP["CaptureService&lt;br/&gt;settle, guard, store"]
+    GUARD["SelfWriteGuard"]
+    PST["ClipboardPaster&lt;br/&gt;write then keystroke"]
+    STORE["ClipStore + BlobStore&lt;br/&gt;SQLite + deflate"]
+  end
+
+  subgraph APP["PasteJump.App &mdash; WPF"]
+    HOST["PasteJumpPasteHost&lt;br/&gt;IPasteModeHost"]
+    OVL["OverlayWindow"]
+    HIST["HistoryWindow"]
+    TOAST["ToastWindow"]
+    MENU["TrayMenuBuilder"]
+  end
+
+  KEY --&gt; HOOK
+  CLIP --&gt; MSGW
+  HOT --&gt; MSGW
+  TRAY --&gt; MSGW
+  MSGW --&gt; MON
+  MSGW --&gt; HK
+  MSGW --&gt; TI
+
+  HOOK --&gt;|"KeyboardHookEvent"| VKT
+  VKT --&gt;|"GestureKey"| REC
+  REC --&gt;|"actions"| CTL
+  CTL --&gt;|"IPasteModeHost"| HOST
+  CTL --&gt;|"IClipCatalog"| STORE
+  HOST --&gt;|"BeginInvoke"| OVL
+  HOST --&gt; PST
+  PST --&gt;|"NoteWrite SelfWriteKey"| GUARD
+  PST --&gt;|"TryWrite"| CBA
+  PST --&gt;|"SendPaste"| SND
+  PST --&gt;|"settle delay per app"| FG
+
+  MON --&gt;|"OnClipboardChanged"| CAP
+  CAP --&gt;|"TryRead"| CBA
+  CAP --&gt;|"IsOwnWrite"| GUARD
+  CAP --&gt;|"Add + RecordHistory"| STORE
+  CAP --&gt;|"ClipCaptured"| TOAST
+  CAP --&gt;|"NotifyClipCaptured"| CTL
+
+  HK --&gt;|"Pressed"| HIST
+  TI --&gt;|"Activated"| MENU
+  HIST --&gt; STORE
+</pre>
+    </div>
+    <figcaption><b>Two independent paths, and that asymmetry is diagnostic.</b> Capture rides
+    <code>WM_CLIPBOARDUPDATE</code>, which no other process's hook can suppress; the gesture rides the
+    keyboard hook, which any hook earlier in the chain can. When copying works and pasting does not, a rival
+    clipboard manager eating the injected keystroke is the first suspect &mdash; hence the configurable
+    <code>PasteKeystroke</code>.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================ CLASSES -->
+<section id="classes">
+  <span class="view-label">View 3 &mdash; <span>classes and contracts</span></span>
+  <div class="col">
+    <h2>The state machine and its five seams</h2>
+    <p>The gesture is split in two on purpose. <code>PasteGestureRecognizer</code> answers only
+    <em>&ldquo;is this keystroke mine, and what does it mean&rdquo;</em>;
+    <code>PasteModeController</code> owns the session &mdash; the window of clips, the cursor, the commit
+    mode, the marks &mdash; and performs no side effect itself. Everything it wants doing goes through
+    <code>IPasteModeHost</code>, which is what makes a paste testable without a clipboard.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"darkMode":true,"background":"#0D151B","primaryColor":"#16222B","primaryTextColor":"#DCE7ED","primaryBorderColor":"#3E6273","lineColor":"#7FA6BB","fontFamily":"IBM Plex Mono, monospace","fontSize":"12px","classText":"#DCE7ED"}}}%%
+classDiagram
+  direction TB
+
+  class PasteGestureRecognizer {
+    +bool CtrlHeld
+    +bool AltHeld
+    +bool WinHeld
+    +bool ShiftHeld
+    +int MissedControlReleaseCount
+    +Handle(GestureKey, isDown) bool
+    +HandleCharacter(char) bool
+    +ShouldSwallowUnhandled() bool
+    +Reset()
+  }
+
+  class PasteModeController {
+    +PasteSessionState State
+    +PasteCommitMode CommitMode
+    +Clip Current
+    +Begin() PasteCommitKind
+    +Handle(PasteAction) PasteCommitKind
+    +HandleDigit(int) PasteCommitKind
+    +SetSearchQuery(string)
+    +ModifierReleased() PasteCommitKind
+    +Abort() PasteCommitKind
+    +NotifyClipCaptured()
+  }
+
+  class IPasteModeHost {
+    &lt;&lt;interface&gt;&gt;
+    +SnapshotExistingClipboard()
+    +RestoreExistingClipboard()
+    +PasteClip(Clip, IClipFormatter)
+    +PasteJoined(clips, IClipFormatter)
+    +PassThroughPaste()
+    +ShowOverlay(PasteOverlayModel)
+    +HideOverlay()
+    +RequestDeleteAllConfirmation(int, Action)
+    +NoteClipDeleted()
+  }
+
+  class IClipCatalog {
+    &lt;&lt;interface&gt;&gt;
+    +Snapshot() Clip[]
+    +Delete(long)
+    +DeleteAllUnpinned()
+    +SetPinned(long, bool)
+    +MoveToFront(long)
+  }
+
+  class PasteOverlayModel {
+    +long ClipId
+    +int Position
+    +int Total
+    +string PreviewText
+    +PasteCommitMode CommitMode
+    +PasteKindFilter KindFilter
+    +int MarkedCount
+    +bool PopOnPaste
+  }
+
+  class PasteJumpPasteHost {
+    -Dispatcher _dispatcher
+    -ClipboardPaster _paster
+    -IReadOnlyList~ClipPayload~ _savedClipboard
+    +SetOverlayAnchor(x, y, PopupPosition)
+  }
+
+  class ClipboardPaster {
+    +MaxWriteAttempts = 4
+    +Write(payloads, thenPaste)
+    +SendPasteOnly() bool
+    -ResolveSettleDelay() TimeSpan
+  }
+
+  class PasteKeyMap {
+    +ToAction(char) PasteAction
+    +Parse(string) PasteKeyMap
+    +Validate() bool
+  }
+
+  class ClipStoreCatalog
+
+  PasteGestureRecognizer --&gt; PasteModeController : drives
+  PasteModeController --&gt; IPasteModeHost : asks
+  PasteModeController --&gt; IClipCatalog : reads and mutates
+  PasteModeController ..&gt; PasteOverlayModel : renders one frame
+  IPasteModeHost &lt;|.. PasteJumpPasteHost
+  IClipCatalog &lt;|.. ClipStoreCatalog
+  PasteJumpPasteHost --&gt; ClipboardPaster : write then keystroke
+  PasteGestureRecognizer ..&gt; PasteKeyMap : letters are data
+</pre>
+    </div>
+    <figcaption><b>Nothing in the left column touches Windows.</b> <code>PasteOverlayModel</code> is
+    immutable and carries <code>ClipId</code> because <code>Position</code> is a coordinate in the
+    <em>filtered</em> window &mdash; resolving a clip by position once drew the wrong image when a kind
+    filter was on.</figcaption>
+  </figure>
+
+  <div class="col">
+    <h3>Where the abstractions bite</h3>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Seam</th><th>Implemented by</th><th>Why it exists</th></tr></thead>
+      <tbody>
+        <tr><td><code>IClipboardAccess</code></td><td><code>Win32ClipboardAccess</code></td><td>Reads every format in one pass, with a <em>bounded</em> retry (~620&nbsp;ms). The original spun on <code>OpenClipboard</code> forever, turning another app's misbehaviour into a hang.</td></tr>
+        <tr><td><code>IPasteSender</code></td><td><code>InputSender</code></td><td><code>SendInput</code> with a real scan code and our own <code>dwExtraInfo</code> signature &mdash; that signature is how the hook ignores <em>our</em> injection without ignoring RDP, VMs or macro keyboards.</td></tr>
+        <tr><td><code>IForegroundWindowInfo</code></td><td><code>ForegroundWindowInfo</code></td><td>Names the window being pasted into, so the settle delay can be per application and the ignore list can be checked <em>before</em> reading a password manager's clipboard.</td></tr>
+        <tr><td><code>IClipCatalog</code></td><td><code>ClipStoreCatalog</code></td><td>Keeps &ldquo;delete all unpinned&rdquo; as one rule in the store rather than restated by whoever draws the dialog.</td></tr>
+        <tr><td><code>IPasteModeHost</code></td><td><code>PasteJumpPasteHost</code></td><td>Every side effect of the state machine, all of it queued onto the Dispatcher &mdash; the reason the controller can run inside a keyboard hook at all.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================ CAPTURE -->
+<section id="capture">
+  <span class="view-label">View 4 &mdash; <span>sequence: a copy becomes a clip</span></span>
+  <div class="col">
+    <h2>One copy is not one notification</h2>
+    <p>An OLE writer announces its data object and renders it afterwards, so a single Ctrl+C raises two or
+    more <code>WM_CLIPBOARDUPDATE</code> messages with different sequence numbers &mdash; and a read landing
+    between them sees eight bytes of bookkeeping and no content. Every guard below exists because one of
+    those readings was once stored as a clip.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"darkMode":true,"background":"#0D151B","primaryColor":"#16222B","primaryTextColor":"#DCE7ED","primaryBorderColor":"#3E6273","lineColor":"#7FA6BB","actorBkg":"#16222B","actorBorder":"#3E6273","actorTextColor":"#DCE7ED","signalColor":"#7FA6BB","signalTextColor":"#BBD0DC","labelBoxBkgColor":"#0F2B2E","labelBoxBorderColor":"#2E7D88","labelTextColor":"#DCE7ED","noteBkgColor":"#241812","noteBorderColor":"#A8451A","noteTextColor":"#F0C4AE","sequenceNumberColor":"#0D151B","activationBkgColor":"#0F2B2E","fontFamily":"IBM Plex Mono, monospace","fontSize":"12px"}}}%%
+sequenceDiagram
+  autonumber
+  participant SRC as Source app
+  participant WIN as Windows clipboard
+  participant MON as ClipboardMonitor
+  participant CAP as CaptureService
+  participant CB as Win32ClipboardAccess
+  participant SW as SelfWriteGuard
+  participant ST as ClipStore
+  participant UI as Toast / windows
+
+  SRC-&gt;&gt;WIN: Ctrl+C, OleSetClipboard then OleFlushClipboard
+  WIN-&gt;&gt;MON: WM_CLIPBOARDUPDATE
+  MON-&gt;&gt;CAP: OnClipboardChanged()
+  CAP-&gt;&gt;CAP: schedule read in ClipboardSettleMs, default 120 ms
+  WIN-&gt;&gt;MON: WM_CLIPBOARDUPDATE, the second step
+  MON-&gt;&gt;CAP: OnClipboardChanged()
+  Note over CAP: Coalesced, and the window RESTARTS.&lt;br/&gt;Bounded at 4 extensions so an app&lt;br/&gt;rewriting on a timer cannot defer for ever.
+  CAP-&gt;&gt;CAP: sequence number moved? excluded process?
+  CAP-&gt;&gt;CB: TryRead()
+  CB--&gt;&gt;CAP: ClipboardSnapshot: payloads, text, kind, hasOwner
+  CAP-&gt;&gt;SW: IsOwnWrite(snapshot.SelfWriteKey)
+  SW--&gt;&gt;CAP: no, this is somebody else's copy
+  CAP-&gt;&gt;CAP: bookkeeping only? then retry, it is a half-written clipboard
+  CAP-&gt;&gt;CAP: same DedupKey as the last clip?
+  ST-&gt;&gt;ST: republish carrying MORE bytes: ReplacePayloads, silently
+  CAP-&gt;&gt;ST: Add(snapshot) then RecordHistory
+  ST--&gt;&gt;CAP: Clip, wasNewCapture
+  CAP-&gt;&gt;UI: ClipCaptured
+  UI-&gt;&gt;UI: toast, beep, controller.NotifyClipCaptured()
+</pre>
+    </div>
+    <figcaption><b>The settle window restarts rather than expiring.</b> A fixed window measured from the
+    first notification was the first attempt and produced a spurious &ldquo;same as the last copy&rdquo;
+    toast whenever the second step landed just after it. 120&nbsp;ms was measured, not chosen: a WinForms
+    <code>SetImage</code> holds the clipboard locked for ~50&nbsp;ms and its <code>CF_DIB</code> first reads
+    at 51&nbsp;ms.</figcaption>
+  </figure>
+
+  <div class="col">
+    <h3>Every guard on the way in</h3>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Guard</th><th class="num">Budget</th><th>What it prevents</th></tr></thead>
+      <tbody>
+        <tr><td>Settle window, restarting</td><td class="num">120 ms &times; 4</td><td>One copy stored as two clips, or announced as a repeat of itself.</td></tr>
+        <tr><td>Sequence number unchanged</td><td class="num">&mdash;</td><td>Paying to open the clipboard for a duplicate notification.</td></tr>
+        <tr><td>Excluded process, checked <em>first</em></td><td class="num">&mdash;</td><td>Pulling a password manager's clipboard into memory before deciding to discard it.</td></tr>
+        <tr><td>Bookkeeping-only payloads</td><td class="num">2 retries, 350 ms</td><td>An 8-byte <code>DataObject</code> stored as a <code>[binary]</code> clip &mdash; and, worse, promoting an unrelated old blob to the front of the stack.</td></tr>
+        <tr><td><code>IsOwnWrite(SelfWriteKey)</code></td><td class="num">5 s TTL</td><td>A paste being captured straight back as a new clip. Content-addressed, so there is no timing race.</td></tr>
+        <tr><td><code>IsEchoOfOwnWrite</code></td><td class="num">1 s</td><td>The <em>second</em> notification for one paste falling through to the duplicate branch, which announces itself.</td></tr>
+        <tr><td>Owner is null</td><td class="num">&mdash;</td><td>An app flushing its formats as it closes reading as a fresh copy. Only ownership tells that from a repeat.</td></tr>
+        <tr><td><code>RedundantImageFormats.Prune</code></td><td class="num">~⅔ of bytes</td><td>Keeping the same pixels three times as <code>CF_DIB</code>, <code>CF_DIBV5</code> and <code>System.Drawing.Bitmap</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================ PASTE -->
+<section id="paste">
+  <span class="view-label">View 5 &mdash; <span>sequence: the gesture, end to end</span></span>
+  <div class="col">
+    <h2>From keystroke to paste, and back again</h2>
+    <p>This is the whole product in one diagram. Note where the work happens: the hook thread decides and
+    returns, and every consequence &mdash; the overlay, the clipboard write, the keystroke &mdash; runs on
+    the UI thread through <code>Dispatcher.BeginInvoke</code>. Note also the last two messages: our own
+    paste comes back round as a clipboard change, and the capture path has to recognise it. That return
+    edge is where the bug reported this morning lived.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"darkMode":true,"background":"#0D151B","primaryColor":"#16222B","primaryTextColor":"#DCE7ED","primaryBorderColor":"#3E6273","lineColor":"#7FA6BB","actorBkg":"#16222B","actorBorder":"#3E6273","actorTextColor":"#DCE7ED","signalColor":"#7FA6BB","signalTextColor":"#BBD0DC","labelBoxBkgColor":"#0F2B2E","labelBoxBorderColor":"#2E7D88","labelTextColor":"#DCE7ED","noteBkgColor":"#241812","noteBorderColor":"#A8451A","noteTextColor":"#F0C4AE","sequenceNumberColor":"#0D151B","activationBkgColor":"#0F2B2E","fontFamily":"IBM Plex Mono, monospace","fontSize":"12px"}}}%%
+sequenceDiagram
+  autonumber
+  participant U as You
+  participant HK as Hook thread
+  participant REC as Recognizer
+  participant CTL as Controller
+  participant H as Paste host, UI thread
+  participant OV as OverlayWindow
+  participant W as Windows
+  participant CAP as CaptureService
+
+  U-&gt;&gt;HK: Ctrl down
+  HK-&gt;&gt;REC: Handle(Control, down)
+  REC--&gt;&gt;HK: not swallowed, the app underneath tracks Ctrl too
+
+  U-&gt;&gt;HK: V down
+  HK-&gt;&gt;HK: read Ctrl, Alt, Win, Shift LIVE via GetAsyncKeyState
+  HK-&gt;&gt;REC: Handle(Paste, down)
+  REC-&gt;&gt;CTL: Begin()
+  CTL-&gt;&gt;H: SnapshotExistingClipboard()
+  CTL-&gt;&gt;CTL: RefreshWindow(), kind filter then search query
+  alt store is empty
+    CTL-&gt;&gt;H: PassThroughPaste()
+    Note over CTL,H: PassedThrough. Never swallow Ctrl+V&lt;br/&gt;when there is nothing to offer.
+  else clips available
+    CTL-&gt;&gt;H: ShowOverlay(PasteOverlayModel)
+    H-&gt;&gt;OV: BeginInvoke: place and show
+    OV-&gt;&gt;W: caret, else foreground centre, else corner if topmost
+  end
+  REC--&gt;&gt;HK: swallowed, so Edge never sees the V
+
+  U-&gt;&gt;HK: V again, and again
+  HK-&gt;&gt;CTL: Advance, then Render, then ShowOverlay
+
+  U-&gt;&gt;HK: Ctrl up
+  HK-&gt;&gt;REC: Handle(Control, up)
+  REC-&gt;&gt;CTL: ModifierReleased()
+  CTL-&gt;&gt;CTL: Commit(): marks win, else suppressed by Delete, else current clip
+  CTL-&gt;&gt;H: PasteClip(clip, formatter)
+  H-&gt;&gt;H: BuildPayloads, apply formatter
+  H-&gt;&gt;H: NoteWrite(snapshot.SelfWriteKey)
+  Note over H: The fix. Key the round trip, not the bytes:&lt;br/&gt;Windows refills CF_TEXT, CF_OEMTEXT and&lt;br/&gt;CF_LOCALE from the PASTING thread's locale.
+  H-&gt;&gt;W: TryWrite(payloads), up to 4 attempts
+  W--&gt;&gt;H: written
+  H-&gt;&gt;H: wait the settle delay for this app, default 25 ms
+  H-&gt;&gt;W: SendInput: Ctrl+V, or Shift+Insert
+  W-&gt;&gt;U: the application pastes
+  W-&gt;&gt;CAP: WM_CLIPBOARDUPDATE, our own write coming back
+  CAP-&gt;&gt;CAP: IsOwnWrite(SelfWriteKey): skipped, no clip, no toast
+</pre>
+    </div>
+    <figcaption><b>Never send the keystroke unless the write succeeded.</b> Clipboard writes genuinely
+    fail &mdash; it is a machine-wide lock &mdash; and a Ctrl+V after a failed write pastes whatever was
+    there before, which looks exactly like PasteJump choosing the wrong clip. That ordering lives in
+    <code>Core</code> precisely so it can be tested.</figcaption>
+  </figure>
+
+  <div class="col">
+    <h3>What releasing Ctrl can mean</h3>
+    <p>The commit is not one branch. Marks beat the cursor, a <code>Delete</code> during the session
+    suppresses the paste entirely, and the <code>X</code> cycle can arm something destructive &mdash; which
+    is why the only irreversible outcome asks first, and asks <em>asynchronously</em>, because a modal
+    dialog inside the hook would block every keystroke on the machine.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>PasteCommitKind</th><th>Reached when</th><th>What the user sees</th></tr></thead>
+      <tbody>
+        <tr><td><code>Pasted</code></td><td>Mode is Paste and a clip or a set of marks exists</td><td>The clip arrives; with Shift held it is also deleted (&ldquo;pop&rdquo;).</td></tr>
+        <tr><td><code>PassedThrough</code></td><td>Empty store, emptied window, or every mark deleted</td><td>A native Ctrl+V. Nothing of ours happened.</td></tr>
+        <tr><td><code>Cancelled</code></td><td>Esc, mode is Cancel, or <code>Delete</code> was pressed this session</td><td>Clipboard restored, nothing pasted.</td></tr>
+        <tr><td><code>Deleted</code></td><td>Mode is Delete</td><td>Current clip gone, clipboard restored.</td></tr>
+        <tr><td><code>DeleteAllRequested</code></td><td>Mode is DeleteAll</td><td>A confirmation, later, on the UI thread. <em>Nothing has been deleted yet</em>.</td></tr>
+        <tr><td><code>PushedToClipboard</code></td><td><code>S</code></td><td>Clip is on the clipboard; no keystroke sent.</td></tr>
+        <tr><td><code>None</code></td><td>Stepping, searching, pinning, marking, deleting one clip</td><td>Session stays open.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================ STATE -->
+<section id="state">
+  <span class="view-label">View 6 &mdash; <span>state: session and commit mode</span></span>
+  <div class="col">
+    <h2>Three states, and a modifier that stops mattering</h2>
+    <p>In <code>Browsing</code>, holding Ctrl is what keeps the session alive and releasing it commits. In
+    <code>Searching</code> that would be unusable &mdash; you need both hands to type &mdash; so releasing
+    Ctrl does nothing at all and the session ends explicitly with Enter or Escape. While the search box is
+    up, <strong>no letter and no digit is an action</strong>: the arrows are the only way to step, because
+    they are the one pair that can never be part of a query.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"darkMode":true,"background":"#0D151B","primaryColor":"#16222B","primaryTextColor":"#DCE7ED","primaryBorderColor":"#3E6273","lineColor":"#7FA6BB","fontFamily":"IBM Plex Mono, monospace","fontSize":"12px","labelBackgroundColor":"#0D151B"}}}%%
+stateDiagram-v2
+  direction LR
+  [*] --&gt; Idle
+  Idle --&gt; Browsing : Ctrl + trigger, and NO Alt, Win or Shift
+  Idle --&gt; Idle : trigger alone, or any other key, passes through
+  Browsing --&gt; Browsing : trigger steps older, arrows, digits, Home, End
+  Browsing --&gt; Browsing : K kind filter, Z formatter, X commit cycle, J mark
+  Browsing --&gt; Searching : F
+  Searching --&gt; Browsing : Ctrl + F closes the box
+  Searching --&gt; Idle : Enter commits, Esc aborts
+  Browsing --&gt; Idle : Ctrl up commits
+  Browsing --&gt; Idle : Esc aborts, clipboard restored
+  Browsing --&gt; Idle : H, O, T, E, F1 end the session, then open a window
+  Browsing --&gt; Idle : Ctrl release never seen, session ABORTED
+</pre>
+    </div>
+    <figcaption><b>Anything that opens a window must end the session first.</b> <code>F1</code> once did
+    not, so the key card appeared over a live overlay that went on swallowing the very keys it was
+    explaining. The last edge is the watchdog: a missed Ctrl-up is aborted rather than committed, because
+    releasing Ctrl is what asks for a paste and here we do not know that the user did.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p>The <code>X</code> cycle runs <em>Paste &rarr; Cancel &rarr; Delete &rarr; DeleteAll &rarr;
+    Cancel</em> and never returns to Paste &mdash; deliberate parity with the original, since a destructive
+    cycle that looped back through &ldquo;paste&rdquo; would make an over-eager keypress paste something you
+    were trying to delete. The kind filter, by contrast, <em>does</em> wrap: nothing there is destructive,
+    so getting back to seeing everything must not cost three more taps.</p>
+  </div>
+</section>
+
+<!-- ============================================ STORE -->
+<section id="store">
+  <span class="view-label">View 7 &mdash; <span>data: the store and three identities</span></span>
+  <div class="col">
+    <h2>Clip identity is not clip position</h2>
+    <p>Immutable ids plus a fractional <code>sort_key</code>, so repositioning a pinned clip is one
+    <code>UPDATE</code> &mdash; in the original it was three <code>FileMove</code> calls per clip across
+    parallel directories. The stack and the archive are separate tables on purpose: a clip is a thing to
+    paste and gets evicted; a history row is a record of when something was copied and gets pruned by age.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"darkMode":true,"background":"#0D151B","primaryColor":"#16222B","primaryTextColor":"#DCE7ED","primaryBorderColor":"#3E6273","lineColor":"#7FA6BB","fontFamily":"IBM Plex Mono, monospace","fontSize":"12px"}}}%%
+erDiagram
+  clip ||--o{ clip_format : "one row per clipboard format"
+  clip ||--o{ clip_tag : "tagged"
+  tag  ||--o{ clip_tag : "applied to clips"
+  history ||--|| history_fts : "FTS5, external content"
+  clip {
+    INTEGER id PK
+    REAL sort_key "fractional, pinned first"
+    INTEGER pinned
+    TEXT preview "capped at PreviewMaxChars"
+    INTEGER kind "Text Image Files Other"
+    TEXT source_exe
+    INTEGER total_bytes
+    TEXT content_hash "identity"
+  }
+  clip_format {
+    INTEGER clip_id FK
+    INTEGER format_id "re-registered by NAME on write"
+    TEXT format_name
+    BLOB data "small payloads inline"
+    TEXT blob_hash "large payloads in blobs, deflated"
+  }
+  history {
+    INTEGER id PK
+    TEXT captured_utc
+    TEXT preview "indexed by history_fts"
+    TEXT blob_hash "full text beyond the preview cap"
+    TEXT imported_from
+  }
+</pre>
+    </div>
+    <figcaption><b>Format ids are not durable.</b> Ids from <code>RegisterClipboardFormat</code> are stable
+    only for the Windows session, so a payload stores the <em>name</em> and is re-registered on write.
+    Persisting the number alone would attach today's bytes to an unrelated format tomorrow.</figcaption>
+  </figure>
+
+  <div class="col">
+    <h3>Three hashes that answer three different questions</h3>
+    <p>They were two until this morning, and the missing third is what the case study below is about.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Key</th><th>Question</th><th>Covers</th><th>Consequence of getting it wrong</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>ContentHash</code></td>
+          <td>Is this the same clip?</td>
+          <td>Every format's id, name and bytes.</td>
+          <td>It is a stored column and the lookup for enrichment. Too loose and two clips merge.</td>
+        </tr>
+        <tr>
+          <td><code>DedupKey</code></td>
+          <td>Did the user copy this again?</td>
+          <td>Trimmed text alone for text clips; the content hash otherwise.</td>
+          <td>Word and Excel stamp their rich formats with generator ids, so a bytes-exact key never fires and the stack fills with apparent duplicates.</td>
+        </tr>
+        <tr>
+          <td><code>SelfWriteKey</code></td>
+          <td>Is this clipboard <em>ours</em>?</td>
+          <td>Only the payloads Windows does not refill for itself.</td>
+          <td>Too tight and PasteJump captures its own paste as a new clip &mdash; which is exactly what happened.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================ THREADS -->
+<section id="threads">
+  <span class="view-label">Constraint &mdash; <span>two threads, one deadline</span></span>
+  <div class="col">
+    <h2>Why nothing in the hook may take its time</h2>
+    <p>Read this figure as the reason for a dozen decisions elsewhere: why the trigger key and the letter
+    map are parsed once per settings change rather than per keystroke, why the delete-all prompt is a
+    request rather than a question, and why a <code>Console.Beep</code> &mdash; which blocks until the tone
+    finishes &mdash; goes to the thread pool.</p>
+  </div>
+
+  <figure>
+    <div class="plate">
+      <img src="images/arch-threads.svg" alt="The hook thread translates the key, runs the recognizer and controller, queues its side effects and returns inside the LowLevelHooksTimeout budget; the UI thread then shows the overlay, writes the clipboard, waits the settle delay and calls SendInput.">
+    </div>
+    <figcaption><b>The hook decides; the Dispatcher does.</b> A watchdog on a 250&nbsp;ms timer covers the
+    case where Windows drops the hook anyway &mdash; and it cannot ask <code>IsInstalled</code>, because a
+    discarded hook leaves that reporting <code>true</code> for ever. It reasons from evidence instead: has
+    anything been heard since Ctrl went down, and is a session still open while Ctrl is physically up.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================ CASE STUDY -->
+<section id="case">
+  <span class="view-label">Case study &mdash; <span>reported 2026-08-21, fixed the same morning</span></span>
+  <div class="col">
+    <h2>The loop that closed wrong</h2>
+    <p>The report: <em>&ldquo;I pressed Ctrl+V in Edge and I saw the paste overlay, and immediately it
+    displayed copy overlay also.&rdquo;</em> Not a notification fault and nothing to do with Edge. Look at
+    the last two messages of View 5: a paste comes back as a clipboard change, and it was not recognised as
+    ours &mdash; so it was stored as a brand new clip and announced, exactly like any copy.</p>
+
+    <p>The live logs said so in one reading. <code>logs\gesture.log</code> has the commit
+    (<code>Ctrl up ... fg=msedge.exe</code> at 07:55:37.305) and <code>logs\capture.log</code> has the read
+    135&nbsp;ms later &mdash; <code>STORED clip 3699 (new=True)</code>, where every later paste of the same
+    clip said <code>skipped: this is our own write</code>.</p>
+
+    <h3>The one byte</h3>
+    <p>Two clips in the store held the same 66 characters, the same four formats and the same 2,044 bytes.
+    They differed in a single byte pair.</p>
+  </div>
+
+  <div class="bytes">
+    <div>
+      <div class="who">clip 3698 &middot; as captured</div>
+      <div class="hex">09 <span class="hot">40</span> 00 00</div>
+      <div class="what"><code>CF_LOCALE</code> = 0x4009, English (India) &mdash; the layout the text was copied under.</div>
+    </div>
+    <div>
+      <div class="who">clip 3699 &middot; as read back</div>
+      <div class="hex">09 <span class="hot">04</span> 00 00</div>
+      <div class="what"><code>CF_LOCALE</code> = 0x0409, English (US) &mdash; what Windows synthesised when it was pasted.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <p><strong>A clipboard write does not read back as what was written.</strong> The writer deliberately
+    drops <code>CF_TEXT</code>, <code>CF_OEMTEXT</code> and <code>CF_LOCALE</code> when
+    <code>CF_UNICODETEXT</code> is present, because a stale ANSI rendering captured under another codepage
+    can contradict the Unicode beside it and whichever the target app prefers decides what the user gets.
+    Windows then regenerates all three &mdash; <em>from the pasting thread's locale, not the copying
+    application's</em>. So the round trip is not the identity, and <code>ContentHash</code>, which covers
+    every format's bytes, could not match it.</p>
+
+    <div class="fix">
+      <p class="lede">Why it survived so long</p>
+      <p>It is self-limiting per clip. The recaptured twin carries the <em>synthesised</em> locale, so it is
+      a fixed point and every later paste of that twin is recognised correctly. The log therefore reads like
+      an intermittent fault &mdash; stored once, skipped twice &mdash; and a bug that stops reproducing on
+      the second attempt is a bug that gets dismissed. It reappears for each newly captured clip, for ever.</p>
+    </div>
+
+    <p>Measured footprint on the reporting machine: <strong>347 clips carry 0x4009 and 228 carry
+    0x0409</strong>, and eight of the ten largest same-text clip groups differ <em>only</em> in that byte.
+    Those groups are paste-recaptures, not repeat copies &mdash; one duplicate clip and one history row per
+    first paste, with the browse position reset each time.</p>
+
+    <h3>The fix</h3>
+    <ol class="steps">
+      <li><b>Separate the two questions that shared one hash.</b> <code>ContentHash</code> still identifies
+      a clip and is untouched, since those bytes really do differ. <code>SelfWriteKey</code> identifies a
+      round trip: the same hash over the payloads Windows does not refill. Where nothing is dropped it
+      <em>is</em> <code>ContentHash</code>, so images, file lists and every existing store are unaffected.
+      <span class="where">src/PasteJump.Core/Model/ClipboardSnapshot.cs</span></li>
+      <li><b>Put the rule in Core, once.</b> <code>SynthesisedTextFormats.DropDerived</code> is now called
+      by both the write filter and the identity key &mdash; one list, not two that can disagree, which is
+      precisely this bug's shape.
+      <span class="where">src/PasteJump.Core/Model/SynthesisedTextFormats.cs</span></li>
+      <li><b>Refuse to canonicalise into nothing.</b> A clip holding only <code>CF_TEXT</code> keeps it: an
+      empty payload set would identify every such clip as the same one, and a paste would suppress the
+      capture of an unrelated copy.</li>
+      <li><b>Prove it can fail.</b> Ten tests, including the reported case with the measured bytes. Against
+      a build that keys on the content hash, three of them fail; the suite is 1,071 green with the fix in.
+      <span class="where">tests/PasteJump.Core.Tests/SynthesisedTextFormatsTests.cs</span></li>
+    </ol>
+
+    <div class="note">
+      <p class="lede">The transferable part</p>
+      <p>Three instruments answered this and none of them was reasoning: the gesture log gave the commit,
+      the capture log gave the read, and <em>the store gave the cause</em>. When a capture question comes up
+      again, query the database early &mdash; a format list and four bytes settled in minutes what an
+      afternoon of plausible theories about Edge would not have.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>PasteJump &middot; keyboard-driven multiple clipboards for Windows &middot; a ground-up reimplementation
+  of Clipjump, from observed behaviour. Detail lives in <code>CLAUDE.md</code> (the landmine sections),
+  <code>PLAN.md</code> (design and the state-machine spec) and <code>TASKS.md</code> (what is open).</p>
+</footer>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, securityLevel: 'strict' });
+</script>
+</body>
+</html>
