@@ -553,6 +553,19 @@ that immediately caught two real bugs. Expect to do the same again.
   - **`IdleKeyboardTests.The_promise_holds_for_any_bindings`** re-runs the whole-keyboard sweep against awkward
     custom maps. Without it, "only the trigger is swallowed when idle" would only ever have been proven for the
     defaults.
+- **A settings shot only shows what fits, and three attempts to fix that failed before one worked (2026-08-21).**
+  The window ships at 760 high because that is what a 1080p screen shows at 125% scaling, so every longer tab
+  scrolls - and a screenshot of a scrolled tab silently omits whatever is below the fold. Two settings added
+  that day were missing from the manual's images entirely, which is how it was noticed.
+  `CycleTabs` now disables scrolling and lets `SizeToContent` measure the real content per tab, which is the
+  only one of these that works: the **first** `ScrollViewer` in the tree reports `ScrollableHeight` 0 (it is an
+  outer shell), and even the **maximum** across all of them under-reports, because a panel's extent is not
+  realised while it is scrolled. Found by instrumenting, not by reasoning - three rounds of plausible
+  arithmetic produced three identical 760px shots.
+  **`SizeToContent` will not exceed the monitor work area**, so on a 1080p screen the ceiling is about 1092px
+  whatever the content wants. The Appearance and Advanced tabs are taller than that and are still cropped;
+  they are documented in prose instead. Rendering the content to a `RenderTargetBitmap` sized past the screen
+  would lift the cap, and is the next thing to try if a full-tab image is ever needed.
 - **Adding a settings tab renumbers every shot after it, and `update-help-images.ps1` maps by index.** The
   harness names a settings shot `SettingsWindow-<index>-<Tab>`, so inserting *Keys* at position 3 shifted four
   mappings; each one silently stops matching and the help keeps the **previous** image, now documenting the wrong

@@ -1981,9 +1981,40 @@ internal static class Program
             return;
         }
 
+        // Grown for the shots only. The window ships at 760 high because that is what a 1080p screen can
+        // show at 125% scaling, which means every longer tab scrolls - and a screenshot of a scrolled tab
+        // silently omits whatever is below the fold. Two settings added on 2026-08-21 landed there and were
+        // missing from the manual's images entirely. The content is the real form either way; only how much
+        // of it fits in one picture changes, and the page scales by WIDTH, so a taller image costs no
+        // legibility.
+        var designedHeight = window.Height;
+
         for (var i = 0; i < tabs.Items.Count; i++)
         {
             tabs.SelectedIndex = i;
+            window.Height = designedHeight;
+            window.UpdateLayout();
+            Drain();
+
+            // Grown to THIS tab's content rather than to one height for all of them: the tabs differ by a
+            // factor of three, so a single number either crops the long ones or pads the short ones with
+            // empty form. Capped, because the Advanced tab lists every setting in the application and is
+            // inherently longer than any sensible picture.
+            // Scrolling off, then let the window size to its content. Two cleverer attempts failed and are
+            // worth naming: the FIRST ScrollViewer in the tree reports ScrollableHeight 0 (it is an outer
+            // shell), and even the maximum across all of them under-reports, because a panel's full extent
+            // is not realised while it is scrolled. Turning scrolling off forces a real measurement, which
+            // SizeToContent then honours. Capped, since the Advanced tab lists every setting there is.
+            var scrollers = FindDescendants<System.Windows.Controls.ScrollViewer>(window);
+            var restore = scrollers.Select(v => (Scroller: v, Was: v.VerticalScrollBarVisibility)).ToList();
+
+            foreach (var (scroller, _) in restore)
+            {
+                scroller.VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Disabled;
+            }
+
+            window.MaxHeight = 2400;
+            window.SizeToContent = SizeToContent.Height;
             window.UpdateLayout();
             Drain();
 
@@ -1996,10 +2027,47 @@ internal static class Program
             {
                 Capture(window, Path.Combine(_shotDirectory, $"{_theme}-{name}-{i}-{header}.png"));
             }
+
+            window.SizeToContent = SizeToContent.Manual;
+            window.MaxHeight = double.PositiveInfinity;
+
+            foreach (var (scroller, was) in restore)
+            {
+                scroller.VerticalScrollBarVisibility = was;
+            }
         }
 
         tabs.SelectedIndex = 0;
+        window.Height = designedHeight;
+        window.UpdateLayout();
         Drain();
+    }
+
+    /// <summary>Every descendant of a type, in visual-tree order.</summary>
+    private static List<T> FindDescendants<T>(System.Windows.Media.Visual root)
+        where T : System.Windows.Media.Visual
+    {
+        var found = new List<T>();
+        Walk(root);
+        return found;
+
+        void Walk(System.Windows.Media.Visual node)
+        {
+            if (node is T match)
+            {
+                found.Add(match);
+            }
+
+            var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(node);
+
+            for (var i = 0; i < count; i++)
+            {
+                if (System.Windows.Media.VisualTreeHelper.GetChild(node, i) is System.Windows.Media.Visual child)
+                {
+                    Walk(child);
+                }
+            }
+        }
     }
 
     private static T? FindDescendant<T>(System.Windows.Media.Visual root)
