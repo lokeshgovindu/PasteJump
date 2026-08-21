@@ -5,8 +5,8 @@
 # builds here because it is still sitting in a working folder, the package that resolved out of a
 # local NuGet cache, and the tool that everyone assumed was part of the SDK.
 #
-# Releases are NOT built here. The note at the bottom of this file says why, so nobody spends an
-# afternoon rediscovering it.
+# Releases are cut by release.yml, on a tag. The note at the bottom of this file used to explain why
+# they could not be; it is kept, corrected, because the correction is the interesting part.
 name: build
 
 on:
@@ -96,19 +96,25 @@ jobs:
           if-no-files-found: warn
 
 # ---------------------------------------------------------------------------------------------------
-# Why there is no release job
+# Why there IS a release job now
 #
-# tools/pack-release.ps1 compiles the manual into PasteJump.chm, and that needs hhc.exe from HTML Help
-# Workshop - a deprecated download that is not on GitHub's Windows images and not installable from a
-# package manager in one line. Its fallback, packaging a previously built .chm, cannot help a runner
-# either: the .chm lives under artifacts/ and artifacts/ is not committed.
+# This note used to say there could not be one, and the reasoning was sound: tools/pack-release.ps1
+# compiles the manual into PasteJump.chm, that needs hhc.exe from HTML Help Workshop - a deprecated
+# download - and its fallback of packaging a previously built .chm cannot help a runner, because the
+# .chm lives under artifacts/ and artifacts/ is not committed. Two ways out were listed: commit the
+# built .chm, or ship ZIPs without the manual. Both cost something.
 #
-# So a tag-triggered release job would fail at step 3 of 5 today. Two ways to earn one, neither done:
+# Neither was needed, because the premise was never measured. It is now, on the windows-latest image
+# on 2026-08-21 (run 32498657740):
 #
-#   - commit the built .chm, and have pack-release.ps1 prefer it when hhc.exe is absent; or
-#   - give pack-release.ps1 a documented switch that ships the ZIPs without the manual, and accept
-#     that a released ZIP would then differ from a locally built one.
+#   hhc.exe PRESENT at C:\Program Files (x86)\HTML Help Workshop\hhc.exe    (not on PATH)
+#   the manual compiled: 960,658 bytes, against 961,022 locally
 #
-# Until then releases are cut on a development machine, which is what has happened so far and what
-# the pre-release was built with.
+# That path is the first one build-help.ps1 looks in, and the size difference is the version and build
+# time stamped into every page. So the help compiles on a hosted runner with no setup at all, and
+# release.yml packs a release there the same way a development machine does.
+#
+# Worth keeping as a lesson rather than deleting: an unmeasured constraint held this back for months,
+# and one twelve-minute probe run retired it. `choco install html-help-workshop`, incidentally, returns
+# 404 - the package is dead, which is probably what the assumption was built on.
 # ---------------------------------------------------------------------------------------------------

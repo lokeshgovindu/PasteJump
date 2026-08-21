@@ -1,0 +1,317 @@
+# Cuts a release from a tag: builds the packages on a clean runner, hashes them, and opens a DRAFT
+# release with them attached.
+#
+# This exists because the reason it could not exist stopped being true. build.yml used to end with a
+# note explaining that hhc.exe - the HTML Help compiler, from a deprecated download - was not on
+# GitHub's Windows images, so pack-release.ps1 could never get past compiling the manual. Measured on
+# windows-latest on 2026-08-21 (run 32498657740): hhc.exe IS there, at
+# C:\Program Files (x86)\HTML Help Workshop\hhc.exe, which is the first path build-help.ps1 looks in,
+# and it compiled the real manual - 960,658 bytes against 961,022 locally, the difference being the
+# version and build time that every page is stamped with. Nothing had to be committed or vendored.
+#
+# DRAFT, and not published, which is the one deliberate stop in an otherwise unattended job:
+#
+#   - The notes are prose, and a machine cannot write them. What it can do is everything mechanical
+#     around them: the version, the files, and a SHA256 per file in the format
+#     mirror-to-sourceforge.yml greps back out of the notes as a manifest. Hand-copied hashes are how
+#     that check comes to fail on a release where nothing is actually wrong.
+#   - Publishing is the trigger for that mirror. It puts files on a public file area under a big green
+#     Download button, and a person pressing Publish is the review step for it.
+#
+# So the ritual is: write docs/release-notes/<tag>.md, commit, tag, push the tag. Then read the draft,
+# fix the prose, press Publish. Everything between those two happens here.
+#
+# ZIPs only, deliberately. pack-release.ps1 will also compile an installer when Inno Setup is present,
+# and something answering to that name is on the runner image - but a setup.exe is a distribution
+# channel this project has never shipped, so this job attaches the three archives and nothing else.
+name: release
+
+on:
+  push:
+    tags:
+      # Every tag this project has used is a year-first version: 2026.1, 2026.1-pre3.
+      - '20*'
+  # For a tag that already exists - a re-run after fixing something in the packaging, or a first run
+  # for a tag that was pushed before this file was.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build, e.g. 2026.1-pre4'
+        required: true
+      prerelease:
+        description: 'Mark the draft as a pre-release'
+        type: boolean
+        default: true
+
+# Creating a release and uploading assets to it. Nothing else here writes anything.
+permissions:
+  contents: write
+
+# Deliberately NOT cancel-in-progress, unlike build.yml: a cancelled release job can leave a draft
+# holding some of its assets, which looks exactly like a release that is ready.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    # Three publishes of a self-contained WPF application, plus the tests and the smoke harness. Locally
+    # that is about eight minutes; the cap is loose enough not to fail a slow runner and tight enough
+    # that a window which opens and never closes does not hold the machine for the six-hour default.
+    timeout-minutes: 60
+
+    steps:
+      - name: Work out what is being released
+        id: what
+        shell: bash
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          # A hyphenated suffix is what this project has always used for something unfinished:
+          # 2026.1-pre3. A bare 2026.1 is a release. A dispatch says which it is explicitly.
+          if [ -n "${{ inputs.tag }}" ]; then
+            pre="${{ inputs.prerelease }}"
+          elif [ "$tag" != "${tag%%-*}" ]; then
+            pre=true
+          else
+            pre=false
+          fi
+
+          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag (prerelease=$pre)"
+
+      - name: Check out the tag, with the full history
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.what.outputs.tag }}
+          # Not optional: the version's fourth part is the number of commits reachable from HEAD, so a
+          # shallow clone would package 2026.1.0.1 and name the release after it.
+          fetch-depth: 0
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Refuse to replace a release that is already published
+        # Asked before anything is built, because the answer will not change and eight minutes of
+        # packaging is a poor way to find it out. Re-running onto a DRAFT is fine and expected;
+        # re-running onto a published release would replace bytes people have already downloaded and
+        # that the other channel has already mirrored and hashed.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.what.outputs.tag }}'
+
+          if state=$(gh release view "$tag" --json isDraft -q .isDraft 2>/dev/null); then
+            if [ "$state" = 'true' ]; then
+              echo "draft=true" >> "$GITHUB_ENV"
+              echo "$tag already has a draft release. Its assets will be replaced."
+            else
+              echo "::error title=Already published::$tag is published. Delete that release first if it really has to be rebuilt."
+              exit 1
+            fi
+          else
+            echo "draft=false" >> "$GITHUB_ENV"
+            echo "$tag has no release yet."
+          fi
+
+      - name: Restore
+        run: dotnet restore PasteJump.slnx
+
+      - name: Report the version being released
+        run: dotnet msbuild src/PasteJump.App/PasteJump.App.csproj -t:PrintPasteJumpVersion -nologo -v:m
+
+      - name: Build
+        run: dotnet build PasteJump.slnx -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: dotnet test PasteJump.slnx -c Release --no-build
+
+      - name: The Markdown manual matches the HTML it is generated from
+        # The same check build.yml runs, repeated rather than assumed: a tag can point at a commit that
+        # never went through a pull request, and shipping a manual that disagrees with its own source is
+        # the kind of thing nobody notices until a reader does.
+        run: python tools/generate-markdown-help.py --check
+
+      - name: UI smoke
+        run: dotnet run --project tests/PasteJump.UiSmoke -c Release --no-build -- --shot artifacts/ci-shots
+
+      - name: Pack
+        # The same script that has cut every release so far, unchanged and with no CI-only switches -
+        # which is the point. It publishes three shapes, compiles the manual, stages, zips, and writes a
+        # .sha256 beside each archive in sha256sum's own format.
+        run: powershell -ExecutionPolicy Bypass -File tools/pack-release.ps1
+
+      - name: Check what came out
+        id: packed
+        # PowerShell rather than bash for this one: it opens a ZIP and reads a version out of a file
+        # name, and the Windows runner's bash has neither unzip nor any promise of one.
+        shell: pwsh
+        run: |
+          $zips = Get-ChildItem artifacts/release/*.zip | Sort-Object Name
+          $zips | ForEach-Object { "{0,-48} {1,7:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+
+          if ($zips.Count -ne 3) {
+              Write-Output "::error title=Wrong number of packages::Expected 3 ZIPs, found $($zips.Count)."
+              exit 1
+          }
+
+          # The single-file shape, which is the one whose name carries no suffix.
+          $single = $zips | Where-Object { $_.Name -notmatch '-(unpacked|net10)\.zip$' }
+
+          # The version is read back off a file name rather than recomputed, so what the release is
+          # called cannot disagree with what is inside it.
+          $version = [regex]::Match($single.Name, '^PasteJump-(.+)-win-x64\.zip$').Groups[1].Value
+
+          if (-not $version) {
+              Write-Output "::error title=Unrecognised package name::$($single.Name)"
+              exit 1
+          }
+
+          "version=$version" | Out-File $env:GITHUB_OUTPUT -Append
+          "Packaged $version"
+
+          # The manual has to be in there. It is the one part of a package that comes from a tool outside
+          # the build, so it is the one part that can go missing while everything still succeeds.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead($single.FullName)
+
+          try {
+              $hasManual = $archive.Entries.Name -contains 'PasteJump.chm'
+          }
+          finally {
+              $archive.Dispose()
+          }
+
+          if (-not $hasManual) {
+              Write-Output "::error title=No manual::$($single.Name) has no PasteJump.chm in it."
+              exit 1
+          }
+
+      - name: Compose the release notes
+        shell: bash
+        run: |
+          tag='${{ steps.what.outputs.tag }}'
+          version='${{ steps.packed.outputs.version }}'
+          notes="docs/release-notes/$tag.md"
+
+          if [ -f "$notes" ]; then
+            cat "$notes" > body.md
+            echo "Using $notes"
+          else
+            # Nothing committed for this tag, so the draft carries the raw material for the notes rather
+            # than a generated paragraph pretending to be them. The subject lines are what somebody
+            # writing the notes wants in front of them anyway.
+            previous=$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)
+
+            {
+              echo "PasteJump $version."
+              echo
+              echo "<!-- Draft. Write the notes here, then delete the list below. -->"
+              echo
+              if [ -n "$previous" ]; then
+                echo "### Commits since $previous"
+                echo
+                git log --no-merges --pretty='- %s' "$previous..$tag"
+              fi
+            } > body.md
+
+            echo "::warning title=No notes committed::docs/release-notes/$tag.md does not exist, so the draft carries a commit list instead of notes."
+          fi
+
+          # The hashes go in whatever the notes say, in the format the SourceForge mirror greps back out
+          # of them: 64 hex characters, whitespace, file name. That is the manifest which proves the
+          # second channel serves the bytes GitHub advertised - and computing it here is the whole reason
+          # this step exists, because hand-copied hashes are how that check comes to fail on a release
+          # where nothing is actually wrong.
+          #
+          # One line each, printed rather than cat'ed together: pack-release.ps1 writes those files with
+          # -NoNewline, so concatenating three of them yields a single 200-character line and not one
+          # hash the mirror can match.
+          {
+            echo '```'
+            for f in artifacts/release/*.zip.sha256; do
+              cat "$f"
+              echo
+            done
+            echo '```'
+          } > hashes.md
+
+          # A notes file can place them itself with a <!-- hashes --> line, which is where they belong:
+          # under the sentence about SmartScreen and an unknown publisher, not stranded at the bottom
+          # under a heading of their own. Without that marker they are appended, so a tag with no notes
+          # still publishes a verifiable manifest.
+          if grep -q '<!-- hashes -->' body.md; then
+            awk '/<!-- hashes -->/ { while ((getline line < "hashes.md") > 0) print line; next } { print }' \
+              body.md > body.filled.md
+            mv body.filled.md body.md
+          else
+            {
+              echo
+              echo '### Files'
+              echo
+              cat hashes.md
+            } >> body.md
+          fi
+
+          echo '--- body.md ---'
+          cat body.md
+
+      - name: Open the draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.what.outputs.tag }}'
+          version='${{ steps.packed.outputs.version }}'
+          title="PasteJump $version"
+
+          pre=''
+          if [ '${{ steps.what.outputs.prerelease }}' = 'true' ]; then
+            pre='--prerelease'
+          fi
+
+          if [ "$draft" = 'true' ]; then
+            gh release upload "$tag" artifacts/release/*.zip --clobber
+            gh release edit "$tag" --title "$title" --notes-file body.md $pre
+          else
+            gh release create "$tag" artifacts/release/*.zip \
+              --draft $pre \
+              --title "$title" \
+              --notes-file body.md
+          fi
+
+          url=$(gh release view "$tag" --json url -q .url)
+
+          {
+            echo "## Draft release for \`$tag\`"
+            echo
+            echo "PasteJump **$version** - three ZIPs, not published."
+            echo
+            echo "$url"
+            echo
+            echo '| file | sha256 |'
+            echo '| --- | --- |'
+            for f in artifacts/release/*.zip.sha256; do
+              printf '| `%s` | `%s…` |\n' "$(cut -d' ' -f3 "$f")" "$(cut -c1-16 "$f")"
+            done
+            echo
+            echo 'Read it, fix the prose, then press Publish - which is also what mirrors it to SourceForge.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the packages
+        # So a draft that has to be deleted and remade does not need another eight-minute build, and so
+        # the archives can be looked at without downloading them from a release that is not public yet.
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-packages
+          path: |
+            artifacts/release/*.zip
+            artifacts/release/*.sha256
+          if-no-files-found: warn
