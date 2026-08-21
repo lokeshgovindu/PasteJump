@@ -124,7 +124,24 @@ jobs:
         run: dotnet restore PasteJump.slnx
 
       - name: Report the version being released
-        run: dotnet msbuild src/PasteJump.App/PasteJump.App.csproj -t:PrintPasteJumpVersion -nologo -v:m
+        id: version
+        # The same MSBuild target pack-release.ps1 asks, so a release name and the binary inside it cannot
+        # disagree about what this commit is called. Asked BEFORE packing, so the file names that come out
+        # can be checked against it rather than parsed for it - a directory that already holds a previous
+        # release's archives would otherwise answer the question with the wrong version.
+        shell: pwsh
+        run: |
+          $printed = dotnet msbuild src/PasteJump.App/PasteJump.App.csproj -t:PrintPasteJumpVersion -nologo -v:m
+          $printed
+          $version = [regex]::Match(($printed -join "`n"), '\d+\.\d+\.\d+\.\d+').Value
+
+          if (-not $version) {
+              Write-Output "::error title=No version::PrintPasteJumpVersion printed nothing that looks like a version."
+              exit 1
+          }
+
+          "version=$version" | Out-File $env:GITHUB_OUTPUT -Append
+          "Releasing PasteJump $version"
 
       - name: Build
         run: dotnet build PasteJump.slnx -c Release --no-restore -warnaserror
@@ -148,38 +165,39 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File tools/pack-release.ps1
 
       - name: Check what came out
-        id: packed
-        # PowerShell rather than bash for this one: it opens a ZIP and reads a version out of a file
-        # name, and the Windows runner's bash has neither unzip nor any promise of one.
+        # PowerShell rather than bash for this one: it opens a ZIP, and the Windows runner's bash has
+        # neither unzip nor any promise of one.
         shell: pwsh
         run: |
-          $zips = Get-ChildItem artifacts/release/*.zip | Sort-Object Name
-          $zips | ForEach-Object { "{0,-48} {1,7:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+          $version = '${{ steps.version.outputs.version }}'
 
-          if ($zips.Count -ne 3) {
-              Write-Output "::error title=Wrong number of packages::Expected 3 ZIPs, found $($zips.Count)."
+          # Named exactly, not globbed. Three files with the version already known is a check; three
+          # files matching PasteJump-*.zip is a count that a leftover archive from an earlier release
+          # passes just as well - and that is not hypothetical, it is what the output directory looks
+          # like on the machine releases used to be cut on.
+          $expected = @(
+              "PasteJump-$version-win-x64.zip",
+              "PasteJump-$version-win-x64-unpacked.zip",
+              "PasteJump-$version-win-x64-net10.zip"
+          )
+
+          $missing = $expected | Where-Object { -not (Test-Path "artifacts/release/$_") }
+
+          if ($missing) {
+              Write-Output "::error title=Missing packages::pack-release.ps1 produced no $($missing -join ', ')."
+              Get-ChildItem artifacts/release -Filter *.zip | ForEach-Object { "  present: $($_.Name)" }
               exit 1
           }
 
-          # The single-file shape, which is the one whose name carries no suffix.
-          $single = $zips | Where-Object { $_.Name -notmatch '-(unpacked|net10)\.zip$' }
-
-          # The version is read back off a file name rather than recomputed, so what the release is
-          # called cannot disagree with what is inside it.
-          $version = [regex]::Match($single.Name, '^PasteJump-(.+)-win-x64\.zip$').Groups[1].Value
-
-          if (-not $version) {
-              Write-Output "::error title=Unrecognised package name::$($single.Name)"
-              exit 1
+          $expected | ForEach-Object {
+              $file = Get-Item "artifacts/release/$_"
+              "{0,-48} {1,7:N1} MB" -f $file.Name, ($file.Length / 1MB)
           }
-
-          "version=$version" | Out-File $env:GITHUB_OUTPUT -Append
-          "Packaged $version"
 
           # The manual has to be in there. It is the one part of a package that comes from a tool outside
-          # the build, so it is the one part that can go missing while everything still succeeds.
+          # the build, so it is the one part that can go missing while everything else succeeds.
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = [IO.Compression.ZipFile]::OpenRead($single.FullName)
+          $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path "artifacts/release/$($expected[0])"))
 
           try {
               $hasManual = $archive.Entries.Name -contains 'PasteJump.chm'
@@ -189,15 +207,17 @@ jobs:
           }
 
           if (-not $hasManual) {
-              Write-Output "::error title=No manual::$($single.Name) has no PasteJump.chm in it."
+              Write-Output "::error title=No manual::$($expected[0]) has no PasteJump.chm in it."
               exit 1
           }
+
+          "The manual is in the package."
 
       - name: Compose the release notes
         shell: bash
         run: |
           tag='${{ steps.what.outputs.tag }}'
-          version='${{ steps.packed.outputs.version }}'
+          version='${{ steps.version.outputs.version }}'
           notes="docs/release-notes/$tag.md"
 
           if [ -f "$notes" ]; then
@@ -235,7 +255,7 @@ jobs:
           # hash the mirror can match.
           {
             echo '```'
-            for f in artifacts/release/*.zip.sha256; do
+            for f in artifacts/release/PasteJump-$version-win-x64*.zip.sha256; do
               cat "$f"
               echo
             done
@@ -268,7 +288,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag='${{ steps.what.outputs.tag }}'
-          version='${{ steps.packed.outputs.version }}'
+          version='${{ steps.version.outputs.version }}'
           title="PasteJump $version"
 
           pre=''
@@ -277,10 +297,10 @@ jobs:
           fi
 
           if [ "$draft" = 'true' ]; then
-            gh release upload "$tag" artifacts/release/*.zip --clobber
+            gh release upload "$tag" artifacts/release/PasteJump-$version-win-x64*.zip --clobber
             gh release edit "$tag" --title "$title" --notes-file body.md $pre
           else
-            gh release create "$tag" artifacts/release/*.zip \
+            gh release create "$tag" artifacts/release/PasteJump-$version-win-x64*.zip \
               --draft $pre \
               --title "$title" \
               --notes-file body.md
@@ -297,7 +317,7 @@ jobs:
             echo
             echo '| file | sha256 |'
             echo '| --- | --- |'
-            for f in artifacts/release/*.zip.sha256; do
+            for f in artifacts/release/PasteJump-$version-win-x64*.zip.sha256; do
               printf '| `%s` | `%s…` |\n' "$(cut -d' ' -f3 "$f")" "$(cut -c1-16 "$f")"
             done
             echo
