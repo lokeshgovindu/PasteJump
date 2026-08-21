@@ -1,4 +1,6 @@
-// System.IO explicitly: the WPF implicit-usings set omits it, unlike the plain library set.
+// System.IO and System.Globalization explicitly: the WPF implicit-usings set omits both, unlike the
+// plain library set.
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows;
@@ -671,16 +673,23 @@ internal static class Program
                     // while nothing reached the control.
                     var (text, rowVisible) = ((OverlayWindow)window).CapturedAtForSmokeTest();
 
-                    if (text != "2026-08-21 15:12" && text != "2026-08-21 09:42")
+                    // Parsed back, not matched against a literal. The overlay formats with the machine's own
+                    // short date and time - that is the feature - so a literal is a bet on the culture the
+                    // check happens to run under. This asserted a shape that only this machine produces
+                    // ("2026-08-21 09:42") and called GitHub's runner a failure for rendering the same
+                    // instant as "8/21/2026 9:42 AM", which is exactly what it was asked to do.
+                    //
+                    // What must be true is culture-independent, and stronger than a shape: the control shows
+                    // the moment the clip was captured, in a form this machine can read back. "g" carries no
+                    // seconds, hence the minute of tolerance.
+                    var expected = SeededCaptureTime.ToLocalTime().DateTime;
+
+                    if (!DateTime.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.None, out var shown)
+                        || Math.Abs((shown - expected).TotalMinutes) > 1)
                     {
-                        // Local time, so the expected string depends on the machine's offset - both the UTC
-                        // instant and this machine's rendering of it are accepted, and anything else is a
-                        // finding rather than a timezone.
-                        if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"^2026-08-2[12] \d\d:\d\d$"))
-                        {
-                            _failures++;
-                            Console.WriteLine($"  FAIL  the overlay's timestamp reads \"{text}\", not a date and time");
-                        }
+                        _failures++;
+                        Console.WriteLine($"  FAIL  the overlay's timestamp reads \"{text}\", which this culture "
+                            + $"does not read back as {expected:g}");
                     }
 
                     if (!rowVisible)
@@ -934,11 +943,17 @@ internal static class Program
         var overlay = new OverlayWindow();
         var frame = TextFrame();
 
-        // A point on the primary monitor, away from every edge, so nothing here depends on clamping.
-        const int x = 700;
-        const int y = 500;
+        // The anchor is the middle of the work area, computed rather than fixed. This used to be (700,500)
+        // under a comment claiming it was away from every edge, which was true of the machine it was written
+        // on and false on a hosted runner, whose primary monitor is 1091 device pixels wide: the overlay did
+        // not fit beside that point, the real code clamped it inside the work area - correctly - and this
+        // check reported the clamp as a misplacement. The centre is the one point where both placements fit
+        // on any screen large enough to run the application at all.
+        var scale = WindowInterop.GetScaleForPoint(1, 1);
+        var workArea = WindowInterop.GetWorkAreaForPoint(1, 1, scale);
 
-        var scale = WindowInterop.GetScaleForPoint(x, y);
+        var x = (int)Math.Round((workArea.Left + (workArea.Width / 2)) * scale);
+        var y = (int)Math.Round((workArea.Top + (workArea.Height / 2)) * scale);
 
         overlay.Show();
 
@@ -960,6 +975,25 @@ internal static class Program
         else
         {
             Console.WriteLine($"  overlay placement: corner at ({overlay.Left:F0},{overlay.Top:F0})");
+        }
+
+        // And the clamp itself, which is what the runner stumbled into and nothing here was checking: anchored
+        // to a point too close to the right edge for the overlay to fit beside it, the window still has to land
+        // wholly inside the work area. Worth keeping as a case of its own - a laptop screen and a clip with a
+        // long line reach it without anybody arranging for it.
+        overlay.Render(frame, new OverlayAnchor((int)Math.Round((workArea.Right - 8) * scale), y, OverlayPlacement.BelowPoint));
+
+        if (overlay.Left < workArea.Left || overlay.Left + overlay.ActualWidth > workArea.Right + 1)
+        {
+            _failures++;
+            Console.WriteLine($"  FAIL  anchored near the right edge, the overlay spans "
+                + $"{overlay.Left:F0}-{overlay.Left + overlay.ActualWidth:F0} in a work area of "
+                + $"{workArea.Left:F0}-{workArea.Right:F0}");
+        }
+        else
+        {
+            Console.WriteLine($"  overlay placement: clamped to ({overlay.Left:F0},{overlay.Top:F0}), "
+                + $"inside a work area ending at {workArea.Right:F0}");
         }
 
         overlay.Close();
