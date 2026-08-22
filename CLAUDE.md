@@ -76,7 +76,9 @@ is a different chord and a few applications bind it elsewhere.
 start it cold, and what has been finished, both newest first. It is not repeated here: two copies of a task
 list disagree within a day, and the one that gets read is whichever the reader opened first.
 
-Open right now: **the clip's timestamp on the right of the paste overlay's facts row** (asked 2026-08-20).
+Open right now: **nothing** — `TASKS.md` read *Nothing pending* on 2026-08-22. This line went on naming the
+clip timestamp after it had shipped, which is exactly the drift the paragraph above predicts, so treat any
+task named here as a pointer with a date on it rather than as the list.
 
 Explicitly **rejected** in the Ditto/CopyQ feature review, so they do not need revisiting: LAN peer-to-peer sync (fights the
 single-writer SQLite model — two machines on one folder corrupt the store), scripting and plugins, cloud accounts,
@@ -2215,6 +2217,14 @@ dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a 
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
 dotnet run --project tests/PasteJump.UiSmoke -- --shot out   # ...and save PNGs of each
 ```
+
+**No screenshots on a weekday. Saturday and Sunday only.** Office applications are on this machine
+Monday to Friday, so anything that photographs the screen can pick up work material that must not
+leave it — `tests/PasteJump.OverlaySpike` (it crops the real screen to judge whether the overlay is
+visible), overlay-placement verification, and any ad-hoc `CopyFromScreen` probe. Check the day first,
+and if it is a weekday say which shot is outstanding rather than taking it. **`--shot` above counts
+too, by default**: it renders offscreen and cannot contain the desktop, but the instruction was given
+twice and emphatically, so a weekday XAML edit ships on the harness's assertions and the picture waits.
 
 **A Debug build talks.** `DebugConsole.Attach` gives it a console — attaching to the parent's when run from
 a terminal, allocating one otherwise — and everything logged also goes to `data\pastejump-debug.log`, which
