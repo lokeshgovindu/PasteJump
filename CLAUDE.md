@@ -43,7 +43,7 @@ symptom is a `.zip` whose name disagrees with the exe inside it. It still verifi
 | | |
 |---|---|
 | Build | Release, 0 warnings, 0 errors |
-| Tests | 1002 in Debug (`dotnet test`) - 949 in Core.Tests, 53 in Interop.Tests; **1000 in Release**, see below |
+| Tests | 1108 in Debug (`dotnet test`) - 1034 in Core.Tests, 74 in Interop.Tests; **1106 in Release**, see below |
 | UI smoke | `tests/PasteJump.UiSmoke` — every window, both themes, exit 0 |
 | CI | `.github/workflows/build.yml` — build, tests, the window renders, and the Markdown manual check |
 | Manual | HTML in `docs/help` is the SOURCE; `docs/manual/*.md` is generated from it for GitHub |
@@ -130,8 +130,8 @@ src/PasteJump.Core      Domain logic. net10.0 — deliberately NOT net10.0-windo
 src/PasteJump.Interop   Win32 implementations of Core's abstractions. net10.0-windows.
 src/PasteJump.Import    One-time Clipjump 12.x history migration.
 src/PasteJump.App       WPF: overlay, history, settings, tray wiring.
-tests/PasteJump.Core.Tests      949 tests.
-tests/PasteJump.Interop.Tests   53 tests. Interop logic needing no message loop or live keyboard.
+tests/PasteJump.Core.Tests      1034 tests.
+tests/PasteJump.Interop.Tests   74 tests. Interop logic needing no message loop or live keyboard.
 tests/PasteJump.Interop.Probe   Phase 0 spike harness. Not shipped.
 tests/PasteJump.OverlaySpike    Is the overlay VISIBLE in every running application? Not shipped.
 tests/PasteJump.UiSmoke         Shows every window in both themes. Exit 0 if all open.
@@ -2181,8 +2181,8 @@ Every one of these compiles, builds clean, and silently defeats the theme.
   which is precisely why Pause and Disable were reported as being the same command.
 - **An off state's toggle is bold in the tray menu (2026-08-15), and the menu is the one place that must not use
   the disabled-beats-paused precedence.** Asked for, and the reason it is needed is that the menu is opened by
-dotnet test                                         # 1002 tests (Debug)
-dotnet test -c Release                              # 1000 - what CI runs, and it is not the same set
+  right-clicking the very icon whose hue carries the state, so opening it covers up the indicator: `Resume Capture`
+  and `Enable PasteJump` are `Emphasised`, since the row that undoes an off state is both the state indicator and
   the way out of it. **Both are bold when both apply** — a paused-then-disabled PasteJump genuinely has two things
   to switch back on, and picking one would hide the other, unlike `ApplyTrayIcon` and `BuildTrayTooltip` which have
   to choose a single answer. Note the signal is now shared with About, which is `Emphasised` by request; if a third
@@ -2210,8 +2210,8 @@ dotnet test -c Release                              # 1000 - what CI runs, and i
 
 ```
 dotnet build                                        # zero warnings expected
-dotnet test                                         # 1002 tests (Debug)
-dotnet test -c Release                              # 1000 - what CI runs, and it is not the same set
+dotnet test                                         # 1108 tests (Debug)
+dotnet test -c Release                              # 1106 - what CI runs, and it is not the same set
 dotnet publish src/PasteJump.App/PasteJump.App.csproj -c Release -o artifacts/publish
 dotnet run --project tests/PasteJump.Interop.Probe    # Phase 0 spikes (needs a human)
 dotnet run --project tests/PasteJump.UiSmoke          # every window, both themes
