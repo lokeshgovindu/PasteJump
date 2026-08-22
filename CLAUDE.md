@@ -98,7 +98,8 @@ nuget.org and drops in where `bundle_e_sqlite3` is now; and blobs on disk need s
 
 ### The immediate next task
 
-**Spike B has passed, including the Excel acid test. Spike A is still open.** See `PLAN.md` §9 for the
+**Spike B has passed, including the Excel acid test. Spike A has passed its latency criterion on a real
+keyboard (2026-08-22) and is open only on the parts a person has to judge.** See `PLAN.md` §9 for the
 criteria and the measured results.
 
 `tests/PasteJump.SpikeRunner` runs the machine-judgeable half and writes to `artifacts/phase0/`. It must be
@@ -113,10 +114,21 @@ schtasks /Run /TN PJSpike   &&   schtasks /Delete /TN PJSpike /F
 
 **What that leaves for a human**, and it is specific — the rest is done:
 
-- **Hook latency at a real sample size.** The hook installs and the callbacks that landed were ≤0.072 ms,
-  but a task runs in a session with no active input desktop, so `SendInput` was refused 294 times out of 300
-  and `keybd_event` produced nothing. Twelve samples is not a p95. Use the probe's Tab 1.
-- **Foreground stability while a person types** in Notepad, Word, VS Code, Chrome and Windows Terminal.
+- **Hook latency is DONE (2026-08-22): p95 = 0.071 ms over 691 real keystrokes, 0 handler faults**, 14x
+  inside the sub-1 ms criterion. The `max` of 3.398 ms is the first four callbacks warming up and never
+  moves again. Same recipe as above, `PasteJump.Probe.exe`, then Install hook and type. Note the report is
+  a **keystroke record** - the probe logs every virtual key - so keep only its measurements, and do not
+  ask anyone to run Tab 1 while they might type a password.
+- **The 30-minute soak is NOT done, and it is a different claim from the p95.** That run held the hook for
+  4.2 minutes. A hook Windows discards for exceeding `LowLevelHooksTimeout` looks exactly like a working
+  application that has stopped hearing keys, so only duration answers it - watch the age-since-last-event
+  in the stats line while still typing.
+- **Which applications the paste lands in is still unrun.** 11 window handles say focus moved about; they
+  do not say what the programs were. Notepad, Word, VS Code, Chrome and Windows Terminal, one at a time.
+- **Foreground stability while a person types** in Notepad, Word, VS Code, Chrome and Windows Terminal -
+  still open, and the probe's `fg changes` counter does **not** answer it. That number counts every
+  foreground change including the deliberate ones (14 in the run above), so it cannot separate "the user
+  switched application" from "we stole focus". Judge it by typing and watching that nothing interrupts.
 - **Mixed-DPI overlay placement.** Not merely unrun — **untestable on this machine**: both monitors report
   96 dpi, so one has to be set to a different scale before the criterion means anything.
 

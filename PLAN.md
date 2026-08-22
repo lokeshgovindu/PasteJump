@@ -507,7 +507,36 @@ scheduled task, since an agent's own process tree is denied the clipboard.
 The `FoolGUI` hack the original needed is therefore not required here, and §3's first
 decision — never using the system clipboard as scratch space — is what avoids it.
 
-**Spike A is partly open.** The hook installs and uninstalls cleanly, no handler
+**Spike A — the latency criterion passes on real keystrokes (2026-08-22).** The interactive probe was
+launched from a scheduled task, the hook installed by hand, and a person typed: **691 samples,
+p50=0.028 ms, p95=0.071 ms, p99=0.360 ms, max=3.398 ms, 0 handler faults** — the p95 is 14x inside the
+sub-1 ms criterion. That supersedes the 12-sample figure below, and the difference is what makes it
+worth stating: those 12 were *injected* events in a session with no input desktop, these are a real
+keyboard. The `max` is the first few callbacks (the key log shows `worst=` reaching 3.401 ms within the
+first four events and never moving again), so it is JIT warm-up, not a tail under load.
+
+**What that run does NOT settle, and the numbers say so rather than the intent.** The hook was
+installed for **249 s (4.2 min)** across **11 distinct foreground windows**, so:
+
+- **The 30-minute soak is still unrun.** *"Confirm no silent unhook after 30 min of typing"* is a
+  separate claim from the p95, and 4.2 minutes cannot support it — a hook Windows drops for exceeding
+  `LowLevelHooksTimeout` looks exactly like a working app that has stopped receiving keys, which is
+  why the criterion asks for duration rather than sample count.
+- **The paste-landing check is unrun.** *"Release Ctrl → Ctrl+V lands correctly in Notepad, Word,
+  VS Code, Chrome and Windows Terminal"* needs the paste verified in each application; 11 window
+  handles prove focus moved about, not which programs they were or that anything pasted. 16 of the
+  691 events were injected, so some paste did happen, but the probe cannot say into what.
+- **Focus retention is not evidenced either way.** `fg changes = 14` counts every foreground change,
+  including the deliberate ones, so the count cannot distinguish "the user switched app" from "we
+  stole focus". Reading it as a pass would be reading a number that does not answer the question.
+- **Mixed-DPI placement remains untestable as configured** — both monitors still report 96 dpi, so one
+  has to be set to a different scale before the criterion means anything.
+
+The saved report is a **keystroke record** (the probe logs every virtual key), so only its measurements
+are kept, in `artifacts/phase0/spike-20260822-183625-sanitised.txt`; the original was deleted. Keep that
+in mind before asking anyone to run Tab 1 again.
+
+**The earlier, superseded reading:** the hook installs and uninstalls cleanly, no handler
 faults, and every callback observed came in at ≤0.072 ms — comfortably inside the
 300 ms budget. But a scheduled task has no active input desktop, so `SendInput` was
 refused 294 of 300 times and only 12 samples landed; that is not a p95. Both monitors
